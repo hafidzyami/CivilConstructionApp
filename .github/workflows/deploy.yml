@@ -1,0 +1,256 @@
+name: Deploy to VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/backend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://${{ secrets.VM_HOST }}:6969/api
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT || 22 }}
+          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,GITHUB_TOKEN,GITHUB_ACTOR,DOCKER_REGISTRY,IMAGE_NAME,VM_HOST
+          script: |
+            # Navigate to application directory
+            cd /opt/civilconstruction || mkdir -p /opt/civilconstruction && cd /opt/civilconstruction
+
+            # Login to GitHub Container Registry
+            echo "$GITHUB_TOKEN" | docker login $DOCKER_REGISTRY -u $GITHUB_ACTOR --password-stdin
+
+            # Create .env file with secrets
+            cat > .env <<EOF
+POSTGRES_USER=${POSTGRES_USER:-ybandung}
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+POSTGRES_DB=${POSTGRES_DB:-civilconstruction}
+POSTGRES_PORT=6967
+BACKEND_PORT=6969
+FRONTEND_PORT=6968
+NODE_ENV=production
+NEXT_PUBLIC_API_URL=http://$VM_HOST:6969/api
+EOF
+
+            # Set proper permissions
+            chmod 600 .env
+
+            # Create docker-compose.yml
+            cat > docker-compose.yml <<'COMPOSE_EOF'
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: civilconstruction-db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-civilconstruction}
+    ports:
+      - "${POSTGRES_PORT:-6967}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - civilconstruction-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/backend:latest
+    container_name: civilconstruction-backend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${BACKEND_PORT:-6969}:6969"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 6969
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-civilconstruction}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - civilconstruction-network
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:6969/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/frontend:latest
+    container_name: civilconstruction-frontend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${FRONTEND_PORT:-6968}:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - civilconstruction-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  civilconstruction-network:
+    driver: bridge
+COMPOSE_EOF
+
+            # Replace placeholders with actual values
+            sed -i "s|DOCKER_REGISTRY_PLACEHOLDER|$DOCKER_REGISTRY|g" docker-compose.yml
+            sed -i "s|IMAGE_NAME_PLACEHOLDER|$IMAGE_NAME|g" docker-compose.yml
+
+            # Pull latest images
+            docker compose pull
+
+            # Stop and remove old containers
+            docker compose down
+
+            # Start new containers
+            docker compose up -d
+
+            # Clean up old images
+            docker image prune -af
+
+            # Show running containers
+            docker compose ps
+
+      - name: Verify Deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT || 22 }}
+          script: |
+            cd /opt/civilconstruction
+            
+            # Wait for services to be healthy
+            echo "Waiting for services to be healthy..."
+            sleep 30
+            
+            # Check backend health
+            BACKEND_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:6969/health)
+            if [ "$BACKEND_HEALTH" != "200" ]; then
+              echo "Backend health check failed!"
+              docker compose logs backend
+              exit 1
+            fi
+            echo "Backend is healthy ✓"
+            
+            # Check frontend
+            FRONTEND_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000)
+            if [ "$FRONTEND_HEALTH" != "200" ]; then
+              echo "Frontend health check failed!"
+              docker compose logs frontend
+              exit 1
+            fi
+            echo "Frontend is healthy ✓"
+            
+            echo "Deployment successful! 🚀"

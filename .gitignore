@@ -1,0 +1,8 @@
+# Add this to .gitignore if using local .env files
+.env
+.env.local
+.env*.local
+*.env
+
+# GitHub Actions
+.github/workflows/*.log
