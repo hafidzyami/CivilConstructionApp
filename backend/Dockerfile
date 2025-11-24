@@ -24,6 +24,9 @@ COPY src ./src
 # Build application (TypeScript can now find generated Prisma types)
 RUN npm run build
 
+# Remove compiled generated folder to avoid module conflicts
+RUN rm -rf dist/generated
+
 # Stage 2: Production
 FROM node:20-alpine AS production
 
