@@ -12,7 +12,7 @@ const router = Router();
  *       properties:
  *         id:
  *           type: integer
- *           description: The auto-generated id of the detail
+ *           description: The auto-generated increment id of the detail
  *         latitude:
  *           type: number
  *           format: float

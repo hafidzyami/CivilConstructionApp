@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-    # Opsional: Trigger jika ada perubahan di file tertentu saja agar hemat resource
     paths:
       - 'backend/**'
       - 'frontend/**'
@@ -13,18 +12,18 @@ on:
 
 env:
   DOCKER_REGISTRY: ghcr.io
+  # Kita set default dulu, tapi nanti akan ditimpa oleh step "Lowercase"
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   # ------------------------------------------------------------------
-  # JOB 1: BUILD & PUSH (Selective / Cerdas)
+  # JOB 1: BUILD & PUSH
   # ------------------------------------------------------------------
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    # Kita butuh output variables untuk memberitahu job deploy (opsional, tapi bagus untuk log)
     outputs:
       backend: ${{ steps.changes.outputs.backend }}
       frontend: ${{ steps.changes.outputs.frontend }}
@@ -33,7 +32,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- LOGIKA DETEKSI PERUBAHAN ---
+      # --- PERBAIKAN: LOWERCASE IMAGE NAME ---
+      # Bash syntax ${VAR,,} mengubah string menjadi lowercase
+      - name: Lowercase Image Name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - name: Check for changes
         uses: dorny/paths-filter@v3
         id: changes
@@ -54,7 +58,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- BACKEND BUILD (Hanya jika folder backend berubah) ---
+      # --- BACKEND ---
       - name: Extract metadata for Backend
         if: steps.changes.outputs.backend == 'true'
         id: meta-backend
@@ -75,7 +79,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # --- FRONTEND BUILD (Hanya jika folder frontend berubah) ---
+      # --- FRONTEND ---
       - name: Extract metadata for Frontend
         if: steps.changes.outputs.frontend == 'true'
         id: meta-frontend
@@ -106,6 +110,12 @@ jobs:
     needs: build-and-push
     
     steps:
+      # --- PERBAIKAN: LOWERCASE IMAGE NAME (LAGI) ---
+      # Perlu dilakukan lagi karena ini job baru (environment terpisah)
+      - name: Lowercase Image Name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -116,6 +126,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          # Ambil dari env yang sudah di-lowercase di step sebelumnya
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           VM_HOST: ${{ secrets.VM_HOST }}
         with:
@@ -128,10 +139,9 @@ jobs:
             APP_DIR="/opt/civilconstruction"
             mkdir -p $APP_DIR && cd $APP_DIR
 
-            # Login agar bisa pull image private
             echo "$GITHUB_TOKEN" | docker login $DOCKER_REGISTRY -u $GITHUB_ACTOR --password-stdin
 
-            # Generate .env (Password aman terjaga)
+            # Generate .env
             cat > .env <<EOF
             POSTGRES_USER=${POSTGRES_USER:-postgres}
             POSTGRES_PASSWORD=$POSTGRES_PASSWORD
@@ -146,20 +156,23 @@ jobs:
             chmod 600 .env
 
             # Generate docker-compose.yml
+            # Note: Saya hapus "version: '3.8'" karena itu warning obsolete di log kamu
             cat > docker-compose.yml <<'COMPOSE_EOF'
-            version: '3.8'
             services:
               backend:
                 image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/backend:latest
                 container_name: civilconstruction-backend
                 restart: unless-stopped
                 env_file: .env
-                ports: ["${BACKEND_PORT:-6969}:6969"]
-                extra_hosts: ["host.docker.internal:host-gateway"]
+                ports:
+                  - "${BACKEND_PORT:-6969}:6969"
+                extra_hosts:
+                  - "host.docker.internal:host-gateway"
                 environment:
                   NODE_ENV: production
                   PORT: 6969
-                networks: [civilconstruction-network]
+                networks:
+                  - civilconstruction-network
                 command: sh -c "npx prisma migrate deploy && node dist/index.js"
                 healthcheck:
                   test: ["CMD", "node", "-e", "require('http').get('http://localhost:6969/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
@@ -173,10 +186,15 @@ jobs:
                 container_name: civilconstruction-frontend
                 restart: unless-stopped
                 env_file: .env
-                ports: ["${FRONTEND_PORT:-6968}:3000"]
-                environment: { NODE_ENV: production }
-                depends_on: { backend: { condition: service_healthy } }
-                networks: [civilconstruction-network]
+                ports:
+                  - "${FRONTEND_PORT:-6968}:3000"
+                environment:
+                  NODE_ENV: production
+                depends_on:
+                  backend:
+                    condition: service_healthy
+                networks:
+                  - civilconstruction-network
                 healthcheck:
                   test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
                   interval: 30s
@@ -192,36 +210,31 @@ jobs:
             sed -i "s|DOCKER_REGISTRY_PLACEHOLDER|$DOCKER_REGISTRY|g" docker-compose.yml
             sed -i "s|IMAGE_NAME_PLACEHOLDER|$IMAGE_NAME|g" docker-compose.yml
 
-            # --- KECERDASAN DOCKER COMPOSE ---
-            # 1. Pull: Hanya akan mendownload layer baru jika ada image yang diupdate.
-            #    Jika Frontend tidak di-build (tidak ada update), Docker akan bilang "Image is up to date".
             echo "⬇️ Pulling images..."
             docker compose pull
 
-            # 2. Up: Hanya akan me-restart container yang imagenya berubah.
-            #    Jika Frontend tidak berubah, container frontend TIDAK akan direstart. 
-            #    Zero downtime untuk service yang tidak berubah!
             echo "🚀 Updating containers..."
             docker compose up -d --remove-orphans
             
             echo "🧹 Pruning old images..."
             docker image prune -af
 
-            # Verification Loop (sama seperti sebelumnya)
             echo "Waiting for services..."
             sleep 10
-            # ... (Verifikasi Backend) ...
+            
+            # Check Backend
             for i in {1..6}; do
               if curl -s http://localhost:6969/health > /dev/null; then echo "✅ Backend OK"; break; fi
               echo "⏳ Waiting Backend ($i/6)"; sleep 5
-              if [ $i -eq 6 ]; then docker compose logs backend; exit 1; fi
+              if [ $i -eq 6 ]; then echo "❌ Backend Logs:"; docker compose logs backend; exit 1; fi
             done
-            # ... (Verifikasi Frontend) ...
+
+            # Check Frontend
             for i in {1..6}; do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000)
               if [ "$STATUS" == "200" ]; then echo "✅ Frontend OK"; break; fi
               echo "⏳ Waiting Frontend ($i/6)"; sleep 5
-              if [ $i -eq 6 ]; then docker compose logs frontend; exit 1; fi
+              if [ $i -eq 6 ]; then echo "❌ Frontend Logs:"; docker compose logs frontend; exit 1; fi
             done
             
             echo "🎉 Deployment Success!"
