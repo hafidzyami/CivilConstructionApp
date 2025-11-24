@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Set dummy DATABASE_URL for prisma.config.ts during build
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/civilconstruction?schema=public"
+
 # Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
