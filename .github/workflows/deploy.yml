@@ -101,15 +101,12 @@ jobs:
           port: ${{ secrets.VM_PORT || 22 }}
           envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,GITHUB_TOKEN,GITHUB_ACTOR,DOCKER_REGISTRY,IMAGE_NAME,VM_HOST
           script: |
-            # Navigate to application directory
             cd /opt/civilconstruction || mkdir -p /opt/civilconstruction && cd /opt/civilconstruction
-
-            # Login to GitHub Container Registry
+            
             echo "$GITHUB_TOKEN" | docker login $DOCKER_REGISTRY -u $GITHUB_ACTOR --password-stdin
-
-            # Create .env file with secrets
-            cat > .env <<EOF
-            POSTGRES_USER=${POSTGRES_USER:-ybandung}
+            
+            cat > .env <<'EOF'
+            POSTGRES_USER=${POSTGRES_USER:-postgres}
             POSTGRES_PASSWORD=$POSTGRES_PASSWORD
             POSTGRES_DB=${POSTGRES_DB:-civilconstruction}
             POSTGRES_PORT=6967
@@ -118,107 +115,95 @@ jobs:
             NODE_ENV=production
             NEXT_PUBLIC_API_URL=http://$VM_HOST:6969/api
             EOF
-
-            # Set proper permissions
+            
             chmod 600 .env
-
-            # Create docker-compose.yml
+            
             cat > docker-compose.yml <<'COMPOSE_EOF'
-version: '3.8'
-
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: civilconstruction-db
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: ${POSTGRES_DB:-civilconstruction}
-    ports:
-      - "${POSTGRES_PORT:-6967}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - civilconstruction-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  backend:
-    image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/backend:latest
-    container_name: civilconstruction-backend
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "${BACKEND_PORT:-6969}:6969"
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: 6969
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-civilconstruction}?schema=public
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - civilconstruction-network
-    command: sh -c "npx prisma migrate deploy && node dist/index.js"
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:6969/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-
-  frontend:
-    image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/frontend:latest
-    container_name: civilconstruction-frontend
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "${FRONTEND_PORT:-6968}:3000"
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - civilconstruction-network
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-
-volumes:
-  postgres_data:
-    driver: local
-
-networks:
-  civilconstruction-network:
-    driver: bridge
-COMPOSE_EOF
-
-            # Replace placeholders with actual values
+            version: '3.8'
+            
+            services:
+              postgres:
+                image: postgres:16-alpine
+                container_name: civilconstruction-db
+                restart: unless-stopped
+                env_file: .env
+                environment:
+                  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+                  POSTGRES_DB: ${POSTGRES_DB:-civilconstruction}
+                ports:
+                  - "${POSTGRES_PORT:-6967}:5432"
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                networks:
+                  - civilconstruction-network
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+            
+              backend:
+                image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/backend:latest
+                container_name: civilconstruction-backend
+                restart: unless-stopped
+                env_file: .env
+                ports:
+                  - "${BACKEND_PORT:-6969}:6969"
+                environment:
+                  NODE_ENV: ${NODE_ENV:-production}
+                  PORT: 6969
+                  DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-civilconstruction}?schema=public
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+                networks:
+                  - civilconstruction-network
+                command: sh -c "npx prisma migrate deploy && node dist/index.js"
+                healthcheck:
+                  test: ["CMD", "node", "-e", "require('http').get('http://localhost:6969/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+                  interval: 30s
+                  timeout: 3s
+                  retries: 3
+                  start_period: 10s
+            
+              frontend:
+                image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/frontend:latest
+                container_name: civilconstruction-frontend
+                restart: unless-stopped
+                env_file: .env
+                ports:
+                  - "${FRONTEND_PORT:-6968}:3000"
+                environment:
+                  NODE_ENV: ${NODE_ENV:-production}
+                depends_on:
+                  backend:
+                    condition: service_healthy
+                networks:
+                  - civilconstruction-network
+                healthcheck:
+                  test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+                  interval: 30s
+                  timeout: 3s
+                  retries: 3
+                  start_period: 10s
+            
+            volumes:
+              postgres_data:
+                driver: local
+            
+            networks:
+              civilconstruction-network:
+                driver: bridge
+            COMPOSE_EOF
+            
             sed -i "s|DOCKER_REGISTRY_PLACEHOLDER|$DOCKER_REGISTRY|g" docker-compose.yml
             sed -i "s|IMAGE_NAME_PLACEHOLDER|$IMAGE_NAME|g" docker-compose.yml
-
-            # Pull latest images
+            
             docker compose pull
-
-            # Stop and remove old containers
             docker compose down
-
-            # Start new containers
             docker compose up -d
-
-            # Clean up old images
             docker image prune -af
-
-            # Show running containers
             docker compose ps
 
       - name: Verify Deployment
