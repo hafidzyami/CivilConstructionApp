@@ -29,7 +29,7 @@ app.get('/health', (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'Civil Construction API',
+    message: 'MarkAny GaneshaIT Civil Construction API',
     documentation: '/api-docs',
     version: '1.0.0',
   });

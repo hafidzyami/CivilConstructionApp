@@ -14,7 +14,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 6969
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-civilconstruction}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?schema=public
     networks:
       - civilconstruction-network
     command: sh -c "npx prisma migrate deploy && node dist/index.js"

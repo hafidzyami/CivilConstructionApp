@@ -143,17 +143,20 @@ jobs:
 
             # Generate .env
             cat > .env <<EOF
-            POSTGRES_USER=${POSTGRES_USER:-postgres}
+            POSTGRES_USER=$POSTGRES_USER
             POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-            POSTGRES_DB=${POSTGRES_DB:-civilconstruction}
+            POSTGRES_DB=$POSTGRES_DB
             POSTGRES_PORT=${POSTGRES_PORT:-5432}
             BACKEND_PORT=6969
             FRONTEND_PORT=6968
             NODE_ENV=production
             NEXT_PUBLIC_API_URL=http://$VM_HOST:6969/api
-            DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-civilconstruction}?schema=public
+            DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/$POSTGRES_DB?schema=public
             EOF
             chmod 600 .env
+            
+            echo "📝 Generated .env file:"
+            cat .env | grep -v PASSWORD
 
             # Generate docker-compose.yml
             # Note: Saya hapus "version: '3.8'" karena itu warning obsolete di log kamu
@@ -171,6 +174,7 @@ jobs:
                 environment:
                   NODE_ENV: production
                   PORT: 6969
+                  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?schema=public
                 networks:
                   - civilconstruction-network
                 command: sh -c "npx prisma migrate deploy && node dist/index.js"
