@@ -6,3 +6,9 @@
 
 # GitHub Actions
 .github/workflows/*.log
+
+# macOS system files
+.DS_Store
+
+# Cache directories
+/cache
