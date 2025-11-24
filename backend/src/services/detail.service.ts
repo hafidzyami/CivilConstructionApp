@@ -1,4 +1,4 @@
-import { Prisma } from '../generated/client/client';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 
 export class DetailService {

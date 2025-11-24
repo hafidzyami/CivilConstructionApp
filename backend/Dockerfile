@@ -24,9 +24,6 @@ COPY src ./src
 # Build application (TypeScript can now find generated Prisma types)
 RUN npm run build
 
-# Remove compiled generated folder to avoid module conflicts
-RUN rm -rf dist/generated
-
 # Stage 2: Production
 FROM node:20-alpine AS production
 
@@ -43,17 +40,13 @@ COPY package*.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 
-# Install production dependencies only
-RUN npm ci --only=production
+# Install ALL deps (needed for prisma generate), Generate, then Prune to production only
+RUN npm ci && \
+    npm run prisma:generate && \
+    npm prune --production
 
-# Generate Prisma Client in production (creates src/generated)
-RUN npm run prisma:generate
-
-# Copy built files from builder stage (only dist, NOT generated)
+# Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
-
-# Create symlink so dist/../generated points to src/generated
-RUN ln -s /app/src/generated /app/generated
 
 # Unset dummy DATABASE_URL (will be provided at runtime)
 ENV DATABASE_URL=
