@@ -29,6 +29,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Set dummy DATABASE_URL for prisma.config.ts
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/civilconstruction?schema=public"
+
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
@@ -40,9 +43,14 @@ COPY prisma.config.ts ./
 # Install production dependencies only
 RUN npm ci --only=production
 
-# Copy built files from builder stage
+# Generate Prisma Client in production (creates src/generated)
+RUN npm run prisma:generate
+
+# Copy built files from builder stage (only dist, NOT generated)
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src/generated ./src/generated
+
+# Unset dummy DATABASE_URL (will be provided at runtime)
+ENV DATABASE_URL=
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
