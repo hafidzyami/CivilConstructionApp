@@ -52,6 +52,9 @@ RUN npm run prisma:generate
 # Copy built files from builder stage (only dist, NOT generated)
 COPY --from=builder /app/dist ./dist
 
+# Copy Prisma Client to correct location (dist/../generated = /app/generated)
+RUN cp -r src/generated ./generated
+
 # Unset dummy DATABASE_URL (will be provided at runtime)
 ENV DATABASE_URL=
 
