@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Set dummy DATABASE_URL for Prisma generate during build
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/civilconstruction?schema=public"
+
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -15,7 +18,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 
-# Generate Prisma Client
+# Generate Prisma Client (uses dummy DATABASE_URL)
 RUN npm run prisma:generate
 
 # Build application
