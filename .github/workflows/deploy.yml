@@ -109,15 +109,15 @@ jobs:
 
             # Create .env file with secrets
             cat > .env <<EOF
-POSTGRES_USER=${POSTGRES_USER:-ybandung}
-POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-POSTGRES_DB=${POSTGRES_DB:-civilconstruction}
-POSTGRES_PORT=6967
-BACKEND_PORT=6969
-FRONTEND_PORT=6968
-NODE_ENV=production
-NEXT_PUBLIC_API_URL=http://$VM_HOST:6969/api
-EOF
+            POSTGRES_USER=${POSTGRES_USER:-ybandung}
+            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+            POSTGRES_DB=${POSTGRES_DB:-civilconstruction}
+            POSTGRES_PORT=6967
+            BACKEND_PORT=6969
+            FRONTEND_PORT=6968
+            NODE_ENV=production
+            NEXT_PUBLIC_API_URL=http://$VM_HOST:6969/api
+            EOF
 
             # Set proper permissions
             chmod 600 .env
