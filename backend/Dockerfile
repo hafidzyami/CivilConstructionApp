@@ -6,22 +6,22 @@ WORKDIR /app
 # Set dummy DATABASE_URL for Prisma generate during build
 ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/civilconstruction?schema=public"
 
-# Copy package files
+# Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 
-# Install dependencies
+# Install ALL dependencies (including devDependencies for build)
 RUN npm ci
 
-# Copy source code
+# Generate Prisma Client first (creates generated folder)
+RUN npm run prisma:generate
+
+# Now copy source code after Prisma Client is generated
 COPY tsconfig.json ./
 COPY src ./src
 
-# Generate Prisma Client (uses dummy DATABASE_URL)
-RUN npm run prisma:generate
-
-# Build application
+# Build application (TypeScript can now find generated Prisma types)
 RUN npm run build
 
 # Stage 2: Production
