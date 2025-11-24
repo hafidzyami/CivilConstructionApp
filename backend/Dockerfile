@@ -3,9 +3,6 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Set dummy DATABASE_URL for Prisma generate during build
-ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/civilconstruction?schema=public"
-
 # Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -14,7 +11,7 @@ COPY prisma.config.ts ./
 # Install ALL dependencies (including devDependencies for build)
 RUN npm ci
 
-# Generate Prisma Client first (creates generated folder)
+# Generate Prisma Client first (creates src/generated folder)
 RUN npm run prisma:generate
 
 # Now copy source code after Prisma Client is generated
@@ -42,7 +39,7 @@ RUN npm ci --only=production
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/generated ./generated
+COPY --from=builder /app/src/generated ./src/generated
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
