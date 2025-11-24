@@ -4,31 +4,37 @@
 
 ### Development dengan Docker
 
+**Note:** Backend connect ke PostgreSQL yang sudah ada di host (bukan PostgreSQL container). Pastikan PostgreSQL sudah berjalan di sistem Anda.
+
 1. **Pastikan Docker dan Docker Compose sudah terinstall**
 
-2. **Build dan jalankan containers:**
+2. **Buat database (jika belum ada):**
+   ```bash
+   # Linux/Mac dengan PostgreSQL
+   createdb civilconstruction
+   
+   # Atau menggunakan psql
+   psql -U postgres -c "CREATE DATABASE civilconstruction;"
+   ```
+
+3. **Build dan jalankan containers:**
    ```bash
    docker-compose up -d
    ```
 
-3. **Cek logs:**
+4. **Cek logs:**
    ```bash
    docker-compose logs -f backend
    ```
 
-4. **Akses aplikasi:**
-   - Backend API: http://localhost:3001
-   - API Documentation: http://localhost:3001/api-docs
-   - Health Check: http://localhost:3001/health
+5. **Akses aplikasi:**
+   - Backend API: http://localhost:6969
+   - API Documentation: http://localhost:6969/api-docs
+   - Health Check: http://localhost:6969/health
 
-5. **Stop containers:**
+6. **Stop containers:**
    ```bash
    docker-compose down
-   ```
-
-6. **Stop dan hapus volumes (termasuk data database):**
-   ```bash
-   docker-compose down -v
    ```
 
 ### Development Lokal (tanpa Docker)
