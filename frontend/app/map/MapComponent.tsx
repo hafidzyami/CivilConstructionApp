@@ -46,6 +46,36 @@ function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }
   return null;
 }
 
+// Building types configuration
+const BUILDING_TYPES = [
+  'Hospital',
+  'School',
+  'Residential Housing',
+  'River',
+  'Lake',
+  'Office',
+  'Others'
+] as const;
+
+type BuildingType = typeof BUILDING_TYPES[number];
+
+interface SelectedFeature {
+  featureId: string;
+  type: BuildingType;
+  customType?: string;
+}
+
+// Color mapping for building types
+const TYPE_COLORS: Record<BuildingType, { color: string; fillColor: string }> = {
+  'Hospital': { color: '#DC2626', fillColor: '#FCA5A5' },
+  'School': { color: '#D97706', fillColor: '#FCD34D' },
+  'Residential Housing': { color: '#059669', fillColor: '#6EE7B7' },
+  'River': { color: '#0284C7', fillColor: '#7DD3FC' },
+  'Lake': { color: '#1D4ED8', fillColor: '#93C5FD' },
+  'Office': { color: '#7C3AED', fillColor: '#C4B5FD' },
+  'Others': { color: '#6B7280', fillColor: '#D1D5DB' }
+};
+
 export default function MapComponent() {
   const [location, setLocation] = useState<LocationState>(DEFAULT_LOCATION);
   const [radius, setRadius] = useState<number>(300);
@@ -54,6 +84,11 @@ export default function MapComponent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [selectedFeatures, setSelectedFeatures] = useState<Map<string, SelectedFeature>>(new Map());
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
+  const [tempBuildingType, setTempBuildingType] = useState<BuildingType>('Hospital');
+  const [tempCustomType, setTempCustomType] = useState<string>('');
+  const [geoJsonKey, setGeoJsonKey] = useState(0);
 
   const calculateZoom = (dist: number): number => {
     return Math.max(13, 19 - Math.floor(Math.log2(dist / 50)));
@@ -151,10 +186,48 @@ export default function MapComponent() {
     setLocation((prev) => ({ ...prev, zoom: calculateZoom(radius) }));
   }, [radius]);
 
+  // Generate unique ID for feature
+  const getFeatureId = (feature: Feature): string => {
+    const props = feature.properties as Record<string, unknown>;
+    return props.osm_id ? String(props.osm_id) : JSON.stringify(feature.geometry);
+  };
+
+  // Handle feature type assignment
+  const handleAssignType = () => {
+    if (!selectedFeatureId) return;
+    
+    const newSelected = new Map(selectedFeatures);
+    newSelected.set(selectedFeatureId, {
+      featureId: selectedFeatureId,
+      type: tempBuildingType,
+      customType: tempBuildingType === 'Others' ? tempCustomType : undefined
+    });
+    setSelectedFeatures(newSelected);
+    setSelectedFeatureId(null);
+    setTempCustomType('');
+    
+    // Force complete re-render by changing key
+    setGeoJsonKey(prev => prev + 1);
+  };
+
   const getFeatureStyle = (feature: Feature): L.PathOptions => {
     const props = (feature.properties || {}) as Record<string, unknown>;
     const geometry = feature.geometry as GeoJSON.Geometry | null;
     const geometryType = geometry?.type;
+    const featureId = getFeatureId(feature);
+    
+    // Check if feature has been assigned a type
+    const selectedFeature = selectedFeatures.get(featureId);
+    if (selectedFeature) {
+      const colors = TYPE_COLORS[selectedFeature.type];
+      return {
+        color: colors.color,
+        fillColor: colors.fillColor,
+        fillOpacity: 0.8,
+        weight: 3,
+        opacity: 1,
+      };
+    }
 
     if (props.natural === 'water' || props.waterway) {
       return {
@@ -212,82 +285,6 @@ export default function MapComponent() {
       weight: 2,
       opacity: 1,
     };
-  };
-
-  const getPopupContent = (feature: Feature): string => {
-    const props = (feature.properties || {}) as Record<string, unknown>;
-    const priorityKeys = [
-      'name',
-      'building',
-      'highway',
-      'railway',
-      'waterway',
-      'natural',
-      'addr:street',
-      'addr:housenumber',
-      'building:levels',
-      'ref',
-      'maxspeed',
-      'service',
-      'bridge',
-      'tunnel',
-    ];
-    const ignoreKeys = [
-      'geometry',
-      'nodes',
-      'ways',
-      'relation',
-      'source',
-      'created_by',
-      'element_start_id',
-      'osmid',
-      'osm_id',
-      'osm_type',
-      'unique_id',
-      'z_index',
-    ];
-
-    let html =
-      '<div style="font-family: sans-serif; font-size: 12px; max-height: 250px; overflow-y: auto;"><table style="width:100%; border-collapse: collapse;">';
-    let rowsAdded = 0;
-
-    const addRow = (key: string, val: unknown): string => {
-      const niceKey = key
-        .replace('addr:', '')
-        .replace('building:', '')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (l) => l.toUpperCase());
-      return `<tr style="border-bottom: 1px solid #eee;"><td style="font-weight:bold; color:#555; padding:4px; width: 35%; vertical-align: top;">${niceKey}</td><td style="padding:4px; vertical-align: top;">${String(
-        val
-      )}</td></tr>`;
-    };
-
-    priorityKeys.forEach((key) => {
-      if (
-        props[key] &&
-        String(props[key]).trim() !== '' &&
-        String(props[key]).toLowerCase() !== 'nan'
-      ) {
-        html += addRow(key, props[key]);
-        rowsAdded++;
-      }
-    });
-
-    Object.entries(props).forEach(([key, value]) => {
-      if (
-        !priorityKeys.includes(key) &&
-        !ignoreKeys.includes(key) &&
-        value &&
-        String(value).trim() !== '' &&
-        String(value).toLowerCase() !== 'nan'
-      ) {
-        html += addRow(key, value);
-        rowsAdded++;
-      }
-    });
-
-    html += '</table></div>';
-    return rowsAdded === 0 ? '<b>No detailed attributes available</b>' : html;
   };
 
   return (
@@ -545,49 +542,78 @@ export default function MapComponent() {
 
           {osmData && osmData.features && osmData.features.length > 0 && (
             <GeoJSON
-              key={`osm-data-${location.lat}-${location.lon}-${radius}`}
+              key={`osm-${location.lat}-${location.lon}-${radius}-${geoJsonKey}`}
               data={osmData}
               style={(feature: unknown) => getFeatureStyle(feature as Feature)}
               onEachFeature={(feature: Feature, layer: L.Layer) => {
-                const popupContent = getPopupContent(feature);
-                (
-                  layer as unknown as { bindPopup?: (content: string, opts?: unknown) => void }
-                ).bindPopup?.(popupContent, { maxWidth: 300 });
+                const featureId = getFeatureId(feature);
+                const selectedFeature = selectedFeatures.get(featureId);
 
                 const originalStyle = getFeatureStyle(feature);
                 const geometryType = feature.geometry?.type;
                 const isLine = geometryType === 'LineString' || geometryType === 'MultiLineString';
 
+                // Add tooltip to show status
+                const tooltipContent = selectedFeature 
+                  ? `${selectedFeature.type === 'Others' && selectedFeature.customType ? selectedFeature.customType : selectedFeature.type} (Click to change)`
+                  : 'Click to assign type';
+                
+                (
+                  layer as unknown as { bindTooltip?: (content: string, opts?: unknown) => void }
+                ).bindTooltip?.(tooltipContent, { 
+                  permanent: false, 
+                  direction: 'top',
+                  opacity: 0.9 
+                });
+
                 layer.on({
                   click: (e: L.LeafletMouseEvent) => {
-                    (layer as unknown as { openPopup?: () => void }).openPopup?.();
+                    setSelectedFeatureId(featureId);
+                    const currentSelection = selectedFeatures.get(featureId);
+                    setTempBuildingType(currentSelection?.type || 'Hospital');
+                    setTempCustomType(currentSelection?.customType || '');
                     L.DomEvent.stopPropagation(e);
                   },
                   mouseover: (e: L.LeafletMouseEvent) => {
-                    const targetLayer = e.target as unknown as {
-                      setStyle?: (s: L.PathOptions) => void;
-                      bringToFront?: () => void;
-                    };
-                    const hoverStyle: L.PathOptions = {
-                      color: '#FBBF24',
-                      weight: isLine ? 4 : 3,
-                      opacity: 1,
-                    };
-                    if (!isLine) {
-                      hoverStyle.fillColor = '#FDE68A';
-                      hoverStyle.fillOpacity = 0.9;
-                    }
-                    targetLayer.setStyle?.(hoverStyle);
-                    if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-                      targetLayer.bringToFront?.();
+                    // Get fresh data from selectedFeatures Map
+                    const currentSelection = selectedFeatures.get(featureId);
+                    
+                    // Only apply hover effect for unlabeled features
+                    if (!currentSelection) {
+                      const targetLayer = e.target as unknown as {
+                        setStyle?: (s: L.PathOptions) => void;
+                        bringToFront?: () => void;
+                      };
+                      
+                      // Default yellow hover for unlabeled features
+                      const hoverStyle: L.PathOptions = {
+                        color: '#FBBF24',
+                        weight: isLine ? 4 : 3,
+                        opacity: 1,
+                      };
+                      if (!isLine) {
+                        hoverStyle.fillColor = '#FDE68A';
+                        hoverStyle.fillOpacity = 0.9;
+                      }
+                      
+                      targetLayer.setStyle?.(hoverStyle);
+                      if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                        targetLayer.bringToFront?.();
+                      }
                     }
                     L.DomEvent.stopPropagation(e);
                   },
                   mouseout: (e: L.LeafletMouseEvent) => {
-                    const targetLayer = e.target as unknown as {
-                      setStyle?: (s: L.PathOptions) => void;
-                    };
-                    targetLayer.setStyle?.(originalStyle);
+                    // Get fresh data from selectedFeatures Map
+                    const currentSelection = selectedFeatures.get(featureId);
+                    
+                    // Only restore style for unlabeled features
+                    if (!currentSelection) {
+                      const targetLayer = e.target as unknown as {
+                        setStyle?: (s: L.PathOptions) => void;
+                      };
+                      targetLayer.setStyle?.(originalStyle);
+                    }
                     L.DomEvent.stopPropagation(e);
                   },
                 });
@@ -596,6 +622,114 @@ export default function MapComponent() {
             />
           )}
         </MapContainer>
+      </div>
+
+      {/* Building Type Selection Modal */}
+      {selectedFeatureId && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]"
+          onClick={() => setSelectedFeatureId(null)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-slate-900 mb-1">
+              {selectedFeatures.get(selectedFeatureId) ? 'Change' : 'Assign'} Building Type
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">
+              {selectedFeatures.get(selectedFeatureId) 
+                ? 'Click a different type to change the classification' 
+                : 'Select a type to classify this feature'}
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Select Type
+              </label>
+              <select
+                value={tempBuildingType}
+                onChange={(e) => setTempBuildingType(e.target.value as BuildingType)}
+                className="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-slate-900 font-medium"
+              >
+                {BUILDING_TYPES.map((type) => (
+                  <option key={type} value={type} className="text-slate-900 bg-white py-2">
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {tempBuildingType === 'Others' && (
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Custom Type Name
+                </label>
+                <input
+                  type="text"
+                  value={tempCustomType}
+                  onChange={(e) => setTempCustomType(e.target.value)}
+                  placeholder="Enter custom type name..."
+                  className="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-slate-900 placeholder:text-slate-400"
+                />
+              </div>
+            )}
+
+            {/* Color Preview */}
+            <div className="mb-4 p-3 rounded-lg flex items-center gap-3" style={{ 
+              backgroundColor: TYPE_COLORS[tempBuildingType].fillColor,
+              border: `2px solid ${TYPE_COLORS[tempBuildingType].color}`
+            }}>
+              <div 
+                className="w-6 h-6 rounded-full" 
+                style={{ backgroundColor: TYPE_COLORS[tempBuildingType].color }}
+              />
+              <span className="font-medium text-slate-900">
+                Preview: {tempBuildingType === 'Others' && tempCustomType ? tempCustomType : tempBuildingType}
+              </span>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setSelectedFeatureId(null)}
+                className="flex-1 px-4 py-3 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignType}
+                disabled={tempBuildingType === 'Others' && !tempCustomType.trim()}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {selectedFeatures.get(selectedFeatureId) ? 'Update Type' : 'Assign Type'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="absolute bottom-6 left-6 bg-white/95 backdrop-blur-md shadow-lg rounded-xl p-4 z-[999] max-w-xs">
+        <h4 className="font-bold text-slate-900 mb-3 text-sm">Building Types</h4>
+        <div className="space-y-2">
+          {BUILDING_TYPES.map((type) => (
+            <div key={type} className="flex items-center gap-2">
+              <div 
+                className="w-4 h-4 rounded border-2" 
+                style={{ 
+                  backgroundColor: TYPE_COLORS[type].fillColor,
+                  borderColor: TYPE_COLORS[type].color
+                }}
+              />
+              <span className="text-xs text-slate-700">{type}</span>
+            </div>
+          ))}
+        </div>
+        {selectedFeatures.size > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-600">
+            {selectedFeatures.size} building{selectedFeatures.size > 1 ? 's' : ''} classified
+          </div>
+        )}
       </div>
     </div>
   );
