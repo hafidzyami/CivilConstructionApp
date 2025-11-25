@@ -63,6 +63,8 @@ interface SelectedFeature {
   featureId: string;
   type: BuildingType;
   customType?: string;
+  lat: number;
+  lon: number;
 }
 
 // Color mapping for building types
@@ -89,6 +91,8 @@ export default function MapComponent() {
   const [tempBuildingType, setTempBuildingType] = useState<BuildingType>('Hospital');
   const [tempCustomType, setTempCustomType] = useState<string>('');
   const [geoJsonKey, setGeoJsonKey] = useState(0);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [showAIDecision, setShowAIDecision] = useState(false);
 
   const calculateZoom = (dist: number): number => {
     return Math.max(13, 19 - Math.floor(Math.log2(dist / 50)));
@@ -192,15 +196,45 @@ export default function MapComponent() {
     return props.osm_id ? String(props.osm_id) : JSON.stringify(feature.geometry);
   };
 
+  // Extract coordinates from feature (centroid for polygons)
+  const getFeatureCoordinates = (feature: Feature): { lat: number; lon: number } => {
+    const geometry = feature.geometry as GeoJSON.Geometry;
+    
+    if (geometry.type === 'Point') {
+      const coords = (geometry as GeoJSON.Point).coordinates;
+      return { lat: coords[1], lon: coords[0] };
+    } else if (geometry.type === 'Polygon') {
+      const coords = (geometry as GeoJSON.Polygon).coordinates[0];
+      const latSum = coords.reduce((sum, coord) => sum + coord[1], 0);
+      const lonSum = coords.reduce((sum, coord) => sum + coord[0], 0);
+      return { lat: latSum / coords.length, lon: lonSum / coords.length };
+    } else if (geometry.type === 'LineString') {
+      const coords = (geometry as GeoJSON.LineString).coordinates;
+      const midIndex = Math.floor(coords.length / 2);
+      return { lat: coords[midIndex][1], lon: coords[midIndex][0] };
+    }
+    
+    // Default fallback
+    return { lat: 0, lon: 0 };
+  };
+
   // Handle feature type assignment
   const handleAssignType = () => {
     if (!selectedFeatureId) return;
+    
+    // Find the feature from osmData to get its coordinates
+    const feature = osmData?.features.find(f => getFeatureId(f as Feature) === selectedFeatureId);
+    if (!feature) return;
+    
+    const coords = getFeatureCoordinates(feature as Feature);
     
     const newSelected = new Map(selectedFeatures);
     newSelected.set(selectedFeatureId, {
       featureId: selectedFeatureId,
       type: tempBuildingType,
-      customType: tempBuildingType === 'Others' ? tempCustomType : undefined
+      customType: tempBuildingType === 'Others' ? tempCustomType : undefined,
+      lat: coords.lat,
+      lon: coords.lon
     });
     setSelectedFeatures(newSelected);
     setSelectedFeatureId(null);
@@ -208,6 +242,13 @@ export default function MapComponent() {
     
     // Force complete re-render by changing key
     setGeoJsonKey(prev => prev + 1);
+  };
+
+  const handleSubmitLabels = () => {
+    setShowSubmitConfirm(false);
+    // Here you would send the labeled data to backend
+    console.log('Submitting labeled features:', Array.from(selectedFeatures.values()));
+    setShowAIDecision(true);
   };
 
   const getFeatureStyle = (feature: Feature): L.PathOptions => {
@@ -731,6 +772,120 @@ export default function MapComponent() {
           </div>
         )}
       </div>
+
+      {/* Submit Button */}
+      {selectedFeatures.size > 0 && (
+        <div className="absolute bottom-24 left-4 z-[1000]">
+          <button
+            onClick={() => setShowSubmitConfirm(true)}
+            className="px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-3"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Submit Labeled Features ({selectedFeatures.size})</span>
+          </button>
+        </div>
+      )}
+
+      {/* Submit Confirmation Modal */}
+      {showSubmitConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-fadeIn">
+            <div className="flex items-start gap-4 mb-6">
+              <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Confirm Submission</h3>
+                <p className="text-slate-600 text-sm">Are you sure you want to submit {selectedFeatures.size} labeled feature{selectedFeatures.size > 1 ? 's' : ''}?</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-lg p-4 mb-6 max-h-64 overflow-y-auto">
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Labeled Features:</p>
+              <ul className="space-y-3">
+                {Array.from(selectedFeatures.values()).map((feature, idx) => (
+                  <li key={idx} className="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div 
+                        className="w-4 h-4 rounded-full border-2 flex-shrink-0"
+                        style={{ 
+                          backgroundColor: TYPE_COLORS[feature.type].fillColor,
+                          borderColor: TYPE_COLORS[feature.type].color
+                        }}
+                      />
+                      <span className="font-semibold text-slate-900">
+                        {feature.type === 'Others' && feature.customType ? feature.customType : feature.type}
+                      </span>
+                    </div>
+                    <div className="ml-6 text-xs text-slate-600 font-mono">
+                      <div>Lat: {feature.lat.toFixed(6)}</div>
+                      <div>Lon: {feature.lon.toFixed(6)}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSubmitConfirm(false)}
+                className="flex-1 px-4 py-3 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitLabels}
+                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Yes, Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Decision Modal */}
+      {showAIDecision && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-fadeIn">
+            <div className="flex items-start gap-4 mb-6">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Submission Successful!</h3>
+                <p className="text-slate-600 text-sm">Your labeled data has been submitted.</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-5 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M13 7H7v6h6V7z" />
+                  <path fillRule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clipRule="evenodd" />
+                </svg>
+                <h4 className="font-bold text-purple-900">Next Step: AI Decision Making</h4>
+              </div>
+              <p className="text-sm text-purple-800 leading-relaxed">
+                The system will now use <span className="font-semibold">AI-powered decision making</span> to analyze the labeled infrastructure data and determine whether the civil construction application should be <span className="font-semibold text-green-700">approved</span> or <span className="font-semibold text-red-700">rejected</span> based on regulatory compliance, safety standards, and environmental impact assessments.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowAIDecision(false)}
+              className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg transition-all"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
