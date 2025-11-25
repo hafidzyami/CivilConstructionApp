@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Feature, FeatureCollection, Geometry } from 'geojson';
 
 interface OSMRequest {
   lat: number;
@@ -77,80 +78,89 @@ export async function POST(request: NextRequest) {
     const geojson = convertToGeoJSON(osmData);
 
     return NextResponse.json(geojson);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('OSM API error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch OSM data' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message || 'Failed to fetch OSM data' }, { status: 500 });
   }
 }
 
 // Convert Overpass JSON to GeoJSON
-function convertToGeoJSON(osmData: any): any {
-  const features: any[] = [];
+function convertToGeoJSON(osmData: unknown): FeatureCollection {
+  const features: Feature[] = [];
 
-  if (!osmData.elements) {
-    return { type: 'FeatureCollection', features: [] };
+  const elements = (osmData as { elements?: unknown })?.elements;
+  if (!Array.isArray(elements)) {
+    return { type: 'FeatureCollection', features };
   }
 
-  osmData.elements.forEach((element: any) => {
-    let geometry: any = null;
-    const properties = { ...element.tags, osm_id: element.id, osm_type: element.type };
+  elements.forEach((element) => {
+    if (!element || typeof element !== 'object') return;
+    const el = element as Record<string, unknown>;
 
-    // Handle different element types
-    if (element.type === 'node' && element.lat && element.lon) {
-      geometry = {
-        type: 'Point',
-        coordinates: [element.lon, element.lat],
-      };
-    } else if (element.type === 'way' && element.geometry) {
-      const coordinates = element.geometry.map((node: any) => [node.lon, node.lat]);
+    let geometry: Geometry | null = null;
+    const tags = (el.tags as Record<string, unknown>) ?? {};
+    const properties = { ...tags, osm_id: el.id, osm_type: el.type } as Record<string, unknown>;
 
-      // Check if way is closed (polygon)
+    const elType = typeof el.type === 'string' ? el.type : undefined;
+
+    if (elType === 'node' && el.lat !== undefined && el.lon !== undefined) {
+      const lat = Number(el.lat);
+      const lon = Number(el.lon);
+      geometry = { type: 'Point', coordinates: [lon, lat] };
+    } else if (elType === 'way' && Array.isArray(el.geometry)) {
+      const coords = (el.geometry as unknown[]).map((node) => {
+        const n = node as Record<string, unknown>;
+        return [Number(n.lon), Number(n.lat)];
+      });
+
       const isClosed =
-        coordinates.length > 2 &&
-        coordinates[0][0] === coordinates[coordinates.length - 1][0] &&
-        coordinates[0][1] === coordinates[coordinates.length - 1][1];
+        coords.length > 2 &&
+        coords[0][0] === coords[coords.length - 1][0] &&
+        coords[0][1] === coords[coords.length - 1][1];
 
-      if (isClosed && (element.tags.building || element.tags.natural === 'water')) {
-        geometry = {
-          type: 'Polygon',
-          coordinates: [coordinates],
-        };
+      const hasBuilding = Boolean((tags as Record<string, unknown>)['building']);
+      const isNaturalWater = (tags as Record<string, unknown>)['natural'] === 'water';
+
+      if (isClosed && (hasBuilding || isNaturalWater)) {
+        geometry = { type: 'Polygon', coordinates: [coords as [number, number][]] } as Geometry;
       } else {
-        geometry = {
-          type: 'LineString',
-          coordinates: coordinates,
-        };
+        geometry = { type: 'LineString', coordinates: coords as [number, number][] } as Geometry;
       }
-    } else if (element.type === 'relation' && element.members) {
-      // For relations, try to construct multipolygon
-      const outerWays = element.members
-        .filter((m: any) => m.role === 'outer' && m.geometry)
-        .map((m: any) => m.geometry.map((node: any) => [node.lon, node.lat]));
+    } else if (elType === 'relation' && Array.isArray(el.members)) {
+      const outerWays = (el.members as unknown[])
+        .filter(
+          (m) =>
+            m &&
+            typeof m === 'object' &&
+            (m as Record<string, unknown>).role === 'outer' &&
+            Array.isArray((m as Record<string, unknown>).geometry)
+        )
+        .map((m) => (m as Record<string, unknown>).geometry as unknown[])
+        .map((way) =>
+          (way as unknown[]).map((node) => {
+            const n = node as Record<string, unknown>;
+            return [Number(n.lon), Number(n.lat)];
+          })
+        );
 
       if (outerWays.length > 0) {
         geometry = {
           type: 'MultiPolygon',
-          coordinates: outerWays.map((way: any) => [way]),
-        };
+          coordinates: outerWays.map((w) => [w as [number, number][]]),
+        } as Geometry;
       }
     }
 
     if (geometry) {
-      features.push({
-        type: 'Feature',
-        geometry: geometry,
-        properties: properties,
-      });
+      features.push({ type: 'Feature', geometry, properties } as Feature);
     }
   });
 
   // Sort features by z-index (water < roads/railways < buildings)
   features.sort((a, b) => {
-    const getZIndex = (feature: any) => {
-      const props = feature.properties;
+    const getZIndex = (feature: Feature) => {
+      const props = (feature.properties || {}) as Record<string, unknown>;
       if (props.natural === 'water' || props.waterway) return 0;
       if (props.highway || props.railway) return 1;
       if (props.building) return 2;
@@ -159,8 +169,5 @@ function convertToGeoJSON(osmData: any): any {
     return getZIndex(a) - getZIndex(b);
   });
 
-  return {
-    type: 'FeatureCollection',
-    features: features,
-  };
+  return { type: 'FeatureCollection', features };
 }
