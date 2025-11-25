@@ -21,14 +21,14 @@ export async function POST(request: NextRequest) {
 
     // Calculate bounding box
     // Approximate: 1 degree ≈ 111km, convert radius from meters
-    const latDelta = (radius / 111000);
-    const lonDelta = (radius / (111000 * Math.cos(lat * Math.PI / 180)));
-    
+    const latDelta = radius / 111000;
+    const lonDelta = radius / (111000 * Math.cos((lat * Math.PI) / 180));
+
     const bbox = {
       south: lat - latDelta,
       west: lon - lonDelta,
       north: lat + latDelta,
-      east: lon + lonDelta
+      east: lon + lonDelta,
     };
 
     // Build Overpass QL query
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: `data=${encodeURIComponent(overpassQuery)}`
+      body: `data=${encodeURIComponent(overpassQuery)}`,
     });
 
     if (!response.ok) {
@@ -77,7 +77,6 @@ export async function POST(request: NextRequest) {
     const geojson = convertToGeoJSON(osmData);
 
     return NextResponse.json(geojson);
-
   } catch (error: any) {
     console.error('OSM API error:', error);
     return NextResponse.json(
@@ -103,25 +102,26 @@ function convertToGeoJSON(osmData: any): any {
     if (element.type === 'node' && element.lat && element.lon) {
       geometry = {
         type: 'Point',
-        coordinates: [element.lon, element.lat]
+        coordinates: [element.lon, element.lat],
       };
     } else if (element.type === 'way' && element.geometry) {
       const coordinates = element.geometry.map((node: any) => [node.lon, node.lat]);
-      
+
       // Check if way is closed (polygon)
-      const isClosed = coordinates.length > 2 && 
-                      coordinates[0][0] === coordinates[coordinates.length - 1][0] &&
-                      coordinates[0][1] === coordinates[coordinates.length - 1][1];
-      
+      const isClosed =
+        coordinates.length > 2 &&
+        coordinates[0][0] === coordinates[coordinates.length - 1][0] &&
+        coordinates[0][1] === coordinates[coordinates.length - 1][1];
+
       if (isClosed && (element.tags.building || element.tags.natural === 'water')) {
         geometry = {
           type: 'Polygon',
-          coordinates: [coordinates]
+          coordinates: [coordinates],
         };
       } else {
         geometry = {
           type: 'LineString',
-          coordinates: coordinates
+          coordinates: coordinates,
         };
       }
     } else if (element.type === 'relation' && element.members) {
@@ -129,11 +129,11 @@ function convertToGeoJSON(osmData: any): any {
       const outerWays = element.members
         .filter((m: any) => m.role === 'outer' && m.geometry)
         .map((m: any) => m.geometry.map((node: any) => [node.lon, node.lat]));
-      
+
       if (outerWays.length > 0) {
         geometry = {
           type: 'MultiPolygon',
-          coordinates: outerWays.map((way: any) => [way])
+          coordinates: outerWays.map((way: any) => [way]),
         };
       }
     }
@@ -142,7 +142,7 @@ function convertToGeoJSON(osmData: any): any {
       features.push({
         type: 'Feature',
         geometry: geometry,
-        properties: properties
+        properties: properties,
       });
     }
   });
@@ -161,6 +161,6 @@ function convertToGeoJSON(osmData: any): any {
 
   return {
     type: 'FeatureCollection',
-    features: features
+    features: features,
   };
 }

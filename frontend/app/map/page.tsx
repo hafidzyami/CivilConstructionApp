@@ -12,10 +12,9 @@ const MapComponent = dynamic(() => import('./MapComponent'), {
         <p className="text-gray-600">Loading map...</p>
       </div>
     </div>
-  )
+  ),
 });
 
 export default function MapPage() {
   return <MapComponent />;
 }
-

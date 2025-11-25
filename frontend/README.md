@@ -7,17 +7,20 @@ This is a [Next.js](https://nextjs.org) project for Civil Construction Applicati
 ### Development Lokal (tanpa Docker)
 
 1. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 2. **Setup environment variables (opsional):**
+
    ```bash
    # Create .env.local file
    NEXT_PUBLIC_API_URL=http://localhost:3001/api
    ```
 
 3. **Jalankan aplikasi:**
+
    ```bash
    npm run dev
    ```
@@ -37,11 +40,13 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 1. **Pastikan Docker dan Docker Compose sudah terinstall**
 
 2. **Build dan jalankan container:**
+
    ```bash
    docker-compose up -d
    ```
 
 3. **Cek logs:**
+
    ```bash
    docker-compose logs -f frontend
    ```
