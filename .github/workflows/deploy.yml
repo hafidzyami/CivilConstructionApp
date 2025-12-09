@@ -134,6 +134,8 @@ jobs:
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           port: ${{ secrets.VM_PORT || 22 }}
+          timeout: 24h
+          command_timeout: 24h
           envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,GITHUB_TOKEN,GITHUB_ACTOR,DOCKER_REGISTRY,IMAGE_NAME,VM_HOST
           script: |
             APP_DIR="/opt/civilconstruction"
@@ -214,8 +216,12 @@ jobs:
             sed -i "s|DOCKER_REGISTRY_PLACEHOLDER|$DOCKER_REGISTRY|g" docker-compose.yml
             sed -i "s|IMAGE_NAME_PLACEHOLDER|$IMAGE_NAME|g" docker-compose.yml
 
-            echo "⬇️ Pulling images..."
-            docker compose pull
+            echo "⬇️ Pulling images (this may take 10-20 minutes for ML dependencies)..."
+            # Pull with progress and timeout handling
+            docker compose pull --quiet || docker compose pull
+
+            echo "📦 Verifying images..."
+            docker images | grep civilconstruction
 
             echo "🚀 Updating containers..."
             docker compose up -d --remove-orphans
