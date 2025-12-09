@@ -65,8 +65,13 @@ COPY --from=builder /app/dist ./dist
 # Copy OCR source files
 COPY src/ocr ./src/ocr
 
-# Install Python dependencies for OCR
-RUN pip3 install --no-cache-dir -r src/ocr/requirements.txt
+# Create Python virtual environment and install OCR dependencies
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
+    && /opt/venv/bin/pip install --no-cache-dir -r src/ocr/requirements.txt
+
+# Add venv to PATH so Python/pip commands use it
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Unset dummy DATABASE_URL (will be provided at runtime)
 ENV DATABASE_URL=
