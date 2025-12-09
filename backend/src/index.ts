@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import detailRoutes from './routes/detail.routes';
+import ocrRoutes from './routes/ocr.routes';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use('/api/details', detailRoutes);
+app.use('/api/ocr', ocrRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
