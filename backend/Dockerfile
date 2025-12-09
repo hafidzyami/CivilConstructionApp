@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -25,15 +25,29 @@ COPY src ./src
 RUN npm run build
 
 # Stage 2: Production
-FROM node:20-alpine AS production
+FROM node:22-slim AS production
 
 WORKDIR /app
 
 # Set dummy DATABASE_URL for prisma.config.ts
 ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/civilconstruction?schema=public"
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install system dependencies for Python and OCR
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    dumb-init \
+    # OpenCV dependencies
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    # For PaddlePaddle
+    libgfortran5 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -48,12 +62,18 @@ RUN npm ci && \
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy OCR source files
+COPY src/ocr ./src/ocr
+
+# Install Python dependencies for OCR
+RUN pip3 install --no-cache-dir -r src/ocr/requirements.txt
+
 # Unset dummy DATABASE_URL (will be provided at runtime)
 ENV DATABASE_URL=
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+RUN groupadd -g 1001 nodejs && \
+    useradd -u 1001 -g nodejs -s /bin/bash nodejs
 
 RUN chown -R nodejs:nodejs /app
 
