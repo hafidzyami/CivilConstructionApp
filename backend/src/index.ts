@@ -2,11 +2,20 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
+import fs from 'fs';
+import path from 'path';
 import { swaggerSpec } from './config/swagger';
 import detailRoutes from './routes/detail.routes';
 import ocrRoutes from './routes/ocr.routes';
 
 dotenv.config();
+
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, 'ocr', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log(`📁 Created uploads directory: ${uploadDir}`);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
