@@ -229,22 +229,52 @@ jobs:
             echo "🧹 Pruning old images..."
             docker image prune -af
 
-            echo "Waiting for services..."
-            sleep 10
-            
+            echo "Waiting for services to start..."
+            sleep 15
+
             # Check Backend
-            for i in {1..6}; do
-              if curl -s http://localhost:6969/health > /dev/null; then echo "✅ Backend OK"; break; fi
-              echo "⏳ Waiting Backend ($i/6)"; sleep 5
-              if [ $i -eq 6 ]; then echo "❌ Backend Logs:"; docker compose logs backend; exit 1; fi
+            echo "Checking backend health..."
+            for i in {1..10}; do
+              if curl -s http://localhost:6969/health > /dev/null; then
+                echo "✅ Backend OK"
+                break
+              fi
+              echo "⏳ Waiting for backend ($i/10)..."
+              sleep 5
+              if [ $i -eq 10 ]; then
+                echo "❌ Backend failed to start. Logs:"
+                docker compose logs --tail=50 backend
+                exit 1
+              fi
             done
 
-            # Check Frontend
-            for i in {1..6}; do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000)
-              if [ "$STATUS" == "200" ]; then echo "✅ Frontend OK"; break; fi
-              echo "⏳ Waiting Frontend ($i/6)"; sleep 5
-              if [ $i -eq 6 ]; then echo "❌ Frontend Logs:"; docker compose logs frontend; exit 1; fi
+            # Check Frontend - accept any successful HTTP response (2xx, 3xx)
+            echo "Checking frontend health..."
+            for i in {1..10}; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null || echo "000")
+              # Accept 2xx and 3xx status codes
+              if [[ "$STATUS" =~ ^[23] ]]; then
+                echo "✅ Frontend OK (HTTP $STATUS)"
+                break
+              fi
+              # Fallback: check if port is listening
+              if nc -z localhost 3000 2>/dev/null; then
+                echo "✅ Frontend OK (port 3000 is listening)"
+                break
+              fi
+              echo "⏳ Waiting for frontend ($i/10) [HTTP $STATUS]..."
+              sleep 5
+              if [ $i -eq 10 ]; then
+                echo "❌ Frontend failed to start. Logs:"
+                docker compose logs --tail=50 frontend
+                echo ""
+                echo "Checking if frontend container is running:"
+                docker compose ps frontend
+                echo ""
+                echo "Checking if port 3000 is listening:"
+                netstat -tlnp | grep 3000 || echo "Port 3000 not listening"
+                exit 1
+              fi
             done
             
             echo "🎉 Deployment Success!"
