@@ -96,7 +96,7 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           build-args: |
-            NEXT_PUBLIC_API_URL=http://${{ secrets.VM_HOST }}:6969/api
+            NEXT_PUBLIC_API_URL=/api
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha
@@ -152,7 +152,7 @@ jobs:
             BACKEND_PORT=6969
             FRONTEND_PORT=6968
             NODE_ENV=production
-            NEXT_PUBLIC_API_URL=http://$VM_HOST:6969/api
+            NEXT_PUBLIC_API_URL=/api
             DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/$POSTGRES_DB?schema=public
             EOF
             chmod 600 .env

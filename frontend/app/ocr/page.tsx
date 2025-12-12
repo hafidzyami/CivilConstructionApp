@@ -98,7 +98,30 @@ export default function OCRPage() {
     formData.append('engine', ocrEngine);
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6969/api';
+      // Determine API URL: env var > runtime detection > fallback
+      const getApiUrl = () => {
+        // 1. Use environment variable if provided
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          const envUrl = process.env.NEXT_PUBLIC_API_URL;
+          // If page is HTTPS but env URL is HTTP, use relative path (nginx proxy)
+          if (typeof window !== 'undefined' &&
+              window.location.protocol === 'https:' &&
+              envUrl.startsWith('http://')) {
+            return '/api';
+          }
+          return envUrl;
+        }
+
+        // 2. Runtime detection fallback
+        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+          return '/api'; // Production: relative URL
+        }
+
+        // 3. Development fallback
+        return 'http://localhost:6969/api';
+      };
+
+      const apiBaseUrl = getApiUrl();
       const response = await fetch(`${apiBaseUrl}/ocr/process`, {
         method: 'POST',
         body: formData,
@@ -347,7 +370,7 @@ export default function OCRPage() {
                 <button
                   onClick={processOCR}
                   disabled={!selectedFile || processing}
-                  className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                  className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:shadow-xl"
                 >
                   {processing ? (
                     <span className="flex items-center justify-center">
