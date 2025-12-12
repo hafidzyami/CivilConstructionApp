@@ -249,17 +249,18 @@ jobs:
             done
 
             # Check Frontend - accept any successful HTTP response (2xx, 3xx)
+            # Note: Frontend runs on port 3000 inside container, but exposed as 6968 on host
             echo "Checking frontend health..."
             for i in {1..10}; do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null || echo "000")
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:6968 2>/dev/null || echo "000")
               # Accept 2xx and 3xx status codes
               if [[ "$STATUS" =~ ^[23] ]]; then
                 echo "✅ Frontend OK (HTTP $STATUS)"
                 break
               fi
               # Fallback: check if port is listening
-              if nc -z localhost 3000 2>/dev/null; then
-                echo "✅ Frontend OK (port 3000 is listening)"
+              if nc -z localhost 6968 2>/dev/null; then
+                echo "✅ Frontend OK (port 6968 is listening)"
                 break
               fi
               echo "⏳ Waiting for frontend ($i/10) [HTTP $STATUS]..."
@@ -271,8 +272,8 @@ jobs:
                 echo "Checking if frontend container is running:"
                 docker compose ps frontend
                 echo ""
-                echo "Checking if port 3000 is listening:"
-                netstat -tlnp | grep 3000 || echo "Port 3000 not listening"
+                echo "Checking if port 6968 is listening:"
+                netstat -tlnp | grep 6968 || echo "Port 6968 not listening"
                 exit 1
               fi
             done
