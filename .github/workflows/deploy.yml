@@ -10,33 +10,13 @@ on:
       - '.github/workflows/**'
   workflow_dispatch:
 
-env:
-  DOCKER_REGISTRY: ghcr.io
-  # Kita set default dulu, tapi nanti akan ditimpa oleh step "Lowercase"
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
-  # ------------------------------------------------------------------
-  # JOB 1: BUILD & PUSH
-  # ------------------------------------------------------------------
-  build-and-push:
+  deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    outputs:
-      backend: ${{ steps.changes.outputs.backend }}
-      frontend: ${{ steps.changes.outputs.frontend }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # --- PERBAIKAN: LOWERCASE IMAGE NAME ---
-      # Bash syntax ${VAR,,} mengubah string menjadi lowercase
-      - name: Lowercase Image Name
-        run: |
-          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Check for changes
         uses: dorny/paths-filter@v3
@@ -48,74 +28,6 @@ jobs:
             frontend:
               - 'frontend/**'
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # --- BACKEND ---
-      - name: Extract metadata for Backend
-        if: steps.changes.outputs.backend == 'true'
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/backend
-          tags: type=raw,value=latest
-
-      - name: Build and push Backend image
-        if: steps.changes.outputs.backend == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # --- FRONTEND ---
-      - name: Extract metadata for Frontend
-        if: steps.changes.outputs.frontend == 'true'
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
-          tags: type=raw,value=latest
-
-      - name: Build and push Frontend image
-        if: steps.changes.outputs.frontend == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          build-args: |
-            NEXT_PUBLIC_API_URL=/api
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ------------------------------------------------------------------
-  # JOB 2: DEPLOY
-  # ------------------------------------------------------------------
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    
-    steps:
-      # --- PERBAIKAN: LOWERCASE IMAGE NAME (LAGI) ---
-      # Perlu dilakukan lagi karena ini job baru (environment terpisah)
-      - name: Lowercase Image Name
-        run: |
-          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
-
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -123,12 +35,8 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
-          # Ambil dari env yang sudah di-lowercase di step sebelumnya
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          VM_HOST: ${{ secrets.VM_HOST }}
+          BACKEND_CHANGED: ${{ steps.changes.outputs.backend }}
+          FRONTEND_CHANGED: ${{ steps.changes.outputs.frontend }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
@@ -136,15 +44,27 @@ jobs:
           port: ${{ secrets.VM_PORT || 22 }}
           timeout: 24h
           command_timeout: 24h
-          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,GITHUB_TOKEN,GITHUB_ACTOR,DOCKER_REGISTRY,IMAGE_NAME,VM_HOST
+          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,BACKEND_CHANGED,FRONTEND_CHANGED
           script: |
+            set -e  # Exit on error
+
             APP_DIR="/opt/civilconstruction"
+            REPO_DIR="$APP_DIR/repo"
+
             mkdir -p $APP_DIR && cd $APP_DIR
 
-            echo "$GITHUB_TOKEN" | docker login $DOCKER_REGISTRY -u $GITHUB_ACTOR --password-stdin
+            echo "📥 Cloning/updating repository..."
+            if [ -d "$REPO_DIR" ]; then
+              cd $REPO_DIR
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              git clone https://github.com/${{ github.repository }}.git $REPO_DIR
+              cd $REPO_DIR
+            fi
 
-            # Generate .env
-            cat > .env <<EOF
+            echo "📝 Generating .env file..."
+            cat > $APP_DIR/.env <<EOF
             POSTGRES_USER=$POSTGRES_USER
             POSTGRES_PASSWORD=$POSTGRES_PASSWORD
             POSTGRES_DB=$POSTGRES_DB
@@ -155,17 +75,19 @@ jobs:
             NEXT_PUBLIC_API_URL=/api
             DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/$POSTGRES_DB?schema=public
             EOF
-            chmod 600 .env
-            
-            echo "📝 Generated .env file:"
-            cat .env | grep -v PASSWORD
+            chmod 600 $APP_DIR/.env
 
-            # Generate docker-compose.yml
-            # Note: Saya hapus "version: '3.8'" karena itu warning obsolete di log kamu
-            cat > docker-compose.yml <<'COMPOSE_EOF'
+            echo "📝 Generated .env file:"
+            cat $APP_DIR/.env | grep -v PASSWORD
+
+            echo "📝 Generating docker-compose.yml..."
+            cat > $APP_DIR/docker-compose.yml <<'COMPOSE_EOF'
             services:
               backend:
-                image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/backend:latest
+                build:
+                  context: ./repo/backend
+                  dockerfile: Dockerfile
+                image: civilconstruction-backend:latest
                 container_name: civilconstruction-backend
                 restart: unless-stopped
                 env_file: .env
@@ -188,7 +110,12 @@ jobs:
                   start_period: 10s
 
               frontend:
-                image: DOCKER_REGISTRY_PLACEHOLDER/IMAGE_NAME_PLACEHOLDER/frontend:latest
+                build:
+                  context: ./repo/frontend
+                  dockerfile: Dockerfile
+                  args:
+                    NEXT_PUBLIC_API_URL: /api
+                image: civilconstruction-frontend:latest
                 container_name: civilconstruction-frontend
                 restart: unless-stopped
                 env_file: .env
@@ -213,27 +140,34 @@ jobs:
                 driver: bridge
             COMPOSE_EOF
 
-            sed -i "s|DOCKER_REGISTRY_PLACEHOLDER|$DOCKER_REGISTRY|g" docker-compose.yml
-            sed -i "s|IMAGE_NAME_PLACEHOLDER|$IMAGE_NAME|g" docker-compose.yml
+            cd $APP_DIR
 
-            echo "⬇️ Pulling images (this may take 10-20 minutes for ML dependencies)..."
-            # Pull with progress and timeout handling
-            docker compose pull --quiet || docker compose pull
+            # Build only what changed
+            if [ "$BACKEND_CHANGED" = "true" ]; then
+              echo "🔨 Building backend image (this may take 10-20 minutes for ML dependencies)..."
+              docker compose build backend
+            else
+              echo "⏭️ Backend unchanged, skipping build"
+            fi
 
-            echo "📦 Verifying images..."
-            docker images | grep civilconstruction
+            if [ "$FRONTEND_CHANGED" = "true" ]; then
+              echo "🔨 Building frontend image..."
+              docker compose build frontend
+            else
+              echo "⏭️ Frontend unchanged, skipping build"
+            fi
 
-            echo "🚀 Updating containers..."
+            echo "🚀 Starting containers..."
             docker compose up -d --remove-orphans
-            
-            echo "🧹 Pruning old images..."
-            docker image prune -af
 
-            echo "Waiting for services to start..."
+            echo "🧹 Pruning old images..."
+            docker image prune -af --filter "label!=keep"
+
+            echo "⏳ Waiting for services to start..."
             sleep 15
 
             # Check Backend
-            echo "Checking backend health..."
+            echo "🔍 Checking backend health..."
             for i in {1..10}; do
               if curl -s http://localhost:6969/health > /dev/null; then
                 echo "✅ Backend OK"
@@ -248,17 +182,14 @@ jobs:
               fi
             done
 
-            # Check Frontend - accept any successful HTTP response (2xx, 3xx)
-            # Note: Frontend runs on port 3000 inside container, but exposed as 6968 on host
-            echo "Checking frontend health..."
+            # Check Frontend
+            echo "🔍 Checking frontend health..."
             for i in {1..10}; do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:6968 2>/dev/null || echo "000")
-              # Accept 2xx and 3xx status codes
               if [[ "$STATUS" =~ ^[23] ]]; then
                 echo "✅ Frontend OK (HTTP $STATUS)"
                 break
               fi
-              # Fallback: check if port is listening
               if nc -z localhost 6968 2>/dev/null; then
                 echo "✅ Frontend OK (port 6968 is listening)"
                 break
@@ -268,14 +199,15 @@ jobs:
               if [ $i -eq 10 ]; then
                 echo "❌ Frontend failed to start. Logs:"
                 docker compose logs --tail=50 frontend
-                echo ""
-                echo "Checking if frontend container is running:"
-                docker compose ps frontend
-                echo ""
-                echo "Checking if port 6968 is listening:"
-                netstat -tlnp | grep 6968 || echo "Port 6968 not listening"
                 exit 1
               fi
             done
-            
+
             echo "🎉 Deployment Success!"
+            echo ""
+            echo "📊 Container Status:"
+            docker compose ps
+            echo ""
+            echo "💾 Disk Usage:"
+            df -h / | grep -v Filesystem
+            docker system df
