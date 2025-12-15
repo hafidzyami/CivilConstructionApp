@@ -147,7 +147,13 @@ def perform_hybrid_ocr(image, use_cuda=True):
 
 
 def convert_paddle_to_surya_format(paddle_result, image_shape):
-    """Convert PaddleOCR result to Surya-compatible format"""
+    """Convert PaddleOCR result to Surya-compatible format
+
+    PaddleOCR returns: [
+        [[[x1,y1], [x2,y2], [x3,y3], [x4,y4]], ('text', confidence)],
+        ...
+    ]
+    """
     merged = {
         'layout': {'regions': []},
         'tables': [],
@@ -161,59 +167,40 @@ def convert_paddle_to_surya_format(paddle_result, image_shape):
         'type': 'Paragraph'
     })
 
-    # Extract data from OCRResult object
-    # PaddleOCR returns an OCRResult object with attributes:
-    # - rec_texts: list of recognized texts
-    # - rec_scores: list of confidence scores
-    # - rec_polys: list of bounding box polygons
-
+    # Process each line from PaddleOCR
+    # paddle_result is a list of [bbox_polygon, (text, confidence)]
     try:
-        # Access OCRResult attributes (dictionary-like object)
-        texts = paddle_result['rec_texts'] if 'rec_texts' in paddle_result else []
-        scores = paddle_result['rec_scores'] if 'rec_scores' in paddle_result else []
-        polys = paddle_result['rec_polys'] if 'rec_polys' in paddle_result else []
-
-        # Process each detected text line
-        for idx in range(len(texts)):
+        for line in paddle_result:
             try:
-                text = texts[idx]
-                confidence = float(scores[idx]) if idx < len(scores) else 1.0
-                bbox_points = polys[idx] if idx < len(polys) else None
-
-                if bbox_points is None:
+                if not line or len(line) < 2:
                     continue
 
+                bbox_points = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                text_info = line[1]    # ('text', confidence)
+
+                # Extract text and confidence
+                text = text_info[0] if isinstance(text_info, (list, tuple)) and len(text_info) > 0 else str(text_info)
+                confidence = float(text_info[1]) if isinstance(text_info, (list, tuple)) and len(text_info) > 1 else 1.0
+
                 # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
-                # bbox_points is typically a list/array of [x, y] coordinates
-                # Handle numpy arrays as well as lists
-                if hasattr(bbox_points, '__len__') and len(bbox_points) > 0:
-                    # Flatten if needed and extract x, y coordinates
-                    x_coords = []
-                    y_coords = []
+                x_coords = [float(point[0]) for point in bbox_points]
+                y_coords = [float(point[1]) for point in bbox_points]
 
-                    for point in bbox_points:
-                        # Handle numpy arrays, lists, and tuples
-                        if hasattr(point, '__len__') and len(point) >= 2:
-                            x_coords.append(float(point[0]))
-                            y_coords.append(float(point[1]))
+                bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
 
-                    if not x_coords or not y_coords:
-                        continue
-
-                    bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
-
-                    merged['text_lines'].append({
-                        'text': text,
-                        'bbox': bbox,
-                        'confidence': confidence,
-                        'region_type': 'Paragraph'
-                    })
+                merged['text_lines'].append({
+                    'text': text,
+                    'bbox': bbox,
+                    'confidence': confidence,
+                    'region_type': 'Paragraph'
+                })
 
             except Exception as e:
+                print(f"  [WARNING] Skipping line due to error: {e}")
                 continue
 
     except Exception as e:
-        print(f"  [ERROR] Failed to parse OCRResult: {e}")
+        print(f"  [ERROR] Failed to parse PaddleOCR result: {e}")
         import traceback
         traceback.print_exc()
 
@@ -245,55 +232,43 @@ def merge_hybrid_results(layout_result, table_result, detection_result, paddle_r
             })
 
     # Add PaddleOCR text lines
-    # PaddleOCR returns an OCRResult object (dictionary-like) with:
-    # - rec_texts: list of recognized texts
-    # - rec_scores: list of confidence scores
-    # - rec_polys: list of bounding box polygons
+    # PaddleOCR returns: [
+    #   [[[x1,y1], [x2,y2], [x3,y3], [x4,y4]], ('text', confidence)],
+    #   ...
+    # ]
     if paddle_result:
         try:
-            # Extract data from OCRResult object
-            texts = paddle_result['rec_texts'] if 'rec_texts' in paddle_result else []
-            scores = paddle_result['rec_scores'] if 'rec_scores' in paddle_result else []
-            polys = paddle_result['rec_polys'] if 'rec_polys' in paddle_result else []
-
-            # Process each detected text line
-            for idx in range(len(texts)):
+            # Process each line from PaddleOCR
+            for line in paddle_result:
                 try:
-                    text = texts[idx]
-                    confidence = float(scores[idx]) if idx < len(scores) else 1.0
-                    bbox_points = polys[idx] if idx < len(polys) else None
-
-                    if bbox_points is None:
+                    if not line or len(line) < 2:
                         continue
 
+                    bbox_points = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                    text_info = line[1]    # ('text', confidence)
+
+                    # Extract text and confidence
+                    text = text_info[0] if isinstance(text_info, (list, tuple)) and len(text_info) > 0 else str(text_info)
+                    confidence = float(text_info[1]) if isinstance(text_info, (list, tuple)) and len(text_info) > 1 else 1.0
+
                     # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
-                    # Handle numpy arrays as well as lists/tuples
-                    if hasattr(bbox_points, '__len__') and len(bbox_points) > 0:
-                        x_coords = []
-                        y_coords = []
+                    x_coords = [float(point[0]) for point in bbox_points]
+                    y_coords = [float(point[1]) for point in bbox_points]
 
-                        for point in bbox_points:
-                            # Handle numpy arrays, lists, and tuples
-                            if hasattr(point, '__len__') and len(point) >= 2:
-                                x_coords.append(float(point[0]))
-                                y_coords.append(float(point[1]))
+                    line_bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
 
-                        if not x_coords or not y_coords:
-                            continue
+                    # Find best matching region from Surya layout
+                    best_region = find_best_region(line_bbox, merged['layout']['regions'])
 
-                        line_bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
-
-                        # Find best matching region from Surya layout
-                        best_region = find_best_region(line_bbox, merged['layout']['regions'])
-
-                        merged['text_lines'].append({
-                            'text': text,
-                            'bbox': line_bbox,
-                            'confidence': confidence,
-                            'region_type': best_region['type'] if best_region else 'Unknown'
-                        })
+                    merged['text_lines'].append({
+                        'text': text,
+                        'bbox': line_bbox,
+                        'confidence': confidence,
+                        'region_type': best_region['type'] if best_region else 'Unknown'
+                    })
 
                 except Exception as e:
+                    print(f"  [WARNING] Skipping line in hybrid mode: {e}")
                     continue
 
         except Exception as e:
