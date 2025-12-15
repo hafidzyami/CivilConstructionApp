@@ -35,7 +35,11 @@ export class OCRController {
       }
 
       // Path to Python OCR service
-      const pythonScript = path.join(__dirname, '..', 'ocr', 'ocr_service.py');
+      // In production (Docker), OCR files are in /app/src/ocr
+      // In development, they're relative to dist folder
+      const pythonScript = process.env.NODE_ENV === 'production'
+        ? '/app/src/ocr/ocr_service.py'
+        : path.join(__dirname, '..', 'ocr', 'ocr_service.py');
 
       // Execute Python OCR service
       const { stdout, stderr } = await execPromise(
