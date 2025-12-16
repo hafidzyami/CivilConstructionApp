@@ -66,9 +66,16 @@ COPY --from=builder /app/dist ./dist
 COPY src/ocr ./src/ocr
 
 # Create Python virtual environment and install OCR dependencies
-RUN python3 -m venv /opt/venv \
+# Use cache mounts to avoid re-downloading packages
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
-    && /opt/venv/bin/pip install --no-cache-dir -r src/ocr/requirements.txt
+    && /opt/venv/bin/pip install -r src/ocr/requirements.txt
+
+# # Create Python virtual environment and install OCR dependencies
+# RUN python3 -m venv /opt/venv \
+#     && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
+#     && /opt/venv/bin/pip install -r src/ocr/requirements.txt
 
 # Add venv to PATH so Python/pip commands use it
 ENV PATH="/opt/venv/bin:$PATH"
@@ -76,11 +83,17 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Unset dummy DATABASE_URL (will be provided at runtime)
 ENV DATABASE_URL=
 
-# Create non-root user
+# Create non-root user with home directory
 RUN groupadd -g 1001 nodejs && \
-    useradd -u 1001 -g nodejs -s /bin/bash nodejs
+    useradd -u 1001 -g nodejs -s /bin/bash -m nodejs
 
-RUN chown -R nodejs:nodejs /app
+# Set HOME environment variable for PaddleOCR cache
+ENV HOME=/home/nodejs
+
+# Create PaddleOCR cache directories with proper permissions
+RUN mkdir -p /home/nodejs/.paddlex/temp && \
+    mkdir -p /home/nodejs/.paddleocr && \
+    chown -R nodejs:nodejs /app /home/nodejs
 
 USER nodejs
 

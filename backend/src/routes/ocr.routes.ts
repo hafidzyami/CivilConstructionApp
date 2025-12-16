@@ -9,7 +9,11 @@ const ocrController = new OCRController();
 // Configure multer for file upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'ocr', 'uploads'));
+    // Use absolute path that matches where index.ts creates the directory
+    const uploadDir = process.env.NODE_ENV === 'production'
+      ? '/app/dist/ocr/uploads'
+      : path.join(__dirname, '..', 'ocr', 'uploads');
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

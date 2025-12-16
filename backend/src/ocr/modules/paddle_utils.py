@@ -30,9 +30,13 @@ def perform_paddle_ocr(image, use_cuda=True):
         ocr = PaddleOCR(
             use_angle_cls=True,
             lang='korean',
-            det_db_thresh=0.3,
-            det_db_box_thresh=0.5,
-            rec_batch_num=6
+            # Adjust thresholds to detect whole lines, not individual characters
+            det_db_thresh=0.3,          # Binary threshold for text detection
+            det_db_box_thresh=0.6,      # Box threshold (higher = fewer false positives)
+            det_db_unclip_ratio=1.8,    # Expand text boxes (higher = larger boxes)
+            use_dilation=True,          # Dilate text regions to merge characters
+            rec_batch_num=6,
+            show_log=False
         )
 
         # Convert grayscale to BGR if needed
@@ -47,6 +51,15 @@ def perform_paddle_ocr(image, use_cuda=True):
         if not result or not result[0]:
             print("  [WARNING] No text detected")
             return None
+
+        print(f"  > PaddleOCR detected {len(result[0])} text regions")
+
+        # Debug: Print first 3 detections to check if lines are properly detected
+        for i, line in enumerate(result[0][:3]):
+            if line and len(line) >= 2:
+                text = line[1][0] if isinstance(line[1], (list, tuple)) else str(line[1])
+                conf = line[1][1] if isinstance(line[1], (list, tuple)) and len(line[1]) > 1 else 1.0
+                print(f"    Line {i+1}: '{text}' (conf: {conf:.2f})")
 
         # Convert PaddleOCR result to Surya-compatible format
         print("  > Converting to standard format...")
@@ -114,9 +127,13 @@ def perform_hybrid_ocr(image, use_cuda=True):
         paddle_ocr = PaddleOCR(
             use_angle_cls=True,
             lang='korean',
-            det_db_thresh=0.3,
-            det_db_box_thresh=0.5,
-            rec_batch_num=6
+            # Adjust thresholds to detect whole lines, not individual characters
+            det_db_thresh=0.3,          # Binary threshold for text detection
+            det_db_box_thresh=0.6,      # Box threshold (higher = fewer false positives)
+            det_db_unclip_ratio=1.8,    # Expand text boxes (higher = larger boxes)
+            use_dilation=True,          # Dilate text regions to merge characters
+            rec_batch_num=6,
+            show_log=False
         )
 
         # Convert grayscale to BGR if needed
@@ -127,6 +144,16 @@ def perform_hybrid_ocr(image, use_cuda=True):
 
         print("  > [PADDLE] Recognizing text...")
         paddle_result = paddle_ocr.ocr(image_bgr)
+
+        if paddle_result and paddle_result[0]:
+            print(f"  > [PADDLE] Detected {len(paddle_result[0])} text regions")
+
+            # Debug: Print first 3 detections
+            for i, line in enumerate(paddle_result[0][:3]):
+                if line and len(line) >= 2:
+                    text = line[1][0] if isinstance(line[1], (list, tuple)) else str(line[1])
+                    conf = line[1][1] if isinstance(line[1], (list, tuple)) and len(line[1]) > 1 else 1.0
+                    print(f"    Line {i+1}: '{text}' (conf: {conf:.2f})")
 
         # Step 3: Merge Surya layout + PaddleOCR text
         print("  > Merging hybrid results...")

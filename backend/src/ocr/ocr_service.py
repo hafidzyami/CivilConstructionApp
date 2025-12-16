@@ -10,6 +10,7 @@ import cv2
 import base64
 from pathlib import Path
 import io
+import time
 
 # Configure stdout to use UTF-8 encoding (for Korean text)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -32,16 +33,52 @@ def image_to_base64(image):
 
 
 def extract_text_from_results(ocr_results):
-    """Extract plain text from OCR results"""
+    """Extract plain text from OCR results, sorted by position"""
     if not ocr_results or 'text_lines' not in ocr_results:
         return ""
 
     text_lines = []
     for line in ocr_results['text_lines']:
-        if 'text' in line:
-            text_lines.append(line['text'])
+        if 'text' in line and 'bbox' in line:
+            # Store text with vertical position (y coordinate)
+            bbox = line['bbox']
+            y_pos = bbox[1] if len(bbox) >= 2 else 0  # y_min
+            x_pos = bbox[0] if len(bbox) >= 1 else 0  # x_min
+            text_lines.append({
+                'text': line['text'],
+                'y': y_pos,
+                'x': x_pos
+            })
 
-    return '\n'.join(text_lines)
+    # Sort by vertical position (top to bottom), then horizontal (left to right)
+    text_lines.sort(key=lambda item: (item['y'], item['x']))
+
+    # Group lines that are on the same horizontal level (same line)
+    # and join them with space instead of newline
+    if not text_lines:
+        return ""
+
+    grouped_lines = []
+    current_line_group = []
+    current_y = text_lines[0]['y']
+    y_threshold = 20  # pixels - lines within this range are considered same line
+
+    for item in text_lines:
+        # If this text is on roughly the same horizontal level, add to current group
+        if abs(item['y'] - current_y) < y_threshold:
+            current_line_group.append(item['text'])
+        else:
+            # New line detected, save current group and start new one
+            if current_line_group:
+                grouped_lines.append(' '.join(current_line_group))
+            current_line_group = [item['text']]
+            current_y = item['y']
+
+    # Don't forget the last group
+    if current_line_group:
+        grouped_lines.append(' '.join(current_line_group))
+
+    return '\n'.join(grouped_lines)
 
 
 def process_ocr(image_path, use_preprocessing=True, engine='hybrid'):
@@ -56,6 +93,7 @@ def process_ocr(image_path, use_preprocessing=True, engine='hybrid'):
     Returns:
         JSON result with OCR data
     """
+    total_start = time.time()
     result = {
         'success': False,
         'textContent': '',
@@ -67,14 +105,17 @@ def process_ocr(image_path, use_preprocessing=True, engine='hybrid'):
 
     try:
         # Load image
+        load_start = time.time()
         image = cv2.imread(str(image_path))
         if image is None:
             result['error'] = f'Failed to load image: {image_path}'
             return result
+        print(f"[TIMING] Image load: {time.time() - load_start:.2f}s", file=sys.stderr)
 
         # Preprocessing
         if use_preprocessing:
             try:
+                preprocess_start = time.time()
                 preprocessed, metadata = preprocess_image(image, save_steps_dir=None)
                 image_for_ocr = preprocessed
                 result['metadata'] = {
@@ -84,7 +125,10 @@ def process_ocr(image_path, use_preprocessing=True, engine='hybrid'):
                     'final_size': list(metadata.get('final_size', []))
                 }
                 # Convert preprocessed image to base64
+                b64_start = time.time()
                 result['preprocessedImage'] = image_to_base64(preprocessed)
+                print(f"[TIMING] Base64 encode: {time.time() - b64_start:.2f}s", file=sys.stderr)
+                print(f"[TIMING] Preprocessing total: {time.time() - preprocess_start:.2f}s", file=sys.stderr)
             except Exception as e:
                 print(f"[WARNING] Preprocessing failed: {e}", file=sys.stderr)
                 image_for_ocr = image
@@ -97,6 +141,9 @@ def process_ocr(image_path, use_preprocessing=True, engine='hybrid'):
             }
 
         # OCR Processing
+        print(f"[TIMING] Starting OCR with engine: {engine}", file=sys.stderr)
+        ocr_start = time.time()
+
         if engine == 'surya':
             ocr_results = perform_ocr(image_for_ocr, use_cuda=True)
         elif engine == 'paddle':
@@ -104,17 +151,41 @@ def process_ocr(image_path, use_preprocessing=True, engine='hybrid'):
         else:  # hybrid
             ocr_results = perform_hybrid_ocr(image_for_ocr, use_cuda=True)
 
+        ocr_duration = time.time() - ocr_start
+        print(f"[TIMING] OCR processing: {ocr_duration:.2f}s", file=sys.stderr)
+
         if not ocr_results:
             result['error'] = 'OCR processing returned no results'
+            print(f"[DEBUG] OCR returned None or empty", file=sys.stderr)
             return result
 
+        # Check if text_lines exists and has content
+        if 'text_lines' not in ocr_results:
+            result['error'] = 'OCR results missing text_lines key'
+            print(f"[DEBUG] Missing text_lines. Keys: {ocr_results.keys()}", file=sys.stderr)
+            return result
+
+        if not ocr_results['text_lines']:
+            result['error'] = 'OCR processing found no text lines'
+            print(f"[DEBUG] text_lines is empty", file=sys.stderr)
+            return result
+
+        print(f"[DEBUG] Found {len(ocr_results['text_lines'])} text lines", file=sys.stderr)
+
         # Extract text content
+        extract_start = time.time()
         text_content = extract_text_from_results(ocr_results)
         result['textContent'] = text_content
+        print(f"[TIMING] Text extraction: {time.time() - extract_start:.2f}s", file=sys.stderr)
 
         # Store OCR results (convert numpy arrays to lists for JSON serialization)
+        json_start = time.time()
         result['results'] = clean_results_for_json(ocr_results)
         result['success'] = True
+        print(f"[TIMING] JSON conversion: {time.time() - json_start:.2f}s", file=sys.stderr)
+
+        total_duration = time.time() - total_start
+        print(f"[TIMING] ⏱️  Python total time: {total_duration:.2f}s", file=sys.stderr)
 
         return result
 
