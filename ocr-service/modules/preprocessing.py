@@ -2,7 +2,7 @@
 
 import cv2
 import numpy as np
-from .device_utils import check_paddle_gpu_available
+from .device_utils import check_paddle_gpu_available, get_device
 
 
 def resize_if_needed(image, max_dimension=2000):
@@ -47,31 +47,76 @@ def reduce_noise(image, method='light'):
 
 
 def detect_orientation(image):
-    """Detect document orientation using variance of projection"""
+    """
+    Detect document orientation using PaddleOCR DocImgOrientationClassification
+
+    Args:
+        image: Input image (BGR or grayscale numpy array)
+
+    Returns:
+        tuple: (correction_angle, confidence)
+            - correction_angle: Angle to rotate for correction (0, 90, 180, 270)
+            - confidence: Detection confidence (0.0 to 1.0)
+    """
     try:
-        angles_to_test = [0, 90, 180, 270]
-        best_angle = 0
-        best_score = -1
+        from paddleocr import DocImgOrientationClassification
+        import tempfile
+        import os
 
-        for angle in angles_to_test:
-            if angle == 0:
-                rotated = image
-            else:
-                rotated = rotate_image(image, -angle)
+        device = get_device()
 
-            score = calculate_text_orientation_score(rotated)
+        # Save image temporarily (DocImgOrientationClassification requires file path)
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            temp_path = tmp_file.name
+            cv2.imwrite(temp_path, image)
 
-            if score > best_score:
-                best_score = score
-                best_angle = angle
+        try:
+            # Initialize orientation classifier
+            model = DocImgOrientationClassification(
+                model_name="PP-LCNet_x1_0_doc_ori",
+                device=device
+            )
 
-        if best_angle != 0:
-            print(f"  > Detected orientation: {best_angle}°")
+            # Predict orientation
+            output = model.predict(temp_path, batch_size=1)
 
-        return best_angle, 1.0
+            # Parse result - PaddleOCR 3.0.3 returns TopkResult objects (dict-like)
+            for res in output:
+                # Debug: Print the full result structure
+                print(f"  > Debug: Full result = {res}")
+                print(f"  > Debug: Type = {type(res)}")
+                print(f"  > Debug: Has 'res' key = {('res' in res) if hasattr(res, '__contains__') else 'N/A'}")
+
+                # Extract results from TopkResult dictionary
+                # TopkResult can be accessed via .get() method
+                res_data = res.get('res', res)
+                class_id = int(res_data.get('class_ids', [0])[0])
+                confidence = float(res_data.get('scores', [0.0])[0])
+                label_name = res_data.get('label_names', ['0'])[0]
+
+                # Map class_id to detected angle (0, 1, 2, 3 → 0°, 90°, 180°, 270°)
+                angle_map = {0: 0, 1: 90, 2: 180, 3: 270}
+                detected_angle = angle_map.get(class_id, 0)
+
+                # Calculate correction angle (rotate in opposite direction)
+                correction_angle = -detected_angle if detected_angle != 0 else 0
+
+                print(f"  > Detected orientation: {detected_angle}° (label: '{label_name}', confidence: {confidence:.2%})")
+                if correction_angle != 0:
+                    print(f"  > Applying correction: {correction_angle}°")
+
+                return correction_angle, confidence
+
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+        return 0, 0.0
 
     except Exception as e:
-        print(f"  [WARNING] Orientation detection failed: {e}")
+        print(f"  > Orientation detection failed: {e}")
+        print(f"  > Skipping orientation correction")
         return 0, 0.0
 
 
@@ -213,6 +258,14 @@ def resize_to_dpi(image, target_dpi=300, current_dpi=72):
     new_height = int(height * scale)
 
     return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+
+
+def image_to_base64(image):
+    """Convert image to base64 string"""
+    import base64
+    _, buffer = cv2.imencode('.png', image)
+    img_base64 = base64.b64encode(buffer).decode('utf-8')
+    return f"data:image/png;base64,{img_base64}"
 
 
 def preprocess_image(image, save_steps_dir=None):

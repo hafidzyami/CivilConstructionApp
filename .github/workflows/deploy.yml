@@ -7,6 +7,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'ocr-service/**'
       - '.github/workflows/**'
   workflow_dispatch:
 
@@ -27,6 +28,8 @@ jobs:
               - 'backend/**'
             frontend:
               - 'frontend/**'
+            ocr:
+              - 'ocr-service/**'
 
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -37,6 +40,7 @@ jobs:
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           BACKEND_CHANGED: ${{ steps.changes.outputs.backend }}
           FRONTEND_CHANGED: ${{ steps.changes.outputs.frontend }}
+          OCR_CHANGED: ${{ steps.changes.outputs.ocr }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
@@ -44,7 +48,7 @@ jobs:
           port: ${{ secrets.VM_PORT || 22 }}
           timeout: 24h
           command_timeout: 24h
-          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,BACKEND_CHANGED,FRONTEND_CHANGED
+          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,BACKEND_CHANGED,FRONTEND_CHANGED,OCR_CHANGED
           script: |
             set -e  # Exit on error
 
@@ -71,6 +75,7 @@ jobs:
             POSTGRES_PORT=${POSTGRES_PORT:-5432}
             BACKEND_PORT=6969
             FRONTEND_PORT=6968
+            OCR_PORT=7000
             NODE_ENV=production
             NEXT_PUBLIC_API_URL=/api
             DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/$POSTGRES_DB?schema=public
@@ -83,6 +88,33 @@ jobs:
             echo "📝 Generating docker-compose.yml..."
             cat > $APP_DIR/docker-compose.yml <<'COMPOSE_EOF'
             services:
+              ocr-service:
+                build:
+                  context: ./repo/ocr-service
+                  dockerfile: Dockerfile
+                image: civilconstruction-ocr:latest
+                container_name: civilconstruction-ocr
+                restart: unless-stopped
+                env_file: .env
+                ports:
+                  - "${OCR_PORT:-7000}:7000"
+                environment:
+                  PYTHONUNBUFFERED: 1
+                networks:
+                  - civilconstruction-network
+                healthcheck:
+                  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7000/health')"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 60s
+                deploy:
+                  resources:
+                    limits:
+                      memory: 8G
+                    reservations:
+                      memory: 4G
+
               backend:
                 build:
                   context: ./repo/backend
@@ -99,8 +131,12 @@ jobs:
                   NODE_ENV: production
                   PORT: 6969
                   DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?schema=public
+                  OCR_SERVICE_URL: http://ocr-service:7000
                 networks:
                   - civilconstruction-network
+                depends_on:
+                  ocr-service:
+                    condition: service_healthy
                 command: sh -c "npx prisma migrate deploy && node dist/index.js"
                 healthcheck:
                   test: ["CMD", "node", "-e", "require('http').get('http://localhost:6969/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
@@ -143,8 +179,15 @@ jobs:
             cd $APP_DIR
 
             # Build only what changed
+            if [ "$OCR_CHANGED" = "true" ]; then
+              echo "🔨 Building OCR service image (this may take 20-30 minutes for ML dependencies)..."
+              docker compose build ocr-service
+            else
+              echo "⏭️ OCR service unchanged, skipping build"
+            fi
+
             if [ "$BACKEND_CHANGED" = "true" ]; then
-              echo "🔨 Building backend image (this may take 10-20 minutes for ML dependencies)..."
+              echo "🔨 Building backend image..."
               docker compose build backend
             else
               echo "⏭️ Backend unchanged, skipping build"
@@ -165,6 +208,22 @@ jobs:
 
             echo "⏳ Waiting for services to start..."
             sleep 15
+
+            # Check OCR Service
+            echo "🔍 Checking OCR service health..."
+            for i in {1..20}; do
+              if curl -s http://localhost:7000/health > /dev/null; then
+                echo "✅ OCR service OK"
+                break
+              fi
+              echo "⏳ Waiting for OCR service ($i/20)..."
+              sleep 10
+              if [ $i -eq 20 ]; then
+                echo "❌ OCR service failed to start. Logs:"
+                docker compose logs --tail=50 ocr-service
+                exit 1
+              fi
+            done
 
             # Check Backend
             echo "🔍 Checking backend health..."

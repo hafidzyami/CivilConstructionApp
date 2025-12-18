@@ -25,9 +25,11 @@ interface OCRResult {
     }>;
   };
   preprocessedImage?: string;
-  metadata?: {
+  preprocessingMetadata?: {
     steps_completed?: string[];
     rotation_applied?: number;
+    original_size?: number[];
+    final_size?: number[];
   };
   error?: string;
 }
@@ -467,13 +469,13 @@ export default function OCRPage() {
                             Preprocessed Image
                           </h2>
                           <img
-                            src={`data:image/png;base64,${result.preprocessedImage}`}
+                            src={result.preprocessedImage}
                             alt="Preprocessed"
                             className="w-full rounded-lg shadow-md"
                           />
-                          {result.metadata?.rotation_applied !== undefined && (
+                          {result.preprocessingMetadata?.rotation_applied !== undefined && (
                             <p className="text-sm text-slate-600 mt-2">
-                              Rotation applied: {result.metadata.rotation_applied.toFixed(2)}°
+                              Rotation applied: {result.preprocessingMetadata.rotation_applied.toFixed(2)}°
                             </p>
                           )}
                         </div>

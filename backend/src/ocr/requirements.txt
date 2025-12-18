@@ -1,9 +1,0 @@
-opencv-python>=4.8.0
-surya-ocr>=0.17.0
-torch>=2.0.0
-# PaddleOCR 2.x compatible with PaddlePaddle 2.5.x
-# Using older stable versions to avoid set_optimization_level AttributeError
-paddleocr==2.8.1
-paddlepaddle-gpu==2.5.2
-numpy>=1.24.0,<2.0.0
-pillow>=10.0.0

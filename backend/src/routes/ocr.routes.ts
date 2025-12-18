@@ -9,10 +9,10 @@ const ocrController = new OCRController();
 // Configure multer for file upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Use absolute path that matches where index.ts creates the directory
+    // Use temporary upload directory for files before forwarding to OCR service
     const uploadDir = process.env.NODE_ENV === 'production'
-      ? '/app/dist/ocr/uploads'
-      : path.join(__dirname, '..', 'ocr', 'uploads');
+      ? '/app/dist/uploads'
+      : path.join(__dirname, '..', 'uploads');
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {

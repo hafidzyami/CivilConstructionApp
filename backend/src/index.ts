@@ -10,11 +10,11 @@ import ocrRoutes from './routes/ocr.routes';
 
 dotenv.config();
 
-// Ensure upload directory exists
-const uploadDir = path.join(__dirname, 'ocr', 'uploads');
+// Ensure temporary upload directory exists (for receiving files before forwarding to OCR service)
+const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
-  console.log(`📁 Created uploads directory: ${uploadDir}`);
+  console.log(`📁 Created temporary uploads directory: ${uploadDir}`);
 }
 
 const app = express();

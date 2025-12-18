@@ -1,0 +1,14 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+opencv-python>=4.8.0
+surya-ocr>=0.17.0
+torch>=2.0.0
+# PaddleOCR 3.x with DocImgOrientationClassification support
+paddleocr==3.0.3
+# PaddleX version constraint required for PaddleOCR 3.0.3 compatibility
+# See: https://github.com/PaddlePaddle/PaddleOCR/issues/16287
+paddlex<3.2
+# PaddlePaddle 3.0.0 CPU version installed separately via custom index (see Dockerfile)
+numpy>=1.24.0,<2.0.0
+pillow>=10.0.0

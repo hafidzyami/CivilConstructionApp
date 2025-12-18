@@ -1,6 +1,31 @@
 version: '3.8'
 
 services:
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    container_name: civilconstruction-ocr
+    restart: unless-stopped
+    ports:
+      - "${OCR_PORT:-7000}:7000"
+    environment:
+      PYTHONUNBUFFERED: 1
+    networks:
+      - civilconstruction-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
   backend:
     build:
       context: ./backend
@@ -15,6 +40,10 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 6969
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@72.60.78.42:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?schema=public
+      OCR_SERVICE_URL: http://ocr-service:7000
+    depends_on:
+      ocr-service:
+        condition: service_healthy
     networks:
       - civilconstruction-network
     command: sh -c "npx prisma migrate deploy && node dist/index.js"

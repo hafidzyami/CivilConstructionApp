@@ -28,15 +28,13 @@ def perform_paddle_ocr(image, use_cuda=True):
         # GPU is auto-detected if paddlepaddle-gpu is installed
         print("  > Initializing PaddleOCR (Korean + Latin)...")
         ocr = PaddleOCR(
-            use_angle_cls=True,
+            use_angle_cls=False,        # Disabled: orientation handled by DocImgOrientationClassification in preprocessing
             lang='korean',
             # Adjust thresholds to detect whole lines, not individual characters
             det_db_thresh=0.3,          # Binary threshold for text detection
             det_db_box_thresh=0.6,      # Box threshold (higher = fewer false positives)
             det_db_unclip_ratio=1.8,    # Expand text boxes (higher = larger boxes)
-            use_dilation=True,          # Dilate text regions to merge characters
-            rec_batch_num=6,
-            show_log=False
+            rec_batch_num=6
         )
 
         # Convert grayscale to BGR if needed
@@ -125,15 +123,13 @@ def perform_hybrid_ocr(image, use_cuda=True):
         # GPU is auto-detected if paddlepaddle-gpu is installed
         print("  > [PADDLE] Initializing OCR (Korean + Latin)...")
         paddle_ocr = PaddleOCR(
-            use_angle_cls=True,
+            use_angle_cls=False,        # Disabled: orientation handled by DocImgOrientationClassification in preprocessing
             lang='korean',
             # Adjust thresholds to detect whole lines, not individual characters
             det_db_thresh=0.3,          # Binary threshold for text detection
             det_db_box_thresh=0.6,      # Box threshold (higher = fewer false positives)
             det_db_unclip_ratio=1.8,    # Expand text boxes (higher = larger boxes)
-            use_dilation=True,          # Dilate text regions to merge characters
-            rec_batch_num=6,
-            show_log=False
+            rec_batch_num=6
         )
 
         # Convert grayscale to BGR if needed
@@ -146,14 +142,30 @@ def perform_hybrid_ocr(image, use_cuda=True):
         paddle_result = paddle_ocr.ocr(image_bgr)
 
         if paddle_result and paddle_result[0]:
-            print(f"  > [PADDLE] Detected {len(paddle_result[0])} text regions")
+            # Debug: Check paddle_result structure
+            print(f"  > [PADDLE] Result type: {type(paddle_result)}")
+            print(f"  > [PADDLE] Result length: {len(paddle_result) if hasattr(paddle_result, '__len__') else 'N/A'}")
+            if paddle_result and len(paddle_result) > 0:
+                print(f"  > [PADDLE] First element type: {type(paddle_result[0])}")
 
-            # Debug: Print first 3 detections
-            for i, line in enumerate(paddle_result[0][:3]):
-                if line and len(line) >= 2:
-                    text = line[1][0] if isinstance(line[1], (list, tuple)) else str(line[1])
-                    conf = line[1][1] if isinstance(line[1], (list, tuple)) and len(line[1]) > 1 else 1.0
-                    print(f"    Line {i+1}: '{text}' (conf: {conf:.2f})")
+                # Extract OCRResult object - PaddleOCR 3.0.3 returns OCRResult objects
+                ocr_result = paddle_result[0]
+
+                # Access the actual OCR data from OCRResult dictionary
+                # PaddleOCR 3.0.3 uses: rec_polys, rec_texts, rec_scores
+                if 'rec_polys' in ocr_result and 'rec_texts' in ocr_result and 'rec_scores' in ocr_result:
+                    boxes = ocr_result['rec_polys']
+                    texts = ocr_result['rec_texts']
+                    scores = ocr_result['rec_scores']
+
+                    print(f"  > [PADDLE] Detected {len(texts)} text regions")
+
+                    # Debug: Print first 3 detections
+                    for i in range(min(3, len(texts))):
+                        print(f"    Line {i+1}: '{texts[i]}' (conf: {scores[i]:.2f})")
+                else:
+                    print(f"  > [PADDLE] WARNING: Expected keys not found in OCRResult")
+                    print(f"  > [PADDLE] Available keys: {list(ocr_result.keys())}")
 
         # Step 3: Merge Surya layout + PaddleOCR text
         print("  > Merging hybrid results...")
@@ -259,44 +271,77 @@ def merge_hybrid_results(layout_result, table_result, detection_result, paddle_r
             })
 
     # Add PaddleOCR text lines
-    # PaddleOCR returns: [
-    #   [[[x1,y1], [x2,y2], [x3,y3], [x4,y4]], ('text', confidence)],
-    #   ...
-    # ]
+    # PaddleOCR 3.0.3 returns OCRResult objects (dict-like)
     if paddle_result:
         try:
-            # Process each line from PaddleOCR
-            for line in paddle_result:
-                try:
-                    if not line or len(line) < 2:
+            # Check if paddle_result is an OCRResult object (PaddleOCR 3.0.3) - dictionary-based access
+            # PaddleOCR 3.0.3 uses: rec_polys, rec_texts, rec_scores
+            if hasattr(paddle_result, 'keys') and 'rec_polys' in paddle_result and 'rec_texts' in paddle_result and 'rec_scores' in paddle_result:
+                boxes = paddle_result['rec_polys']
+                texts = paddle_result['rec_texts']
+                scores = paddle_result['rec_scores']
+
+                # Process each detected text line
+                for i in range(len(texts)):
+                    try:
+                        bbox_points = boxes[i]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                        text = texts[i]
+                        confidence = float(scores[i])
+
+                        # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
+                        x_coords = [float(point[0]) for point in bbox_points]
+                        y_coords = [float(point[1]) for point in bbox_points]
+
+                        line_bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
+
+                        # Find best matching region from Surya layout
+                        best_region = find_best_region(line_bbox, merged['layout']['regions'])
+
+                        merged['text_lines'].append({
+                            'text': text,
+                            'bbox': line_bbox,
+                            'confidence': confidence,
+                            'region_type': best_region['type'] if best_region else 'Unknown'
+                        })
+
+                    except Exception as e:
+                        print(f"  [WARNING] Skipping line in hybrid mode: {e}")
                         continue
 
-                    bbox_points = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-                    text_info = line[1]    # ('text', confidence)
+            else:
+                # Fallback: Try old PaddleOCR format (list of [bbox, (text, confidence)])
+                # This handles the old API format if needed
+                for line in paddle_result:
+                    try:
+                        if not line or len(line) < 2:
+                            continue
 
-                    # Extract text and confidence
-                    text = text_info[0] if isinstance(text_info, (list, tuple)) and len(text_info) > 0 else str(text_info)
-                    confidence = float(text_info[1]) if isinstance(text_info, (list, tuple)) and len(text_info) > 1 else 1.0
+                        bbox_points = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                        text_info = line[1]    # ('text', confidence)
 
-                    # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
-                    x_coords = [float(point[0]) for point in bbox_points]
-                    y_coords = [float(point[1]) for point in bbox_points]
+                        # Extract text and confidence
+                        text = text_info[0] if isinstance(text_info, (list, tuple)) and len(text_info) > 0 else str(text_info)
+                        confidence = float(text_info[1]) if isinstance(text_info, (list, tuple)) and len(text_info) > 1 else 1.0
 
-                    line_bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
+                        # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
+                        x_coords = [float(point[0]) for point in bbox_points]
+                        y_coords = [float(point[1]) for point in bbox_points]
 
-                    # Find best matching region from Surya layout
-                    best_region = find_best_region(line_bbox, merged['layout']['regions'])
+                        line_bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
 
-                    merged['text_lines'].append({
-                        'text': text,
-                        'bbox': line_bbox,
-                        'confidence': confidence,
-                        'region_type': best_region['type'] if best_region else 'Unknown'
-                    })
+                        # Find best matching region from Surya layout
+                        best_region = find_best_region(line_bbox, merged['layout']['regions'])
 
-                except Exception as e:
-                    print(f"  [WARNING] Skipping line in hybrid mode: {e}")
-                    continue
+                        merged['text_lines'].append({
+                            'text': text,
+                            'bbox': line_bbox,
+                            'confidence': confidence,
+                            'region_type': best_region['type'] if best_region else 'Unknown'
+                        })
+
+                    except Exception as e:
+                        print(f"  [WARNING] Skipping line in hybrid mode: {e}")
+                        continue
 
         except Exception as e:
             print(f"  [ERROR] Failed to parse PaddleOCR result in hybrid mode: {e}")

@@ -32,21 +32,10 @@ WORKDIR /app
 # Set dummy DATABASE_URL for prisma.config.ts
 ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/civilconstruction?schema=public"
 
-# Install system dependencies for Python and OCR
+# Install dumb-init and OpenSSL for proper signal handling and Prisma
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
     dumb-init \
-    # OpenCV dependencies
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    # For PaddlePaddle
-    libgfortran5 \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
@@ -62,38 +51,13 @@ RUN npm ci && \
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy OCR source files
-COPY src/ocr ./src/ocr
-
-# Create Python virtual environment and install OCR dependencies
-# Use cache mounts to avoid re-downloading packages
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
-    && /opt/venv/bin/pip install -r src/ocr/requirements.txt
-
-# # Create Python virtual environment and install OCR dependencies
-# RUN python3 -m venv /opt/venv \
-#     && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
-#     && /opt/venv/bin/pip install -r src/ocr/requirements.txt
-
-# Add venv to PATH so Python/pip commands use it
-ENV PATH="/opt/venv/bin:$PATH"
-
 # Unset dummy DATABASE_URL (will be provided at runtime)
 ENV DATABASE_URL=
 
-# Create non-root user with home directory
+# Create non-root user
 RUN groupadd -g 1001 nodejs && \
-    useradd -u 1001 -g nodejs -s /bin/bash -m nodejs
-
-# Set HOME environment variable for PaddleOCR cache
-ENV HOME=/home/nodejs
-
-# Create PaddleOCR cache directories with proper permissions
-RUN mkdir -p /home/nodejs/.paddlex/temp && \
-    mkdir -p /home/nodejs/.paddleocr && \
-    chown -R nodejs:nodejs /app /home/nodejs
+    useradd -u 1001 -g nodejs -s /bin/bash nodejs && \
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 

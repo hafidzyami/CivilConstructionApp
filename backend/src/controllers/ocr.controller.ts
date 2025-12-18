@@ -1,14 +1,11 @@
 import { Request, Response } from 'express';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import path from 'path';
 import fs from 'fs/promises';
-
-const execPromise = promisify(exec);
+import FormData from 'form-data';
+import fetch from 'node-fetch';
 
 export class OCRController {
   /**
-   * Process OCR on uploaded image
+   * Process OCR on uploaded image via OCR microservice
    */
   async processOCR(req: Request, res: Response): Promise<void> {
     const startTime = Date.now();
@@ -28,7 +25,7 @@ export class OCRController {
       const usePreprocessing = req.body.preprocessing === 'true';
       const engine = req.body.engine || 'hybrid';
 
-      console.log(`[OCR ${startTime}] 📄 File: ${imagePath}`);
+      console.log(`[OCR ${startTime}] 📄 File: ${req.file.originalname}`);
       console.log(`[OCR ${startTime}] 📦 Size: ${(req.file.size / 1024).toFixed(2)} KB`);
       console.log(`[OCR ${startTime}] 🔧 Engine: ${engine}`);
       console.log(`[OCR ${startTime}] 🎨 Preprocessing: ${usePreprocessing}`);
@@ -44,47 +41,66 @@ export class OCRController {
         return;
       }
 
-      // Path to Python OCR service
-      const pythonScript = process.env.NODE_ENV === 'production'
-        ? '/app/src/ocr/ocr_service.py'
-        : path.join(__dirname, '..', 'ocr', 'ocr_service.py');
+      // Get OCR service URL from environment
+      const ocrServiceUrl = process.env.OCR_SERVICE_URL || 'http://localhost:7000';
+      console.log(`[OCR ${startTime}] 🌐 Calling OCR service: ${ocrServiceUrl}`);
 
-      console.log(`[OCR ${startTime}] ⏳ Starting Python OCR process...`);
-      const pythonStart = Date.now();
+      const apiStart = Date.now();
 
-      // Execute Python OCR service
-      const { stdout, stderr } = await execPromise(
-        `python "${pythonScript}" "${imagePath}" "${usePreprocessing}" "${engine}"`,
-        { maxBuffer: 10 * 1024 * 1024 }
-      );
+      // Read file and create form data
+      const fileBuffer = await fs.readFile(imagePath);
+      const formData = new FormData();
+      formData.append('file', fileBuffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype
+      });
+      formData.append('preprocessing', usePreprocessing.toString());
+      formData.append('engine', engine);
 
-      const pythonDuration = Date.now() - pythonStart;
-      console.log(`[OCR ${startTime}] ✅ Python completed in ${(pythonDuration / 1000).toFixed(2)}s`);
+      // Call OCR microservice
+      const response = await fetch(`${ocrServiceUrl}/ocr/process`, {
+        method: 'POST',
+        body: formData,
+        headers: formData.getHeaders()
+      });
 
-      // Log Python stderr for debugging
-      if (stderr) {
-        console.log(`[OCR ${startTime}] 📋 Python stderr:`, stderr);
-      }
+      const apiDuration = Date.now() - apiStart;
+      console.log(`[OCR ${startTime}] ✅ OCR service completed in ${(apiDuration / 1000).toFixed(2)}s`);
 
       // Clean up uploaded file
       await fs.unlink(imagePath);
       console.log(`[OCR ${startTime}] 🗑️  Cleaned up uploaded file`);
 
-      // Parse JSON result
-      const result = JSON.parse(stdout);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`[OCR ${startTime}] ❌ OCR service error: ${response.status} - ${errorText}`);
+        throw new Error(`OCR service error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
 
       // Log result without base64 image
       const logResult = { ...result };
       if (logResult.preprocessedImage) {
         logResult.preprocessedImage = `[base64 image ${logResult.preprocessedImage.length} chars]`;
       }
-      console.log(`[OCR ${startTime}] 📊 Result:`, JSON.stringify(logResult, null, 2));
+      console.log(`[OCR ${startTime}] 📊 Result summary:`, {
+        textLength: result.text?.length || 0,
+        hasPreprocessedImage: !!result.preprocessedImage,
+        textLinesCount: result.results?.text_lines?.length || 0
+      });
 
       const totalDuration = Date.now() - startTime;
       console.log(`[OCR ${startTime}] ⏱️  Total time: ${(totalDuration / 1000).toFixed(2)}s`);
       console.log(`[OCR ${startTime}] ========== REQUEST END ==========\n`);
 
-      res.status(200).json(result);
+      res.status(200).json({
+        success: true,
+        textContent: result.text,
+        preprocessedImage: result.preprocessedImage,
+        preprocessingMetadata: result.preprocessingMetadata,
+        results: result.results
+      });
     } catch (error) {
       const totalDuration = Date.now() - startTime;
       console.log(`[OCR ${startTime}] ❌ Failed after ${(totalDuration / 1000).toFixed(2)}s`);
