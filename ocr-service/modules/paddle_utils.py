@@ -50,18 +50,27 @@ def perform_paddle_ocr(image, use_cuda=True):
             print("  [WARNING] No text detected")
             return None
 
-        print(f"  > PaddleOCR detected {len(result[0])} text regions")
+        # Extract OCRResult object - PaddleOCR 3.0.3 returns OCRResult objects
+        ocr_result = result[0]
 
-        # Debug: Print first 3 detections to check if lines are properly detected
-        for i, line in enumerate(result[0][:3]):
-            if line and len(line) >= 2:
-                text = line[1][0] if isinstance(line[1], (list, tuple)) else str(line[1])
-                conf = line[1][1] if isinstance(line[1], (list, tuple)) and len(line[1]) > 1 else 1.0
-                print(f"    Line {i+1}: '{text}' (conf: {conf:.2f})")
+        # Access the actual OCR data from OCRResult dictionary
+        # PaddleOCR 3.0.3 uses: rec_polys, rec_texts, rec_scores
+        if 'rec_texts' in ocr_result and 'rec_scores' in ocr_result:
+            texts = ocr_result['rec_texts']
+            scores = ocr_result['rec_scores']
+
+            print(f"  > PaddleOCR detected {len(texts)} text regions")
+
+            # Debug: Print first 3 detections
+            for i in range(min(3, len(texts))):
+                print(f"    Line {i+1}: '{texts[i]}' (conf: {scores[i]:.2f})")
+        else:
+            print(f"  [WARNING] Unexpected OCRResult structure")
+            print(f"  Available keys: {list(ocr_result.keys())}")
 
         # Convert PaddleOCR result to Surya-compatible format
         print("  > Converting to standard format...")
-        merged_result = convert_paddle_to_surya_format(result[0], image.shape)
+        merged_result = convert_paddle_to_surya_format(ocr_result, image.shape)
 
         return merged_result
 
@@ -188,10 +197,10 @@ def perform_hybrid_ocr(image, use_cuda=True):
 def convert_paddle_to_surya_format(paddle_result, image_shape):
     """Convert PaddleOCR result to Surya-compatible format
 
-    PaddleOCR returns: [
-        [[[x1,y1], [x2,y2], [x3,y3], [x4,y4]], ('text', confidence)],
-        ...
-    ]
+    PaddleOCR 3.0.3 returns OCRResult objects with:
+    - rec_polys: list of polygon coordinates
+    - rec_texts: list of recognized text strings
+    - rec_scores: list of confidence scores
     """
     merged = {
         'layout': {'regions': []},
@@ -206,37 +215,68 @@ def convert_paddle_to_surya_format(paddle_result, image_shape):
         'type': 'Paragraph'
     })
 
-    # Process each line from PaddleOCR
-    # paddle_result is a list of [bbox_polygon, (text, confidence)]
+    # Process PaddleOCR result
     try:
-        for line in paddle_result:
-            try:
-                if not line or len(line) < 2:
+        # Check if paddle_result is an OCRResult object (PaddleOCR 3.0.3)
+        if hasattr(paddle_result, 'keys') and 'rec_polys' in paddle_result and 'rec_texts' in paddle_result and 'rec_scores' in paddle_result:
+            boxes = paddle_result['rec_polys']
+            texts = paddle_result['rec_texts']
+            scores = paddle_result['rec_scores']
+
+            # Process each detected text line
+            for i in range(len(texts)):
+                try:
+                    bbox_points = boxes[i]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                    text = texts[i]
+                    confidence = float(scores[i])
+
+                    # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
+                    x_coords = [float(point[0]) for point in bbox_points]
+                    y_coords = [float(point[1]) for point in bbox_points]
+
+                    bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
+
+                    merged['text_lines'].append({
+                        'text': text,
+                        'bbox': bbox,
+                        'confidence': confidence,
+                        'region_type': 'Paragraph'
+                    })
+
+                except Exception as e:
+                    print(f"  [WARNING] Skipping line due to error: {e}")
                     continue
 
-                bbox_points = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-                text_info = line[1]    # ('text', confidence)
+        else:
+            # Fallback: Try old PaddleOCR format (list of [bbox, (text, confidence)])
+            for line in paddle_result:
+                try:
+                    if not line or len(line) < 2:
+                        continue
 
-                # Extract text and confidence
-                text = text_info[0] if isinstance(text_info, (list, tuple)) and len(text_info) > 0 else str(text_info)
-                confidence = float(text_info[1]) if isinstance(text_info, (list, tuple)) and len(text_info) > 1 else 1.0
+                    bbox_points = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                    text_info = line[1]    # ('text', confidence)
 
-                # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
-                x_coords = [float(point[0]) for point in bbox_points]
-                y_coords = [float(point[1]) for point in bbox_points]
+                    # Extract text and confidence
+                    text = text_info[0] if isinstance(text_info, (list, tuple)) and len(text_info) > 0 else str(text_info)
+                    confidence = float(text_info[1]) if isinstance(text_info, (list, tuple)) and len(text_info) > 1 else 1.0
 
-                bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
+                    # Convert polygon to bounding box [x_min, y_min, x_max, y_max]
+                    x_coords = [float(point[0]) for point in bbox_points]
+                    y_coords = [float(point[1]) for point in bbox_points]
 
-                merged['text_lines'].append({
-                    'text': text,
-                    'bbox': bbox,
-                    'confidence': confidence,
-                    'region_type': 'Paragraph'
-                })
+                    bbox = [min(x_coords), min(y_coords), max(x_coords), max(y_coords)]
 
-            except Exception as e:
-                print(f"  [WARNING] Skipping line due to error: {e}")
-                continue
+                    merged['text_lines'].append({
+                        'text': text,
+                        'bbox': bbox,
+                        'confidence': confidence,
+                        'region_type': 'Paragraph'
+                    })
+
+                except Exception as e:
+                    print(f"  [WARNING] Skipping line due to error: {e}")
+                    continue
 
     except Exception as e:
         print(f"  [ERROR] Failed to parse PaddleOCR result: {e}")

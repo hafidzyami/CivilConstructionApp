@@ -12,3 +12,5 @@
 
 # Cache directories
 /cache
+
+neo4j/

@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   neo4j:
-    image: neo4j:community
+    image: neo4j:5-community
     container_name: civilconstruction-neo4j
     restart: unless-stopped
     ports:
@@ -11,9 +11,12 @@ services:
     environment:
       - NEO4J_AUTH=${NEO4J_USERNAME}/${NEO4J_PASSWORD}
       - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_dbms_memory_heap_initial_size=512m
-      - NEO4J_dbms_memory_heap_max_size=1G
-      - NEO4J_dbms_memory_pagecache_size=512m
+      # Neo4j 5.x uses server.* prefix instead of dbms.*
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=1G
+      - NEO4J_server_memory_pagecache_size=512m
+      # Allow APOC procedures
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
     volumes:
       - ./neo4j/data:/data
       - ./neo4j/logs:/logs

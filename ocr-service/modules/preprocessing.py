@@ -316,6 +316,21 @@ def preprocess_image(image, save_steps_dir=None):
         current = rotate_image(current, correction_angle)
         metadata['rotation_applied'] += correction_angle
         metadata['steps_completed'].append('rotation')
+
+        # Double-check for 90°/270° ambiguity
+        # If we detected 90° or 270°, verify by running detection again
+        if abs(angle) == 90 or abs(angle) == 270:
+            print(f"  > Double-checking orientation (90°/270° can be ambiguous)...")
+            angle2, confidence2 = detect_orientation(current)
+
+            # If the second detection shows 180°, the first detection was wrong
+            if abs(angle2) == 180:
+                print(f"  > Second check detected {angle2}° - first detection was incorrect!")
+                print(f"  > Applying additional 180° correction")
+                current = rotate_image(current, -angle2)
+                metadata['rotation_applied'] += (-angle2)
+            else:
+                print(f"  > Second check confirmed: {angle2}° (orientation is correct)")
     save_step(current, '3_rotation')
 
     print("[4/5] Detecting skew...")
