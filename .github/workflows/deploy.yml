@@ -8,6 +8,7 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'ocr-service/**'
+      - 'CAD-parser/**'
       - '.github/workflows/**'
   workflow_dispatch:
 
@@ -30,6 +31,8 @@ jobs:
               - 'frontend/**'
             ocr:
               - 'ocr-service/**'
+            cad:
+              - 'CAD-parser/**'
 
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.0.3
