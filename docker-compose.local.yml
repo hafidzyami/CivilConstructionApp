@@ -1,51 +1,59 @@
-version: "3.8"
-
+version: '3.8'
 services:
   neo4j:
-    image: neo4j:community
     container_name: civilconstruction-neo4j
+    image: neo4j:5-community
     restart: unless-stopped
     ports:
-      - "7474:7474"
-      - "7687:7687"
-    environment:
-      - NEO4J_AUTH=${NEO4J_USERNAME}/${NEO4J_PASSWORD}
-      - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_dbms_memory_heap_initial_size=512m
-      - NEO4J_dbms_memory_heap_max_size=8G
-      - NEO4J_dbms_memory_pagecache_size=512m
+      - '7474:7474'
+      - '7687:7687'
     volumes:
       - ./neo4j/data:/data
       - ./neo4j/logs:/logs
       - ./neo4j/import:/import
       - ./neo4j/plugins:/plugins
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME}/${NEO4J_PASSWORD}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=1G
+      - NEO4J_server_memory_pagecache_size=512m
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_server_config_strict__validation_enabled=false
     networks:
       - civilconstruction-network
     healthcheck:
-      test: ["CMD", "cypher-shell", "RETURN 1"]
+      test:
+        - CMD
+        - cypher-shell
+        - '-u'
+        - ${NEO4J_USERNAME}
+        - '-p'
+        - ${NEO4J_PASSWORD}
+        - RETURN 1
       interval: 10s
       timeout: 10s
       retries: 5
+      start_period: 30s
+
   ocr-service:
+    container_name: civilconstruction-ocr
     build:
       context: ./ocr-service
       dockerfile: Dockerfile
-    container_name: civilconstruction-ocr
     restart: unless-stopped
     ports:
-      - "${OCR_PORT:-7000}:7000"
+      - ${OCR_PORT:-7000}:7000
     environment:
       PYTHONUNBUFFERED: 1
     networks:
       - civilconstruction-network
     healthcheck:
       test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:7000/health')",
-        ]
+        - CMD
+        - python
+        - '-c'
+        - import urllib.request; urllib.request.urlopen('http://localhost:7000/health')
       interval: 30s
       timeout: 10s
       retries: 3
@@ -58,64 +66,60 @@ services:
           memory: 4G
 
   backend:
+    container_name: civilconstruction-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: civilconstruction-backend
     restart: unless-stopped
+    depends_on:
+      ocr-service:
+        condition: service_healthy
     ports:
-      - "${BACKEND_PORT:-6969}:6969"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - ${BACKEND_PORT:-6969}:6969
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 6969
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@72.60.78.42:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?schema=public
       OCR_SERVICE_URL: http://ocr-service:7000
-    depends_on:
-      ocr-service:
-        condition: service_healthy
     networks:
       - civilconstruction-network
-    command: sh -c "npx prisma migrate deploy && node dist/index.js"
     healthcheck:
       test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://localhost:6969/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
-        ]
+        - CMD
+        - node
+        - '-e'
+        - 'require(''http'').get(''http://localhost:6969/health'', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})'
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 10s
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
+    extra_hosts:
+      - host.docker.internal:host-gateway
 
   frontend:
+    container_name: civilconstruction-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api}
-    container_name: civilconstruction-frontend
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-6968}:3000"
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
     depends_on:
       backend:
         condition: service_healthy
+    ports:
+      - ${FRONTEND_PORT:-6968}:3000
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
     networks:
       - civilconstruction-network
     healthcheck:
       test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
-        ]
+        - CMD
+        - node
+        - '-e'
+        - 'require(''http'').get(''http://localhost:3000'', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})'
       interval: 30s
       timeout: 3s
       retries: 3
