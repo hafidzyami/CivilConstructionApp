@@ -88,7 +88,7 @@ jobs:
             NODE_ENV=production
             NEXT_PUBLIC_API_URL=/api
             DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/$POSTGRES_DB?schema=public
-            # Neo4j Internal URL untuk Backend
+            OCR_SERVICE_URL=http://ocr-service:7000
             NEO4J_URI=bolt://neo4j:7687
             EOF
             chmod 600 $APP_DIR/.env
