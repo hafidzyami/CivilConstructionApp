@@ -156,7 +156,7 @@ export const getOSMData = async (
     };
 
     res.json(geojson);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('OSM fetch error:', error);
     if (axios.isAxiosError(error)) {
       res.status(error.response?.status || 500).json({
