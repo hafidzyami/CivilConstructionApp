@@ -23,7 +23,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
             <Link
               href="/map"
               className="group relative overflow-hidden bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-10 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 hover:-translate-y-2"
@@ -103,6 +103,53 @@ export default function Home() {
 
                 <div className="flex items-center text-purple-600 font-semibold group-hover:gap-3 gap-2 transition-all duration-300">
                   <span>Start OCR</span>
+                  <svg
+                    className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 8l4 4m0 0l-4 4m4-4H3"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href="/chatbot"
+              className="group relative overflow-hidden bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-10 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 hover:-translate-y-2"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              <div className="relative">
+                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <svg
+                    className="w-7 h-7 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                    />
+                  </svg>
+                </div>
+
+                <h2 className="text-3xl font-bold text-slate-900 mb-4">Regulations Chatbot</h2>
+                <p className="text-slate-600 text-lg leading-relaxed mb-6">
+                  Ask questions about building codes and regulations from national and regional sources
+                </p>
+
+                <div className="flex items-center text-indigo-600 font-semibold group-hover:gap-3 gap-2 transition-all duration-300">
+                  <span>Ask Questions</span>
                   <svg
                     className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
                     fill="none"
