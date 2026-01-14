@@ -1,0 +1,56 @@
+{
+"document_info": {
+    "title": "Chuncheon City Building Ordinance",
+    "description": "Local ordinance incorporating regional characteristics such as mountainous terrain and landscape protection.",
+    "effective_date": "December 30, 2021 (Partial Amendments)",
+    "ordinance_number": "1676",
+    "related_national_law": "Building Act (Act No. 20007)"
+  },
+  "articles": [
+    {
+      "article_number": "5-7",
+      "title": "Permit Application and Procedures",
+      "level": 0,
+      "node": "article",
+      "mentions": "",
+      "national_relation": "Building Act Article 11, Building Act Article 14, Building Act Article 16",
+      "content": "Applications must be submitted to the Mayor. A review is required within 30 days, including deliberation by the Architectural Committee. The same process applies for change permits and reports."
+    },
+    {
+      "article_number": "32",
+      "title": "Securing Open Space on Site",
+      "level": 0,
+      "node": "article",
+      "mentions": "",
+      "national_relation": "Building Act Article 43, Enforcement Decree Article 27-2",
+      "content": "Regulations regarding the requirement to secure open space within the building site."
+    },
+    {
+      "article_number": "34",
+      "title": "Securing Sunlight Rights",
+      "level": 0,
+      "node": "article",
+      "mentions": "",
+      "national_relation": "Building Act Article 61, Enforcement Decree Article 86",
+      "content": "Regulations ensuring sunlight rights for neighboring buildings and residents."
+    },
+    {
+      "article_number": "58",
+      "title": "Designation of Buildings Subject to Landscape Review",
+      "level": 0,
+      "node": "article",
+      "mentions": "",
+      "national_relation": "Building Act Article 4, Enforcement Decree Article 5-5",
+      "content": "Designates specific buildings for landscape review with a particular emphasis on protecting the mountainous landscape of the region."
+    },
+    {
+      "article_number": "Pending",
+      "title": "Chuncheon City Building Management Ordinance (Amendment)",
+      "level": 0,
+      "node": "article",
+      "mentions": "",
+      "national_relation": "Building Act Article 35, Building Management Act",
+      "content": "Scheduled for promulgation on December 31, 2025. Key changes include new support for maintenance of small-scale aging buildings (disaster prevention), strengthened/relaxed demolition permit standards, and simplification of certain agricultural facilities (e.g., livestock barns) from 'permit' to 'report'."
+    }
+  ]
+}

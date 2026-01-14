@@ -1,0 +1,309 @@
+2nd Question to AI_As of Dec/12### 1. Key Building Regulations in Chuncheon (as of December 2025)
+
+Building construction in Chuncheon is primarily governed by the national **Building Act**, supplemented by the local **Chuncheon City Building Ordinance**, which incorporates regional characteristics (e.g., mountainous terrain and landscape protection). Below is a summary of the main laws related to building permits and construction, including recent amendments.
+
+#### Major National Laws
+
+- **Building Act** (Act No. 20007, amended December 26, 2023; latest enforcement ongoing with minor updates in 2025): Regulates building permit applications, procedures, and standards. Key articles: Article 11 (Building Permit), Article 16 (Change Permit), Article 20 (Temporary Building Permit). Submission of design documents is mandatory.
+
+- **Enforcement Decree** and **Enforcement Rules of the Building Act**: Detailed provisions on application forms (Appendix Forms 1-4) and attached documents (site plans, floor plans, etc.). Pre-decision system (Article 10) allows preliminary review of site and scale. Minor amendments in progress in 2025 for enhanced safety management.
+
+#### Chuncheon City Local Ordinances
+
+- **Chuncheon City Building Ordinance** (Ordinance No. 1676, effective December 30, 2021; partially amended): Implements matters delegated by national law. Key provisions:
+
+- **Permit Application and Procedures**: Articles 5-7 – Applications submitted to the Mayor; review within 30 days (including Architectural Committee deliberation). Same process for change permits and reports.
+
+- **Attached Documents**: Design documents per national Enforcement Rules Appendix 2, plus proof of land ownership and land use plan confirmation.
+
+- **Regional Regulations**: Article 32 (Open Space on Site), Article 34 (Sunlight Rights), Article 58 (Designation of Buildings Subject to Landscape Review – emphasis on mountainous landscape protection).
+
+- **Chuncheon City Building Management Ordinance (Amendment)**: Passed committee review on December 5, 2025; scheduled for council approval around December 19 and promulgation by December 31, 2025. Key changes include new support for maintenance of small-scale aging buildings (disaster prevention), strengthened/relaxed demolition permit standards, and simplification of certain agricultural facilities (e.g., livestock barns) from "permit" to "report." This indirectly affects existing permit processes (enhanced management and demolition).
+
+| Ordinance Name | Key Contents (Focus on Building Permits) | Effective Date | Source/Link |
+
+|--------|--------------------------|--------|-----------|
+
+| Building Act | Permit Application & Required Documents, Pre-Decision System, Seismic & Eco-Friendly Enhancements | December 26, 2023 | [National Law Information Center](https://www.law.go.kr/법령/건축법) |
+
+| Enforcement Decree of the Building Act | Forms & Attachments Details, Safety Amendments in Progress | Latest: Ongoing 2025 | [National Law Information Center](https://law.go.kr/LSW/lsInfoP.do?lsiSeq=261591) |
+
+| Chuncheon City Building Ordinance | Regional Open Space, Sunlight, Landscape Standards, Committee Review | December 30, 2021 (Partial Amendments) | [National Law Information Center](https://law.go.kr/LSW/ordinInfoP.do?ordinSeq=1668839) |
+
+| Chuncheon City Building Management Ordinance (Amendment) | Aging Building Support, Demolition Strengthening/Relaxation, Agri-Facility Simplification | Scheduled December 31, 2025 | [Chuncheon City Gazette/News](https://www.gukjenews.com/news/articleView.html?idxno=3449485) |
+
+**Note**: Full texts available at the National Law Information Center. For automated review solutions, integrate with the Ministry of Government Legislation Open API. Updates recommended due to 2025 amendments.
+
+### 2. Required Documents and Forms for Building Permit Applications
+
+Applications are submitted to Chuncheon City Hall's Architecture Division (or local Administrative Welfare Centers). Follow national standards (Enforcement Rules of the Building Act), with potential additional documents per Chuncheon ordinances (e.g., landscape review). Standard list below (applicable in Chuncheon; confirm jurisdiction). Forms downloadable in HWP/PDF from city website or Government24.
+
+#### Application Form
+
+- **Application for Building, Major Repair, or Use Change Permit** (Enforcement Rules Appendix Form 1-4): Basic form with owner details, site location, and use.
+
+- Download: [Chuncheon City Hall Forms](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) > Search "Building Permit Application" (HWP) or [Government24 Guide](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066) (includes PDF samples).
+
+#### Required Submission Documents
+
+Submit with application (5-10 copies total; e-filing via Government24 recommended).
+
+| Category | Document Title | Description/Sample | Remarks/Download |
+
+|------|--------|-----------|--------------|
+
+| Basic Documents | Land Scope Documents | Site location & boundary map (scale 1/250+). Sample: Cadastral map excerpt. | Required. [Government24 Samples](https://www.law.go.kr/flDownload.do?flSeq=85691357&bylClsCd=110201) includes layout examples. |
+
+| | Proof of Ownership | Land register copy, cadastral record (or lease agreement). For shared land: 80% consent form (thumbprint/handwritten signature + ID copy; seal option for special cases). | Omit if using shared admin info. Consent sample: Available via general civil forms sites. |
+
+| | Pre-Decision Document | If preliminary site/scale approval obtained (Article 10). Sample: Issued by Chuncheon City. | Applicable cases only. [Chuncheon Forms Page](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/). |
+
+| Design Documents | Design Documents (Appendix 2) | Site plan, floor plan, elevation, section, structural drawings (exclude interior finishes; scale 1/100). Simplified for standard designs. Sample: CAD/PDF prints (include floor area/building coverage ratio calculations). | Required. [Enforcement Rules Appendix PDF](https://www.law.go.kr/LSW/flDownload.do?flSeq=101925751). |
+
+| | Building Plan | Floor area ratio/building-to-land ratio calculations + parking/landscaping plans. | Required (included in designs). |
+
+| Additional Documents | Related to Other Laws | Environmental/traffic impact assessments (large-scale). Road occupancy permits, etc. | Applicable cases only. [Government24 Guide](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066). |
+
+| | Combined Construction Agreement | For adjacent land negotiations (Article 38-12). | Applicable cases only. |
+
+| Chuncheon-Specific | Landscape Review Report | For mountainous/scenic areas (Ordinance Article 58). | Regional addition. Search "landscape" on [Chuncheon Forms Page](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/). |
+
+- **Tips for Sample Documents**:
+
+- [Government24 Building Permit Guide](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066): Includes PDF samples.
+
+- Attachment Samples: [Building Permit Attachments PDF](https://www.law.go.kr/flDownload.do?gubun=&flSeq=85691357&bylClsCd=110201) – Layout/floor plan examples.
+
+- Full Forms List: [Chuncheon City Forms Page](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) – Search "building" for ~20 HWP files (e.g., temporary permits, occupancy approvals).
+
+**Processing Period**: 14-30 days (including reviews). Electronic submission recommended (Government24 or Minwon.go.kr). For automated solutions, consider XML/JSON conversion of documents. Feel free to ask for more details!### 1. 주요 건축 관련 법규집 (Key Building Acts)
+
+춘천시의 건축 및 건설은 국가 **건축법**을 기반으로 하며, **춘천시 건축 조례**가 지역 특성을 반영한 세부 규정을 보완합니다. 아래는 2025년 12월 기준 최신 버전 요약으로, 최근 개정 사항을 포함합니다. 전체 텍스트는 국가법령정보센터에서 확인 가능하며, 자동 검토 솔루션 개발 시 법제처 오픈 API 연동을 추천합니다.
+
+#### 주요 국가 법령
+
+- **건축법** (법률 제20007호, 2023. 12. 26. 개정, 최신 시행 2023. 9. 12. 기준 유지): 건축허가 신청·절차·기준 규정. 주요 조항: 제11조 (건축허가), 제16조 (변경허가), 제20조 (가설건축물 허가). 설계도서 제출 의무화. 최근 개정으로 내진설계 강화 및 친환경 기준 추가.
+
+- **건축법 시행령** 및 **시행규칙**: 허가 신청서 양식(별지 제1호의4), 첨부서류(배치도·평면도 등) 상세 규정. 사전결정 제도(제10조)로 입지·규모 사전 검토 가능. 2025년 입법예고 중 일부 개정안(안전관리 강화) 진행 중.
+
+#### 춘천시 지자체 조례
+
+- **춘천시 건축 조례** (조례 제1762호, 2023. 6. 11. 시행, 일부 개정 2022. 11.): 국가법 위임 사항 시행. 주요 내용:
+
+- **건축허가 신청 및 절차**: 제5조~제7조 - 시장(춘천시) 제출, 30일 이내 심사(건축위원회 포함). 변경허가·신고 동일.
+
+- **첨부서류**: 국가 시행규칙 별표 2 설계도서 필수 + 대지 소유권 증명·토지이용계획 확인원.
+
+- **지역 특성 규정**: 제32조 (대지안 공지 확보), 제34조 (일조권 확보), 제58조 (경관 심의 대상 지정 - 산악지대 보호 강조).
+
+- **춘천시 건축물관리 조례 (개정안)**: 2025. 12. 3. 상임위 통과, 12. 19. 의결 예정, 12. 31. 공포 예정. 소규모 노후 건축물 유지보수 지원 신설(재난 방지), 해체 허가 기준 강화(안전 완화). 농·축산업 시설(축사 등) 일부 '허가' → '신고' 간소화. 기존 허가 절차에 간접 영향(관리 강화).
+
+| 법령명 | 주요 내용 (건축허가 초점) | 시행일 | 출처/링크 |
+
+|--------|--------------------------|--------|-----------|
+
+| 건축법 | 허가 신청·구비서류 규정, 사전결정 제도, 내진·친환경 강화 | 2023. 12. 26. | [국가법령정보센터](https://www.law.go.kr/법령/건축법) |
+
+| 건축법 시행령 | 양식·첨부서류 상세, 안전관리 개정예고 | 2023. 9. 12. | [국가법령정보센터](https://law.go.kr/LSW/lsInfoP.do?lsiSeq=261591) |
+
+| 춘천시 건축 조례 | 지역 공지·일조·경관 기준, 위원회 심의 | 2023. 6. 11. (일부 개정 2022. 11.) | [국가법령정보센터](https://law.go.kr/LSW/ordinInfoP.do?ordinSeq=1668839) |
+
+| 춘천시 건축물관리 조례 (개정안) | 노후 지원·해체 강화, 농축산 신고 간소화 | 2025. 12. 31. 예정 | [춘천시청 공보](https://www.chuncheon.go.kr/cityhall/administrative-info/municipal-info/chuncheon-gazette/) |
+
+**참고**: 2025년 개정으로 업데이트 필요. 전체 법규집 다운로드: [국가법령정보센터](https://www.law.go.kr) 검색 "건축법" 또는 "춘천시 건축 조례".
+
+### 2. 제출서류 양식 및 샘플 (Documents for Building Permit Applications)
+
+건축허가 신청은 춘천시청 건축과(또는 행정복지센터) 접수. 국가 표준(건축법 시행규칙) 따르되, 춘천시 조례에 따라 경관 심의서 등 추가 가능. 총 5~10부 제출, 전자민원(Government24) 추천. 처리 기간: 14~30일. 샘플 양식은 HWP/PDF로 다운로드 가능.
+
+#### 신청서 (Application Form)
+
+- **건축·대수선·용도 변경허가신청서** (건축법 시행규칙 별지 제1호의4): 건축주 정보·대지 위치·용도 기재.
+
+- 다운로드: [춘천시청 민원편람/서식](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) > "건축·대수선·용도 변경허가신청" 검색 (HWP). 또는 [정부24](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066) (PDF 샘플 포함).
+
+#### 구비서류 (Required Submission Documents)
+
+아래 표준 목록(건축법 시행규칙 기준). 춘천시 특화: 산악·경관 지역 시 제58조 경관 심의서 추가. 행정정보 공동이용 시 일부 생략 가능(토지등기증명서 등).
+
+| 구분 | 서류명 | 설명/샘플 | 비고/다운로드 |
+
+|------|--------|-----------|--------------|
+
+| 기본 서류 | 대지 범위 서류 | 대지 위치도·경계도 (1/250 축척). 샘플: 지적도 발췌본. | 필수. [정부24 PDF 샘플](https://www.law.go.kr/flDownload.do?flSeq=85691357&bylClsCd=110201) 배치도 예시 포함. |
+
+| | 소유권 증명 서류 | 등기부등본·토지대장 (또는 임대차 계약서). 공유지 시 80% 동의서 (지장·자필서명 + 신분증 사본). 샘플: 공유 동의서 (인감증명서 첨부 가능). | 행정정보 이용 시 생략. 공유 동의서 샘플: [민원행정서식](http://www.freeforms.co.kr/view/d8-form100-002732.html) HWP/DOC. |
+
+| | 사전결정서 | 입지·규모 사전 승인 시 (제10조). 샘플: 춘천시 발급서. | 해당 시만. [춘천시청 서식](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/). |
+
+| 설계도서 | 설계도서 (별표 2) | 배치도·평면도·입면도·단면도·구조도 (실내마감 제외, 1/100 축척). 표준설계 시 간소화. 샘플: CAD/PDF 출력 (건축계획서: 용적률·건폐율 계산 포함). | 필수. [건축법 시행규칙 별표2 PDF](https://www.law.go.kr/LSW/flDownload.do?flSeq=101925751) (건축허가신청서 및 허가서 샘플). |
+
+| | 건축계획서 | 용적률·건폐율 계산서 + 주차·조경 계획. | 필수. 상기 설계도서 내 포함. |
+
+| 추가 서류 | 타 법령 관련 | 환경·교통 영향평가서 (대형 시). 도로점용허가신청서 등. | 해당 시만. [정부24 안내](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066). |
+
+| | 결합건축협정서 | 인접 대지 협의 시 (제38조의12). | 해당 시만. [민원행정서식 HWP](http://www.freeforms.co.kr/view/d8-form100-002732.html). |
+
+| 춘천시 특화 | 경관 심의서 | 산악·경관 지역 (제58조). | 지역 추가. [춘천시청 서식](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) 검색 "경관". |
+
+- **샘플 문서 제공 팁**:
+
+- [정부24 건축허가 민원 안내](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066): PDF 샘플 포함 (착오 시 [대체 링크](https://www.gov.kr/portal/rcvfvrSvc/dtlEx/B55370100020)).
+
+- 첨부서류 샘플: [건축허가 첨부서류 PDF](https://www.law.go.kr/flDownload.do?gubun=&flSeq=85691357&bylClsCd=110201) - 배치도·평면도 예시.
+
+- 전체 양식 목록: [춘천시청 서식 페이지](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) - "건축" 검색 시 20여 개 HWP (가설건축물 허가·사용승인 등).
+
+- 추가 샘플: [민원행정서식 무료 다운로드](http://www.freeforms.co.kr/view/d8-form100-002732.html) - HWP/DOC 형식 (건축허가신청서 및 허가서).
+
+**처리 기간**: 14~30일 (심의 포함). 전자제출 추천 (Minwon.go.kr). 개발 시 XML/JSON 변환 고려. 추가 질문 환영!1st First question to AI_as of Dec/7### 1. Key Building Acts in Chuncheon
+
+Building in Chuncheon is based on the national Building Act, supplemented by the Chuncheon City Building Ordinance, a local ordinance. Chuncheon City complies with national laws while also establishing detailed regulations that reflect regional characteristics (e.g., mountainous terrain, landscape protection, etc.). Below is a summary of key laws related to building permits and construction (including recent revisions).
+
+#### Key National Laws
+
+- Building Act (Act No. 20007, revised December 26, 2023): Regulates building permit applications, procedures, and standards. Key provisions include Article 11 (Building Permit), Article 16 (Change Permit), and Article 20 (Temporary Building Permit). Submission of design drawings is mandatory when applying for a building permit. - **Enforcement Decree of the Building Act** and **Enforcement Rules**: Detailed regulations on permit application forms (Appendix 1-4) and attached documents (layout plans, floor plans, etc.). The pre-approval system (Article 10) allows for pre-approval site and scale review.
+
+#### Chuncheon City Local Government Ordinance
+
+- **Chuncheon City Building Ordinance** (Ordinance No. 1749, effective June 11, 2023, partially amended November 2022): Enforces matters delegated by national law. Key provisions:
+
+- **Building Permit Application and Procedures**: Articles 5-7 - Building permit applications must be submitted to the Mayor (Chuncheon City). Review is required within 30 days (including review by the Architectural Committee). Change permits (Article 16) and reporting (Article 14) follow the same procedures.
+
+- **Attached Documents**: Design documents (layout plans, floor plans, elevation plans, etc.) specified in Appendix 2 of the Enforcement Rules of the National Act are required. Additionally, proof of land ownership, land use plan confirmation, etc.
+
+- **Regional Characteristics Regulations**: Article 32 (Securing Open Space on Site), Article 34 (Securing Sunlight Rights), Article 58 (Designation of Buildings Subject to Landscape Review - Emphasizes Landscape Protection in Mountainous Areas).
+
+- **Latest Revision**: As of December 2025, major revisions are centered on the **Chuncheon City Building Management Ordinance** (Amendment to Ordinance No. 1749, scheduled for resolution on December 19, 2025, and promulgation on December 31). These include the establishment of maintenance support for small-scale, aging buildings (to prevent disaster risks) and strengthening building demolition permit standards (to ease safety burdens). This will indirectly impact the existing building permit process (strengthening demolition and management).
+
+| Name of Ordinance | Key Contents (Focus on Building Permits) | Effective Date | Source/Link |
+
+|--------|--------------------------|--------|-----------|
+
+| Building Act | Permit Application and Required Documents Regulations, Pre-Decision System | December 26, 2023 | [National Law Information Center](https://www.law.go.kr/법령/건축법) |
+
+| Chuncheon City Building Ordinance | Regional Notice, Sunlight, and Landscape Standards, Committee Review | June 11, 2023 (Partially Revised November 2022) | [National Law Information Center](https://law.go.kr/LSW/ordinInfoP.do?ordinSeq=1668839) |
+
+| Chuncheon City Building Management Ordinance (Amendment) | Strengthening Support for Aging Buildings and Demolition Permits | Scheduled for December 31, 2025 | [Chuncheon City Hall Public Notice](https://www.chuncheon.go.kr/cityhall/administrative-info/municipal-info/chuncheon-gazette/) |
+
+**Note**: The full text of the ordinance is available at the National Law Information Center. When developing an automated review solution, we recommend utilizing a legal database (e.g., the Ministry of Government Legislation Open API) for API integration. Due to recent revisions (December 2025), updates are required.
+
+### 2. Documents to Submit and Provide for Building Permit Applications (Sample Documents)
+
+Building permit applications are submitted to the Chuncheon City Hall Architecture Division (or the Administrative Welfare Center). While applications follow national standards (Enforcement Decree of the Building Act), additional documents (e.g., a landscape review report) may be required based on Chuncheon City ordinances. Below is a list of standard required documents applicable to Chuncheon City (no differences across local governments; jurisdictional verification is required). Sample forms can be downloaded in HWP/PDF format from the Chuncheon City Hall website. (As mentioned in the meeting, links are organized for ASAP delivery.)
+
+#### Application Form
+
+- **Application for Building, Major Renovation, and Change of Use Permit** (Appendix 1-4 of the Enforcement Regulations of the Building Act): Basic application form. Fill in the building owner information, site location, and use.
+
+- Download: [Chuncheon City Hall Civil Complaint Manual/Forms](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) > Search for "Application for Building, Major Renovation, and Change of Use Permit" (HWP file).
+
+#### Required Submission Documents
+
+Submit the following documents with your application. (5-10 copies total; e-filing is available via Government24)
+
+| Category | Document Title | Description/Sample | Remarks |
+
+|------|--------|-----------|------|
+
+| Basic Documents | Land Scope Documents | Site location map and boundary map (scale 1/250 or higher). Sample: Excerpt from cadastral map. | Required |
+
+| | Proof of ownership documents | Copy of real estate register, land register (or lease agreement). For shared land, an 80% consent form is required. | May be omitted for shared use of administrative information. |
+
+| | Pre-decision document | If prior approval for location and scale has been obtained (Article 10 of the Building Act). Sample: Chuncheon City issued document. | Applicable city only. |
+
+| Design documents | Design documents (Appendix 2) | Layout plan, floor plan, elevation, section, structural drawing, etc. (excluding interior finishing drawings). Simplified when applying standard design. Sample: CAD/PDF printout. | Required, 1/100 scale. |
+
+| | Building plan | Floor area ratio/building-to-land ratio calculation. | Required |
+
+| Additional documents | Related to other laws and regulations | Environmental impact assessment, traffic impact assessment (for large-scale construction). | Applicable city only. |
+
+| | Combined construction agreement | When negotiating with adjacent land (Article 38-12). | Applicable city only |
+
+| Chuncheon City Specialization | Landscape Review | Mountainous and Scenic Area Cities (Article 58 of the Ordinance). | Additional information by region |
+
+- **Tips for Providing Sample Documents**:
+
+- Download the [Building Permit Civil Complaint Guide](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066) from the Government24 website (includes PDF samples).
+
+- Sample attached documents: [Building Permit Application Attachments PDF](https://www.law.go.kr/flDownload.do?gubun=&flSeq=85691357&bylClsCd=110201) - Includes example layout plans. - Full list of forms: [Chuncheon City Hall forms page](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) - Search for "building" and find approximately 20 HWP files (e.g., temporary building permit, occupancy approval application).
+
+Processing period: 14-30 days (including review). Electronic submission is recommended (Minwon.go.kr). Consider converting this document to XML/JSON when developing an automated review solution. Please let me know if you have any further questions! (Please let me know if you need more detailed information during a follow-up meeting.)
+
+### 1. 춘천시 건축 건설 관련 주요 법령 (Building Acts)
+
+춘천시의 건축 건설은 국가 차원의 **건축법** (Building Act)을 기본으로 하며, 이를 보완하는 지자체 조례인 **춘천시 건축 조례**가 적용됩니다. 춘천시는 국가법을 준수하면서 지역 특성(예: 산악 지형, 경관 보호 등)을 반영한 세부 규정을 두고 있습니다. 아래는 건축허가 및 건설 관련 주요 법령 요약입니다. (최신 개정 사항 포함)
+
+#### 주요 국가 법령
+
+- **건축법** (법률 제20007호, 2023. 12. 26. 개정): 건축허가 신청, 절차, 기준 등을 규정. 제11조(건축허가), 제16조(변경허가), 제20조(가설건축물 허가) 등이 핵심. 건축 신청 시 설계도서 제출 의무화.
+
+- **건축법 시행령** 및 **시행규칙**: 허가 신청서 양식(별지 제1호의4), 첨부서류(배치도, 평면도 등) 상세 규정. 사전결정 제도(제10조)로 허가 전 입지·규모 검토 가능.
+
+#### 춘천시 지자체 조례
+
+- **춘천시 건축 조례** (조례 제1749호, 2023. 6. 11. 시행, 일부 개정 2022. 11.): 국가법 위임 사항 시행. 주요 내용:
+
+- **건축허가 신청 및 절차**: 제5조~제7조 - 건축허가 신청 시 시장(춘천시)에게 제출. 30일 이내 심사(건축위원회 심의 포함). 변경허가(제16조), 신고(제14조)도 동일 절차.
+
+- **첨부서류**: 국가법 시행규칙 별표 2의 설계도서(배치도, 평면도, 입면도 등) 필수. 추가로 대지 소유권 증명, 토지이용계획 확인원 등.
+
+- **지역 특성 규정**: 제32조(대지안 공지 확보), 제34조(일조권 확보), 제58조(경관 심의 대상 건축물 지정 - 산악지대 경관 보호 강조).
+
+- **최신 개정**: 2025년 12월 기준, 주요 개정은 **춘천시 건축물관리 조례** (조례 제1749호 개정안, 2025. 12. 19. 의결 예정, 12. 31. 공포 예정)에 집중. 소규모 노후 건축물 유지보수 지원 신설(재난 위험 방지), 건축물 해체 허가 기준 강화(안전 부담 완화). 이는 기존 건축허가 절차에 간접 영향(해체·관리 강화).
+
+| 법령명 | 주요 내용 (건축허가 초점) | 시행일 | 출처/링크 |
+
+|--------|--------------------------|--------|-----------|
+
+| 건축법 | 허가 신청서·구비서류 규정, 사전결정 제도 | 2023. 12. 26. | [국가법령정보센터](https://www.law.go.kr/법령/건축법) |
+
+| 춘천시 건축 조례 | 지역별 공지·일조·경관 기준, 위원회 심의 | 2023. 6. 11. (일부 개정 2022. 11.) | [국가법령정보센터](https://law.go.kr/LSW/ordinInfoP.do?ordinSeq=1668839) |
+
+| 춘천시 건축물관리 조례 (개정안) | 노후 건축물 지원, 해체 허가 강화 | 2025. 12. 31. 예정 | [춘천시청 공보](https://www.chuncheon.go.kr/cityhall/administrative-info/municipal-info/chuncheon-gazette/) |
+
+**참고**: 전체 조례 텍스트는 국가법령정보센터에서 확인 가능. 자동검토 솔루션 개발 시, API 연동을 위해 법령 DB(예: 법제처 오픈 API) 활용 추천. 최근 개정(2025. 12.)으로 인해 업데이트 필요.
+
+### 2. 건축허가 신청 시 제출·제공 서류 (Sample Documents)
+
+건축허가 신청은 춘천시청 건축과(또는 행정복지센터)에서 접수하며, 국가 표준(건축법 시행규칙)을 따르되 춘천시 조례에 따라 추가 서류(예: 경관 심의서)가 요구될 수 있습니다. 아래는 표준 구비서류 목록으로, 춘천시 적용 가능(지자체 차이 없음, 관할 확인 필수). 샘플 양식은 HWP/PDF 형식으로 춘천시청 사이트에서 다운로드 가능. (미팅에서 언급하신 대로, ASAP 제공을 위해 링크 중심으로 정리.)
+
+#### 신청서 (Application Form)
+
+- **건축·대수선·용도 변경허가신청서** (건축법 시행규칙 별지 제1호의4): 기본 신청 양식. 건축주 정보, 대지 위치, 용도 등 기재.
+
+- 다운로드: [춘천시청 민원편람/서식](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) > "건축·대수선·용도 변경허가신청" 검색 (HWP 파일).
+
+#### 구비서류 (Required Submission Documents)
+
+아래 서류를 신청서와 함께 제출. (총 5~10부, 전자민원 가능 via 정부24)
+
+| 구분 | 서류명 | 설명/샘플 | 비고 |
+
+|------|--------|-----------|------|
+
+| 기본 서류 | 대지 범위 서류 | 대지 위치도·경계도 (축척 1/250 이상). 샘플: 지적도 발췌본. | 필수 |
+
+| | 소유권 증명 서류 | 등기부등본, 토지대장 (또는 임대차 계약서). 공유지 시 80% 동의서 추가. | 행정정보 공동이용 시 생략 가능 |
+
+| | 사전결정서 | 입지·규모 사전 승인 받은 경우 (건축법 제10조). 샘플: 춘천시 발급서. | 해당 시만 |
+
+| 설계도서 | 설계도서 (별표 2) | 배치도, 평면도, 입면도, 단면도, 구조도 등 (실내마감도 제외). 표준설계 적용 시 간소화. 샘플: CAD/PDF 출력본. | 필수, 1/100 축척 |
+
+| | 건축계획서 | 용적률·건폐율 계산서. | 필수 |
+
+| 추가 서류 | 타 법령 관련 | 환경영향평가서, 교통영향평가서 (대형 건축 시). | 해당 시만 |
+
+| | 결합건축협정서 | 인접 대지 협의 시 (제38조의12). | 해당 시만 |
+
+| 춘천시 특화 | 경관 심의서 | 산악·경관 지역 시 (조례 제58조). | 지역별 추가 |
+
+- **샘플 문서 제공 팁**:
+
+- 정부24 사이트에서 [건축허가 민원 안내](https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09006&CappBizCD=15000000066) 다운로드 (PDF 샘플 포함).
+
+- 첨부서류 샘플: [건축허가신청서 첨부서류 PDF](https://www.law.go.kr/flDownload.do?gubun=&flSeq=85691357&bylClsCd=110201) - 배치도 예시 포함.
+
+- 전체 양식 목록: [춘천시청 서식 페이지](https://www.chuncheon.go.kr/cityhall/minwon/manual-forms/complaints/) - "건축" 검색 시 20여 개 HWP 파일 (예: 가설건축물 허가서, 사용승인 신청서).
+
+**처리 기간**: 14~30일 (심의 포함). 전자제출 추천 (Minwon.go.kr). 자동검토 솔루션 개발 시, 이 서류의 XML/JSON 변환을 고려하세요. 추가 질문 있으시면 anytime 말씀해주세요! (미팅 follow-up으로 더 세부 자료 필요 시 알려주세요.)

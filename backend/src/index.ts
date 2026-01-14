@@ -8,6 +8,8 @@ import { swaggerSpec } from './config/swagger';
 import detailRoutes from './routes/detail.routes';
 import ocrRoutes from './routes/ocr.routes';
 import osmRoutes from './routes/osm.routes';
+import chatbotRoutes from './routes/chatbot.routes';
+import initService from './services/init.service';
 
 dotenv.config();
 
@@ -33,6 +35,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/details', detailRoutes);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/osm', osmRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -66,9 +69,25 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+
+  // Initialize knowledge base
+  await initService.initialize();
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  await initService.shutdown();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+  await initService.shutdown();
+  process.exit(0);
 });
 
 export default app;

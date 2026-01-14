@@ -51,6 +51,9 @@ RUN npm ci && \
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy regulation data files
+COPY data ./data
+
 # Unset dummy DATABASE_URL (will be provided at runtime)
 ENV DATABASE_URL=
 
