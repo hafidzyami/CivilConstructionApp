@@ -9,6 +9,7 @@ import detailRoutes from './routes/detail.routes';
 import ocrRoutes from './routes/ocr.routes';
 import osmRoutes from './routes/osm.routes';
 import chatbotRoutes from './routes/chatbot.routes';
+import cadRoutes from './routes/cad.routes';
 import initService from './services/init.service';
 
 dotenv.config();
@@ -36,6 +37,7 @@ app.use('/api/details', detailRoutes);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/osm', osmRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/cad', cadRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

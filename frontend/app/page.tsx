@@ -23,7 +23,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             <Link
               href="/map"
               className="group relative overflow-hidden bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-10 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 hover:-translate-y-2"
@@ -166,7 +166,53 @@ export default function Home() {
                 </div>
               </div>
             </Link>
+      <Link
+        href="/cad"
+        className="group relative overflow-hidden bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-10 hover:shadow-2xl hover:shadow-orange-500/10 transition-all duration-500 hover:-translate-y-2"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/0 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
 
+        <div className="relative">
+          <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-orange-500/30 group-hover:scale-110 transition-transform duration-300">
+            <svg
+              className="w-7 h-7 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+              />
+            </svg>
+          </div>
+
+          <h2 className="text-3xl font-bold text-slate-900 mb-4">AutoCAD Analyzer</h2>
+          <p className="text-slate-600 text-lg leading-relaxed mb-6">
+            Extract geometry from DXF files to automatically calculate Site Area, Building Footprint,
+            and Floor Area Ratios (BCR/FAR) with interactive layer filtering.
+          </p>
+
+          <div className="flex items-center text-orange-600 font-semibold group-hover:gap-3 gap-2 transition-all duration-300">
+            <span>Start Analysis</span>
+            <svg
+              className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
+            </svg>
+          </div>
+        </div>
+      </Link>
             <a
               href="https://api-civil.ganeshait.com/api-docs"
               target="_blank"

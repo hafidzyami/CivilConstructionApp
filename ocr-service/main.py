@@ -2,7 +2,8 @@
 FastAPI OCR Service
 Microservice for handling OCR processing with Surya, PaddleOCR, and Hybrid modes
 """
-
+import json
+from modules.dxf_utils import process_dxf_geometry, get_dxf_layers
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -287,3 +288,58 @@ async def process_ocr(
 if __name__ == "__main__":
     logger.info("Starting OCR Service on port 7000...")
     uvicorn.run(app, host="0.0.0.0", port=7000)
+
+@app.post("/cad/layers")
+async def get_layers(file: UploadFile = File(...)):
+    request_id = f"{int(time.time() * 1000)}"
+    temp_file_path = UPLOAD_DIR / f"{request_id}_{file.filename}"
+    
+    try:
+        with temp_file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        layers, error = get_dxf_layers(str(temp_file_path))
+        
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+            
+        return JSONResponse({"layers": layers})
+        
+    except Exception as e:
+        logger.error(f"Layer extraction failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_file_path.exists():
+            temp_file_path.unlink()
+
+@app.post("/cad/process")
+async def process_cad(
+    file: UploadFile = File(...),
+    layers: str = Form(default="[]")
+):
+    request_id = f"{int(time.time() * 1000)}"
+    temp_file_path = UPLOAD_DIR / f"{request_id}_{file.filename}"
+    
+    try:
+        active_layers = json.loads(layers) if layers else []
+        
+        with temp_file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        polygons, scale, bounds, error = process_dxf_geometry(str(temp_file_path), active_layers)
+        
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+            
+        return JSONResponse({
+            "polygons": polygons,
+            "scale": scale,
+            "bounds": bounds
+        })
+        
+    except Exception as e:
+        logger.error(f"CAD processing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_file_path.exists():
+            temp_file_path.unlink()
