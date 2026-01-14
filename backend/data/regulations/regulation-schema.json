@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Building Regulation Schema",
+  "description": "Schema for Korean building regulations with articles, sub-articles, and zones",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the regulation (e.g., 'Building Act', 'Seoul Building Ordinance')"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["National", "Regional"],
+      "description": "Level of the regulation"
+    },
+    "authority": {
+      "type": "string",
+      "description": "Issuing authority (e.g., 'Ministry of Land', 'Seoul Metropolitan Government')"
+    },
+    "articles": {
+      "type": "array",
+      "description": "Base articles (without sub-numbering)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^article_\\d+$",
+            "description": "Unique identifier (e.g., 'article_5', 'article_27')"
+          },
+          "title": {
+            "type": "string",
+            "description": "Article title"
+          },
+          "text": {
+            "type": "string",
+            "description": "Full text content of the article"
+          },
+          "topic": {
+            "type": "string",
+            "description": "What this article regulates (e.g., 'building_coverage_ratio', 'floor_area_ratio')"
+          },
+          "value": {
+            "type": "number",
+            "description": "Numeric value if applicable"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unit of measurement (e.g., 'percent', 'meters')"
+          },
+          "operator": {
+            "type": "string",
+            "enum": ["<=", ">=", "=", "<", ">"],
+            "description": "Comparison operator for the value"
+          }
+        },
+        "required": ["id", "text"]
+      }
+    },
+    "subArticles": {
+      "type": "array",
+      "description": "Sub-articles with hierarchical numbering",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^article_\\d+(-\\d+)+$",
+            "description": "Unique identifier (e.g., 'article_5-1', 'article_5-1-1')"
+          },
+          "title": {
+            "type": "string",
+            "description": "Sub-article title"
+          },
+          "text": {
+            "type": "string",
+            "description": "Full text content of the sub-article"
+          },
+          "topic": {
+            "type": "string",
+            "description": "What this sub-article regulates"
+          },
+          "value": {
+            "type": "number",
+            "description": "Numeric value if applicable"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unit of measurement"
+          },
+          "operator": {
+            "type": "string",
+            "enum": ["<=", ">=", "=", "<", ">"],
+            "description": "Comparison operator for the value"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Depth level (1 for '5-1', 2 for '5-1-1')"
+          },
+          "parentId": {
+            "type": "string",
+            "description": "ID of parent article or sub-article"
+          }
+        },
+        "required": ["id", "text", "level", "parentId"]
+      }
+    },
+    "zones": {
+      "type": "array",
+      "description": "Applicable zones/districts",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique zone identifier (e.g., 'zone_residential_1', 'zone_commercial')"
+          },
+          "name": {
+            "type": "string",
+            "description": "Zone name (e.g., 'Residential Zone Type 1', 'Commercial Zone')"
+          },
+          "type": {
+            "type": "string",
+            "description": "Zone category (e.g., 'Residential', 'Commercial', 'Industrial')"
+          },
+          "appliesToArticles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of article IDs this zone applies to"
+          }
+        },
+        "required": ["id", "name", "type"]
+      }
+    }
+  },
+  "required": ["name", "level", "authority", "articles"]
+}
