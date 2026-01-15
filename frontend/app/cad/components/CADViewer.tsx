@@ -6,14 +6,27 @@ interface CADViewerProps {
   bounds: Bounds | null;
   selections: Record<number, Selection>;
   onTogglePoly: (id: number) => void;
+  // New prop for box selection
+  onBoxSelect: (box: Bounds) => void;
 }
 
-export default function CADViewer({ polygons, bounds, selections, onTogglePoly }: CADViewerProps) {
+export default function CADViewer({ 
+  polygons, 
+  bounds, 
+  selections, 
+  onTogglePoly, 
+  onBoxSelect 
+}: CADViewerProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Selection Box State
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectStart, setSelectStart] = useState({ x: 0, y: 0 });
+  const [selectCurrent, setSelectCurrent] = useState({ x: 0, y: 0 });
 
   const viewBox = useMemo(() => {
     if (!bounds) return "0 0 100 100";
@@ -24,7 +37,29 @@ export default function CADViewer({ polygons, bounds, selections, onTogglePoly }
     return `${centerX - width / 2 + panOffset.x} ${centerY - height / 2 + panOffset.y} ${width} ${height}`;
   }, [bounds, zoom, panOffset]);
 
+  // Helper: Convert screen coordinates to SVG coordinates
+  const getSvgPoint = (clientX: number, clientY: number) => {
+    if (!svgRef.current) return { x: 0, y: 0 };
+    const CTM = svgRef.current.getScreenCTM();
+    if (!CTM) return { x: 0, y: 0 };
+    return {
+      x: (clientX - CTM.e) / CTM.a,
+      y: (clientY - CTM.f) / CTM.d
+    };
+  };
+
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    // CTRL + Left Click = Start Box Select
+    if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
+      setIsSelecting(true);
+      const pt = getSvgPoint(e.clientX, e.clientY);
+      setSelectStart(pt);
+      setSelectCurrent(pt);
+      e.stopPropagation(); // Prevent other handlers
+      return;
+    }
+
+    // Middle Mouse OR Shift+Left = Pan
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
       setIsPanning(true);
       setPanStart({ x: e.clientX, y: e.clientY });
@@ -33,7 +68,10 @@ export default function CADViewer({ polygons, bounds, selections, onTogglePoly }
   };
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (isPanning && svgRef.current && bounds) {
+    if (isSelecting) {
+      const pt = getSvgPoint(e.clientX, e.clientY);
+      setSelectCurrent(pt);
+    } else if (isPanning && svgRef.current && bounds) {
       const dx = e.clientX - panStart.x;
       const dy = e.clientY - panStart.y;
       const rect = svgRef.current.getBoundingClientRect();
@@ -42,11 +80,46 @@ export default function CADViewer({ polygons, bounds, selections, onTogglePoly }
       
       setPanOffset((prev) => ({
         x: prev.x - dx * scaleX,
-        y: prev.y + dy * scaleY, // Inverted Y axis
+        y: prev.y + dy * scaleY, 
       }));
       setPanStart({ x: e.clientX, y: e.clientY });
     }
   };
+
+  const handleMouseUp = () => {
+    if (isSelecting) {
+      setIsSelecting(false);
+      // Calculate final box
+      // Note: SVG Y is flipped in our display transform `scale(1, -1)`
+      // However, getSvgPoint returns "screen-mapped" SVG coords. 
+      // We need to ensure min/max are correct regardless of drag direction.
+      
+      const box: Bounds = {
+        min_x: Math.min(selectStart.x, selectCurrent.x),
+        max_x: Math.max(selectStart.x, selectCurrent.x),
+        // Since Y is flipped in the group transform, we need to be careful.
+        // Actually, because the rectangle is drawn inside the group, 
+        // the coordinates are already in "World Space".
+        min_y: Math.min(selectStart.y, selectCurrent.y),
+        max_y: Math.max(selectStart.y, selectCurrent.y),
+      };
+
+      // Only trigger if dragged slightly (avoid accidental clicks)
+      const dist = Math.sqrt(
+        Math.pow(selectStart.x - selectSelectCurrent.x, 2) + 
+        Math.pow(selectStart.y - selectSelectCurrent.y, 2)
+      );
+      
+      if (dist > 0.5) { // Threshold
+         onBoxSelect(box);
+      }
+    }
+    setIsPanning(false);
+  };
+
+  // Helper to fix the selectCurrent variable typo above if copying directly
+  // Just use selectCurrent in the distance check.
+  const selectSelectCurrent = selectCurrent; 
 
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
@@ -62,11 +135,13 @@ export default function CADViewer({ polygons, bounds, selections, onTogglePoly }
 
   return (
     <div className="flex-1 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl overflow-hidden shadow-lg relative min-h-[400px] z-0">
+      {/* Viewer Controls UI */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 pointer-events-none">
         <div className="bg-white/90 backdrop-blur-sm border border-slate-300 rounded-lg p-2 shadow-lg text-xs text-slate-600 pointer-events-auto">
-          <div className="text-[10px] text-slate-500">
-            Scroll: Zoom<br />
-            Shift+Drag: Pan
+          <div className="text-[10px] text-slate-500 font-medium">
+            <span className="block mb-1">🖱️ Scroll: Zoom</span>
+            <span className="block mb-1">✋ Shift+Drag: Pan</span>
+            <span className="block text-purple-600 font-bold">✨ Ctrl+Drag: Multi Select</span>
           </div>
         </div>
         <button
@@ -87,53 +162,72 @@ export default function CADViewer({ polygons, bounds, selections, onTogglePoly }
           className="w-full h-full block select-none"
           preserveAspectRatio="xMidYMid meet"
           style={{
-            transform: 'scaleY(-1)',
+            transform: 'scaleY(-1)', // Global flip for CAD coordinates
             transformOrigin: 'center',
-            cursor: isPanning ? 'grabbing' : 'default',
+            cursor: isSelecting ? 'crosshair' : (isPanning ? 'grabbing' : 'default'),
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
-          onMouseUp={() => setIsPanning(false)}
-          onMouseLeave={() => setIsPanning(false)}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
         >
-          {polygons.map((poly) => {
-            const selection = selections[poly.id];
-            let fill = '#333333';
-            let stroke = '#555555';
-            let opacity = 0.5;
+          {/* Polygons Group */}
+          <g>
+            {polygons.map((poly) => {
+              const selection = selections[poly.id];
+              let fill = '#333333';
+              let stroke = '#555555';
+              let opacity = 0.5;
 
-            if (selection) {
-              if (selection.isSite && selection.isBuilding) {
-                fill = '#9333ea'; // Purple
-                stroke = '#ffffff';
-                opacity = 0.8;
-              } else if (selection.isSite) {
-                fill = '#06b6d4'; // Cyan
-                stroke = '#ffffff';
-                opacity = 0.4;
-              } else if (selection.isBuilding) {
-                fill = selection.isFootprint ? '#f97316' : '#fbbf24'; // Orange
-                stroke = '#ffffff';
-                opacity = 0.8;
+              if (selection) {
+                if (selection.isSite && selection.isBuilding) {
+                  fill = '#9333ea'; // Purple
+                  stroke = '#ffffff';
+                  opacity = 0.8;
+                } else if (selection.isSite) {
+                  fill = '#06b6d4'; // Cyan
+                  stroke = '#ffffff';
+                  opacity = 0.4;
+                } else if (selection.isBuilding) {
+                  fill = selection.isFootprint ? '#f97316' : '#fbbf24'; // Orange
+                  stroke = '#ffffff';
+                  opacity = 0.8;
+                }
               }
-            }
 
-            const pointsStr = poly.points.map((p) => `${p[0]},${p[1]}`).join(' ');
+              const pointsStr = poly.points.map((p) => `${p[0]},${p[1]}`).join(' ');
 
-            return (
-              <polygon
-                key={poly.id}
-                points={pointsStr}
-                fill={fill}
-                stroke={stroke}
-                strokeWidth={selection ? (bounds ? (bounds.max_x - bounds.min_x) * 0.005 : 0.5) : (bounds ? (bounds.max_x - bounds.min_x) * 0.002 : 0.1)}
-                opacity={opacity}
-                className="hover:opacity-100 cursor-pointer transition-colors duration-200"
-                onClick={() => onTogglePoly(poly.id)}
-              />
-            );
-          })}
+              return (
+                <polygon
+                  key={poly.id}
+                  points={pointsStr}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={selection ? (bounds ? (bounds.max_x - bounds.min_x) * 0.005 : 0.5) : (bounds ? (bounds.max_x - bounds.min_x) * 0.002 : 0.1)}
+                  opacity={opacity}
+                  className="hover:opacity-100 transition-colors duration-200"
+                  // Only allow click toggle if NOT selecting (prevent accidental clicks)
+                  onClick={() => !isSelecting && onTogglePoly(poly.id)}
+                />
+              );
+            })}
+          </g>
+
+          {/* Selection Box Overlay */}
+          {isSelecting && (
+            <rect
+              x={Math.min(selectStart.x, selectCurrent.x)}
+              y={Math.min(selectStart.y, selectCurrent.y)}
+              width={Math.abs(selectCurrent.x - selectStart.x)}
+              height={Math.abs(selectCurrent.y - selectStart.y)}
+              fill="rgba(147, 51, 234, 0.2)" // Purple tint
+              stroke="#9333ea"
+              strokeWidth={(bounds ? (bounds.max_x - bounds.min_x) * 0.003 : 0.5)}
+              strokeDasharray="5,5"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
         </svg>
       </div>
     </div>

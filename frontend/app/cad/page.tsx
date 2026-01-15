@@ -10,6 +10,7 @@ import CADViewer from './components/CADViewer';
 
 export default function CADPage() {
   const [file, setFile] = useState<File | null>(null);
+  // ... (keep existing state)
   const [layers, setLayers] = useState<string[]>([]);
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
   const [step, setStep] = useState<AppStep>('upload');
@@ -25,17 +26,18 @@ export default function CADPage() {
   const [floorCount, setFloorCount] = useState(1);
   const [isFootprint, setIsFootprint] = useState(true);
 
-  // API Helper
+  // ... (keep API Helper and other handlers like handleFileSelect)
   const getApiUrl = () => {
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') return '/api';
-    return 'http://localhost:3001/api';
+    return 'http://localhost:3001/api'; 
   };
 
   const handleFileSelect = async (f: File) => {
+    // ... (keep existing implementation)
     if (!f.name.toLowerCase().endsWith('.dxf')) {
-      alert('Please select a valid .dxf file');
-      return;
+        alert('Please select a valid .dxf file');
+        return;
     }
     setFile(f);
     setLoading(true);
@@ -43,14 +45,14 @@ export default function CADPage() {
     try {
       const formData = new FormData();
       formData.append('file', f);
-
+      
       const res = await fetch(`${getApiUrl()}/cad/layers`, {
         method: 'POST',
         body: formData,
       });
       const data = await res.json();
       setLayers(data.layers || []);
-      setSelectedLayers(data.layers || []);
+      setSelectedLayers(data.layers || []); 
       setStep('layers');
     } catch (err) {
       alert('Failed to load layers');
@@ -75,7 +77,22 @@ export default function CADPage() {
       const data = await res.json();
 
       if (data.polygons) {
-        setPolygons(data.polygons);
+        // Pre-calculate Bounding Boxes for fast selection
+        const enhancedPolygons = data.polygons.map((p: any) => {
+            const xs = p.points.map((pt: number[]) => pt[0]);
+            const ys = p.points.map((pt: number[]) => pt[1]);
+            return {
+                ...p,
+                bbox: {
+                    min_x: Math.min(...xs),
+                    max_x: Math.max(...xs),
+                    min_y: Math.min(...ys),
+                    max_y: Math.max(...ys),
+                }
+            };
+        });
+
+        setPolygons(enhancedPolygons);
         setBounds(data.bounds);
         setStep('analyze');
       }
@@ -89,7 +106,6 @@ export default function CADPage() {
   const togglePoly = (id: number) => {
     setSelections((prev) => {
       const next = { ...prev };
-      // Copy existing or init default
       const current = next[id] 
         ? { ...next[id] } 
         : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
@@ -98,7 +114,6 @@ export default function CADPage() {
         current.isSite = !current.isSite;
       } else {
         current.isBuilding = !current.isBuilding;
-        // Always update building params when interacting in building mode
         if (activeMode === 'building') {
           current.floors = floorCount;
           current.isFootprint = isFootprint;
@@ -114,7 +129,48 @@ export default function CADPage() {
     });
   };
 
+  // --- NEW: Handle Box Selection ---
+  const handleBoxSelect = (box: Bounds) => {
+    setSelections(prev => {
+        const next = { ...prev };
+        let hasChanges = false;
+
+        polygons.forEach(p => {
+            // Simple AABB Intersection Check
+            // Ensure polygon has a bbox (calculated in processFile)
+            const pBox = (p as any).bbox; 
+            if (!pBox) return;
+
+            const intersects = 
+                box.min_x <= pBox.max_x &&
+                box.max_x >= pBox.min_x &&
+                box.min_y <= pBox.max_y &&
+                box.max_y >= pBox.min_y;
+
+            if (intersects) {
+                hasChanges = true;
+                const current = next[p.id] 
+                    ? { ...next[p.id] } 
+                    : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
+
+                // Apply current mode to the intersecting polygon
+                if (activeMode === 'site') {
+                    current.isSite = true; // Add to site
+                } else {
+                    current.isBuilding = true; // Add to building
+                    current.floors = floorCount;
+                    current.isFootprint = isFootprint;
+                }
+                next[p.id] = current;
+            }
+        });
+
+        return hasChanges ? next : prev;
+    });
+  };
+
   const metrics = useMemo(() => {
+    // ... (keep existing metrics logic)
     let siteArea = 0;
     let footprintArea = 0;
     let totalFloorArea = 0;
@@ -140,6 +196,7 @@ export default function CADPage() {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-orange-50 to-slate-100 flex flex-col">
+      {/* Background Effects */}
       <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10"></div>
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-200/30 rounded-full blur-3xl -z-10"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-red-200/30 rounded-full blur-3xl -z-10"></div>
@@ -184,6 +241,7 @@ export default function CADPage() {
                   bounds={bounds}
                   selections={selections}
                   onTogglePoly={togglePoly}
+                  onBoxSelect={handleBoxSelect} // Passed here
                 />
               </div>
             )}
