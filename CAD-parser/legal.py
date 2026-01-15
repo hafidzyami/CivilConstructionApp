@@ -87,7 +87,7 @@ class HybridPermitAuditor:
         }
 
 if __name__ == "__main__":
-    auditor = HybridPermitAuditor('files/simplehouse.dxf')
+    auditor = HybridPermitAuditor('files/50Py2F R.C House.dxf')
     res = auditor.audit()
     
     print(f"--- Final Audit (Hybrid Logic) ---")

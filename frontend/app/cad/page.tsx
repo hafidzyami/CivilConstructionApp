@@ -47,7 +47,8 @@ export default function CADPage() {
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   
   // Pan & Zoom for Viewer
-  const [viewTransform, setViewTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [zoom, setZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
@@ -189,26 +190,42 @@ export default function CADPage() {
     return { siteArea, footprintArea, totalFloorArea, bcr, far };
   }, [selections, polygons]);
 
-  const viewBox = bounds 
-    ? `${bounds.min_x} ${bounds.min_y} ${bounds.max_x - bounds.min_x} ${bounds.max_y - bounds.min_y}`
-    : "0 0 100 100";
+  const viewBox = useMemo(() => {
+    if (!bounds) return "0 0 100 100";
+    
+    const width = (bounds.max_x - bounds.min_x) / zoom;
+    const height = (bounds.max_y - bounds.min_y) / zoom;
+    const centerX = bounds.min_x + (bounds.max_x - bounds.min_x) / 2;
+    const centerY = bounds.min_y + (bounds.max_y - bounds.min_y) / 2;
+    
+    return `${centerX - width / 2 + panOffset.x} ${centerY - height / 2 + panOffset.y} ${width} ${height}`;
+  }, [bounds, zoom, panOffset]);
 
   // Pan & Zoom handlers
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle mouse or Shift+Left
       setIsPanning(true);
-      setPanStart({ x: e.clientX - viewTransform.x, y: e.clientY - viewTransform.y });
+      setPanStart({ x: e.clientX, y: e.clientY });
       e.preventDefault();
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (isPanning) {
-      setViewTransform(prev => ({
-        ...prev,
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y
+    if (isPanning && svgRef.current && bounds) {
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      
+      // Convert screen space movement to SVG coordinate space
+      const rect = svgRef.current.getBoundingClientRect();
+      const scaleX = (bounds.max_x - bounds.min_x) / (rect.width * zoom);
+      const scaleY = (bounds.max_y - bounds.min_y) / (rect.height * zoom);
+      
+      setPanOffset(prev => ({
+        x: prev.x - dx * scaleX,
+        y: prev.y + dy * scaleY // Inverted Y axis
       }));
+      
+      setPanStart({ x: e.clientX, y: e.clientY });
     }
   };
 
@@ -218,15 +235,17 @@ export default function CADPage() {
 
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setViewTransform(prev => ({
-      ...prev,
-      scale: Math.max(0.1, Math.min(10, prev.scale * delta))
-    }));
+    
+    // Smoother zoom with smaller increments
+    const delta = e.deltaY > 0 ? 0.95 : 1.05;
+    const newZoom = Math.max(0.5, Math.min(50, zoom * delta));
+    
+    setZoom(newZoom);
   };
 
   const resetView = () => {
-    setViewTransform({ x: 0, y: 0, scale: 1 });
+    setZoom(1);
+    setPanOffset({ x: 0, y: 0 });
   };
 
   return (
@@ -475,7 +494,7 @@ export default function CADPage() {
                                     <div className="text-2xl font-mono text-white truncate" title={`${metrics.totalFloorArea} m²`}>{metrics.totalFloorArea.toFixed(1)} <span className="text-sm opacity-50">m²</span></div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-400 text-[10px] uppercase tracking-wider mb-1">BCR</div>
+                                    <div className="text-slate-400 text-[10px] uppercase tracking-wider mb-1">BuildingBCR</div>
                                     <div className="text-3xl font-bold text-orange-500">{metrics.bcr.toFixed(1)}<span className="text-lg">%</span></div>
                                 </div>
                                 <div>
@@ -500,7 +519,7 @@ export default function CADPage() {
                                 </svg>
                             </button>
                             <div className="bg-white/90 backdrop-blur-sm border border-slate-300 rounded-lg p-2 shadow-lg text-xs text-slate-600">
-                                <div className="font-mono">Zoom: {viewTransform.scale.toFixed(2)}x</div>
+                                <div className="font-mono">Zoom: {zoom.toFixed(2)}x</div>
                                 <div className="text-[10px] mt-1 text-slate-500">
                                     Scroll: Zoom<br/>
                                     Shift+Drag: Pan
@@ -514,8 +533,8 @@ export default function CADPage() {
                                 viewBox={viewBox} 
                                 className="w-full h-full block select-none"
                                 preserveAspectRatio="xMidYMid meet"
-                                transform="scale(1, -1)"
                                 style={{ 
+                                    transform: 'scaleY(-1)',
                                     transformOrigin: 'center',
                                     cursor: isPanning ? 'grabbing' : 'default'
                                 }}
@@ -525,7 +544,6 @@ export default function CADPage() {
                                 onMouseLeave={handleMouseUp}
                                 onWheel={handleWheel}
                             >
-                                <g transform={`translate(${viewTransform.x / viewTransform.scale}, ${viewTransform.y / viewTransform.scale}) scale(${1 / viewTransform.scale})`}>
                                 {polygons.map((poly) => {
                                     const selection = selections[poly.id];
                                     let fill = '#333333';
@@ -564,7 +582,6 @@ export default function CADPage() {
                                         />
                                     );
                                 })}
-                                </g>
                             </svg>
                         </div>
                     </div>

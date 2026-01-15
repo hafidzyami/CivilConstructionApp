@@ -16,3 +16,4 @@
 neo4j/
 
 CAD-parser/draft/*.py
+CAD-parser/.venv
