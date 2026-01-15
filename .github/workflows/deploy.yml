@@ -85,10 +85,12 @@ jobs:
             BACKEND_PORT=6969
             FRONTEND_PORT=6968
             OCR_PORT=7000
+            CAD_PORT=7001
             NODE_ENV=production
             NEXT_PUBLIC_API_URL=/api
             DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/$POSTGRES_DB?schema=public
             OCR_SERVICE_URL=http://ocr-service:7000
+            CAD_SERVICE_URL=http://cad-service:7001
             NEO4J_URI=bolt://neo4j:7687
             EOF
             chmod 600 $APP_DIR/.env
@@ -148,6 +150,31 @@ jobs:
                     limits:
                       memory: 8G
 
+              cad-service:
+                build:
+                  context: ./repo/CAD-parser
+                  dockerfile: Dockerfile
+                image: civilconstruction-cad:latest
+                container_name: civilconstruction-cad
+                restart: unless-stopped
+                env_file: .env
+                ports:
+                  - "${CAD_PORT:-7001}:7001"
+                environment:
+                  - PYTHONUNBUFFERED=1
+                networks:
+                  - civilconstruction-network
+                healthcheck:
+                  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7001/health')"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 30s
+                deploy:
+                  resources:
+                    limits:
+                      memory: 2G
+
               backend:
                 build:
                   context: ./repo/backend
@@ -167,6 +194,8 @@ jobs:
                   - civilconstruction-network
                 depends_on:
                   ocr-service:
+                    condition: service_healthy
+                  cad-service:
                     condition: service_healthy
                   neo4j:
                     condition: service_healthy
