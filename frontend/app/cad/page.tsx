@@ -10,7 +10,6 @@ import CADViewer from './components/CADViewer';
 
 export default function CADPage() {
   const [file, setFile] = useState<File | null>(null);
-  // ... (keep existing state)
   const [layers, setLayers] = useState<string[]>([]);
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
   const [step, setStep] = useState<AppStep>('upload');
@@ -26,18 +25,17 @@ export default function CADPage() {
   const [floorCount, setFloorCount] = useState(1);
   const [isFootprint, setIsFootprint] = useState(true);
 
-  // ... (keep API Helper and other handlers like handleFileSelect)
+  // API Helper
   const getApiUrl = () => {
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') return '/api';
-    return 'http://localhost:3001/api'; 
+    return 'http://localhost:3001/api';
   };
 
   const handleFileSelect = async (f: File) => {
-    // ... (keep existing implementation)
     if (!f.name.toLowerCase().endsWith('.dxf')) {
-        alert('Please select a valid .dxf file');
-        return;
+      alert('Please select a valid .dxf file');
+      return;
     }
     setFile(f);
     setLoading(true);
@@ -45,14 +43,14 @@ export default function CADPage() {
     try {
       const formData = new FormData();
       formData.append('file', f);
-      
+
       const res = await fetch(`${getApiUrl()}/cad/layers`, {
         method: 'POST',
         body: formData,
       });
       const data = await res.json();
       setLayers(data.layers || []);
-      setSelectedLayers(data.layers || []); 
+      setSelectedLayers(data.layers || []);
       setStep('layers');
     } catch (err) {
       alert('Failed to load layers');
@@ -113,11 +111,12 @@ export default function CADPage() {
       if (activeMode === 'site') {
         current.isSite = !current.isSite;
       } else {
-        current.isBuilding = !current.isBuilding;
-        if (activeMode === 'building') {
+        // Apply settings if turning on
+        if (!current.isBuilding) {
           current.floors = floorCount;
           current.isFootprint = isFootprint;
         }
+        current.isBuilding = !current.isBuilding;
       }
 
       if (!current.isSite && !current.isBuilding) {
@@ -129,18 +128,17 @@ export default function CADPage() {
     });
   };
 
-  // --- NEW: Handle Box Selection ---
+  // --- UPDATED: Toggle Logic for Box Selection ---
   const handleBoxSelect = (box: Bounds) => {
     setSelections(prev => {
         const next = { ...prev };
         let hasChanges = false;
 
         polygons.forEach(p => {
-            // Simple AABB Intersection Check
-            // Ensure polygon has a bbox (calculated in processFile)
             const pBox = (p as any).bbox; 
             if (!pBox) return;
 
+            // Check if polygon is inside/intersecting selection box
             const intersects = 
                 box.min_x <= pBox.max_x &&
                 box.max_x >= pBox.min_x &&
@@ -149,28 +147,36 @@ export default function CADPage() {
 
             if (intersects) {
                 hasChanges = true;
+                // Get existing selection or create new default
                 const current = next[p.id] 
                     ? { ...next[p.id] } 
                     : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
 
-                // Apply current mode to the intersecting polygon
+                // TOGGLE LOGIC: Invert current state
                 if (activeMode === 'site') {
-                    current.isSite = true; // Add to site
+                    current.isSite = !current.isSite;
                 } else {
-                    current.isBuilding = true; // Add to building
-                    current.floors = floorCount;
-                    current.isFootprint = isFootprint;
+                    // If turning ON, apply current floor/footprint settings
+                    if (!current.isBuilding) {
+                        current.floors = floorCount;
+                        current.isFootprint = isFootprint;
+                    }
+                    current.isBuilding = !current.isBuilding;
                 }
-                next[p.id] = current;
+
+                // Remove key if no longer selected
+                if (!current.isSite && !current.isBuilding) {
+                    delete next[p.id];
+                } else {
+                    next[p.id] = current;
+                }
             }
         });
-
         return hasChanges ? next : prev;
     });
   };
 
   const metrics = useMemo(() => {
-    // ... (keep existing metrics logic)
     let siteArea = 0;
     let footprintArea = 0;
     let totalFloorArea = 0;
@@ -196,7 +202,6 @@ export default function CADPage() {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-orange-50 to-slate-100 flex flex-col">
-      {/* Background Effects */}
       <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10"></div>
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-200/30 rounded-full blur-3xl -z-10"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-red-200/30 rounded-full blur-3xl -z-10"></div>
@@ -241,7 +246,7 @@ export default function CADPage() {
                   bounds={bounds}
                   selections={selections}
                   onTogglePoly={togglePoly}
-                  onBoxSelect={handleBoxSelect} // Passed here
+                  onBoxSelect={handleBoxSelect}
                 />
               </div>
             )}

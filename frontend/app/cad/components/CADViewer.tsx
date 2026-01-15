@@ -6,7 +6,6 @@ interface CADViewerProps {
   bounds: Bounds | null;
   selections: Record<number, Selection>;
   onTogglePoly: (id: number) => void;
-  // New prop for box selection
   onBoxSelect: (box: Bounds) => void;
 }
 
@@ -55,7 +54,7 @@ export default function CADViewer({
       const pt = getSvgPoint(e.clientX, e.clientY);
       setSelectStart(pt);
       setSelectCurrent(pt);
-      e.stopPropagation(); // Prevent other handlers
+      e.stopPropagation();
       return;
     }
 
@@ -89,37 +88,24 @@ export default function CADViewer({
   const handleMouseUp = () => {
     if (isSelecting) {
       setIsSelecting(false);
-      // Calculate final box
-      // Note: SVG Y is flipped in our display transform `scale(1, -1)`
-      // However, getSvgPoint returns "screen-mapped" SVG coords. 
-      // We need to ensure min/max are correct regardless of drag direction.
-      
       const box: Bounds = {
         min_x: Math.min(selectStart.x, selectCurrent.x),
         max_x: Math.max(selectStart.x, selectCurrent.x),
-        // Since Y is flipped in the group transform, we need to be careful.
-        // Actually, because the rectangle is drawn inside the group, 
-        // the coordinates are already in "World Space".
         min_y: Math.min(selectStart.y, selectCurrent.y),
         max_y: Math.max(selectStart.y, selectCurrent.y),
       };
 
-      // Only trigger if dragged slightly (avoid accidental clicks)
       const dist = Math.sqrt(
-        Math.pow(selectStart.x - selectSelectCurrent.x, 2) + 
-        Math.pow(selectStart.y - selectSelectCurrent.y, 2)
+        Math.pow(selectStart.x - selectCurrent.x, 2) + 
+        Math.pow(selectStart.y - selectCurrent.y, 2)
       );
       
-      if (dist > 0.5) { // Threshold
+      if (dist > 0.5) {
          onBoxSelect(box);
       }
     }
     setIsPanning(false);
   };
-
-  // Helper to fix the selectCurrent variable typo above if copying directly
-  // Just use selectCurrent in the distance check.
-  const selectSelectCurrent = selectCurrent; 
 
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
@@ -133,15 +119,18 @@ export default function CADViewer({
     setPanOffset({ x: 0, y: 0 });
   };
 
+  // Base stroke width relative to model size (not screen pixels)
+  // This ensures lines scale up/down naturally with the building
+  const baseStrokeWidth = bounds ? (bounds.max_x - bounds.min_x) * 0.002 : 0.1;
+
   return (
     <div className="flex-1 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl overflow-hidden shadow-lg relative min-h-[400px] z-0">
-      {/* Viewer Controls UI */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 pointer-events-none">
         <div className="bg-white/90 backdrop-blur-sm border border-slate-300 rounded-lg p-2 shadow-lg text-xs text-slate-600 pointer-events-auto">
-          <div className="text-[10px] text-slate-500 font-medium">
-            <span className="block mb-1">🖱️ Scroll: Zoom</span>
-            <span className="block mb-1">✋ Shift+Drag: Pan</span>
-            <span className="block text-purple-600 font-bold">✨ Ctrl+Drag: Multi Select</span>
+          <div className="text-[10px] text-slate-500 font-medium space-y-1">
+            <div className="flex items-center gap-2"><span className="w-4 text-center">🖱️</span> Scroll to Zoom</div>
+            <div className="flex items-center gap-2"><span className="w-4 text-center">✋</span> Shift+Drag to Pan</div>
+            <div className="flex items-center gap-2 text-purple-700 font-bold"><span className="w-4 text-center">✨</span> Ctrl+Drag to Select</div>
           </div>
         </div>
         <button
@@ -162,7 +151,7 @@ export default function CADViewer({
           className="w-full h-full block select-none"
           preserveAspectRatio="xMidYMid meet"
           style={{
-            transform: 'scaleY(-1)', // Global flip for CAD coordinates
+            transform: 'scaleY(-1)',
             transformOrigin: 'center',
             cursor: isSelecting ? 'crosshair' : (isPanning ? 'grabbing' : 'default'),
           }}
@@ -172,7 +161,6 @@ export default function CADViewer({
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
         >
-          {/* Polygons Group */}
           <g>
             {polygons.map((poly) => {
               const selection = selections[poly.id];
@@ -204,27 +192,28 @@ export default function CADViewer({
                   points={pointsStr}
                   fill={fill}
                   stroke={stroke}
-                  strokeWidth={selection ? (bounds ? (bounds.max_x - bounds.min_x) * 0.005 : 0.5) : (bounds ? (bounds.max_x - bounds.min_x) * 0.002 : 0.1)}
+                  // FIX 1: Removed vectorEffect from polygons
+                  // FIX 2: Use Model-Relative stroke width
+                  strokeWidth={selection ? baseStrokeWidth * 2.5 : baseStrokeWidth}
                   opacity={opacity}
                   className="hover:opacity-100 transition-colors duration-200"
-                  // Only allow click toggle if NOT selecting (prevent accidental clicks)
                   onClick={() => !isSelecting && onTogglePoly(poly.id)}
                 />
               );
             })}
           </g>
 
-          {/* Selection Box Overlay */}
           {isSelecting && (
             <rect
               x={Math.min(selectStart.x, selectCurrent.x)}
               y={Math.min(selectStart.y, selectCurrent.y)}
               width={Math.abs(selectCurrent.x - selectStart.x)}
               height={Math.abs(selectCurrent.y - selectStart.y)}
-              fill="rgba(147, 51, 234, 0.2)" // Purple tint
-              stroke="#9333ea"
-              strokeWidth={(bounds ? (bounds.max_x - bounds.min_x) * 0.003 : 0.5)}
-              strokeDasharray="5,5"
+              fill="rgba(255, 255, 255, 0.1)"
+              stroke="white"
+              // FIX 3: Keep vectorEffect on Selection Box so it stays crisp (2px)
+              strokeWidth="2" 
+              strokeDasharray="5,5" 
               vectorEffect="non-scaling-stroke"
             />
           )}
