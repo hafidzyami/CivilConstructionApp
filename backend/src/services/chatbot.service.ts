@@ -34,14 +34,14 @@ class ChatbotService {
     if (apiKey) {
       this.genAI = new GoogleGenerativeAI(apiKey);
       this.model = this.genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash-lite', // Latest stable model
+        model: 'gemini-2.5-flash-lite',
         generationConfig: {
-          temperature: 0.7, // Higher temperature for more natural, conversational responses
-          topP: 0.95,
-          topK: 40,
+          temperature: 0.3, // Lower temperature for more consistent, professional responses
+          topP: 0.9,
+          topK: 30,
         },
       });
-      console.log('✅ Gemini LLM initialized for conversational chatbot');
+      console.log('✅ Gemini LLM initialized for chatbot');
     } else {
       console.warn('⚠️  GEMINI_API_KEY not found. Chatbot will use basic responses.');
     }
@@ -192,15 +192,17 @@ Return ONLY valid JSON, no explanations.`;
    * Handle greeting naturally
    */
   private async handleGreeting(query: string, conversationContext: string): Promise<ChatResponse> {
-    const prompt = `You are a friendly Building Regulations Assistant.
+    const prompt = `You are a Building Regulations Assistant.
 
 ${conversationContext ? `Previous conversation:\n${conversationContext}\n\n` : ''}
 
 User just said: "${query}"
 
-Respond naturally and warmly. Briefly mention you can help with building regulations and construction standards (national and Chuncheon regional). Keep it conversational and friendly, not formal. End with asking how you can help.
+Respond professionally and concisely. Briefly mention you can help with building regulations and construction standards (national and Chuncheon regional). Ask what they would like to know.
 
-Response (1-3 sentences):`;
+AVOID filler phrases like "Great to hear from you!", "Feel free to ask!", or ending with "Does that make sense?"
+
+Response (1-2 sentences):`;
 
     const result = await this.model!.generateContent(prompt);
     const message = result.response.text();
@@ -235,13 +237,15 @@ Available regulations in your knowledge base:
 - Regional regulations: ${stats.regionalArticles} articles, ${stats.regionalSubArticles} sub-articles
 - Total: ${stats.regulations} regulations with ${stats.mentions} cross-references and ${stats.relatedTo} national-regional links
 
-Respond naturally explaining what you can help with. Mention:
+Explain what you can help with:
 1. You have access to national and Chuncheon building regulations
 2. You can answer questions about specific topics (BCR, FAR, height, parking, public space, etc.)
 3. You can compare national vs regional regulations
 4. All your answers come from the official regulations in your knowledge base
 
-Keep it conversational and helpful, not a bullet list. 2-4 sentences.
+Keep it professional and informative, 2-4 sentences.
+
+AVOID filler phrases like "Does that make sense?", "Feel free to ask!", or overly casual language.
 
 Response:`;
 
@@ -614,7 +618,9 @@ Common topics you can help with:
 - Public space requirements
 - Setback requirements
 
-Respond conversationally, ${articleNumber ? `explaining that Article ${articleNumber} doesn't exist and why that might be` : 'explaining you don\'t have information about their specific query'}. Be helpful and friendly, and suggest related topics they could ask about.
+Respond professionally, ${articleNumber ? `explaining that Article ${articleNumber} doesn't exist in your knowledge base and why that might be` : 'explaining you don\'t have information about their specific query'}. Suggest related topics they could ask about.
+
+AVOID filler phrases like "Does that make sense?", "Let me know if you have questions!", or overly casual greetings like "Hey there!"
 
 Response:`;
 
@@ -646,7 +652,7 @@ Content: ${article.text.slice(0, 800)}
     const stats = await knowledgeBaseService.getStats();
 
     // Create conversational RAG prompt
-    const prompt = `You are a friendly and knowledgeable Building Regulations Assistant. Your goal is to help users understand building codes in a natural, conversational way.
+    const prompt = `You are a professional Building Regulations Assistant. Your goal is to provide accurate, clear, and informative answers about building codes and regulations.
 
 ${conversationContext ? `CONVERSATION HISTORY:\n${conversationContext}\n\n` : ''}
 
@@ -661,16 +667,25 @@ AVAILABLE REGULATIONS:
 - Regional regulations (Chuncheon): ${stats.regionalArticles} articles, ${stats.regionalSubArticles} sub-articles
 
 INSTRUCTIONS:
-1. Answer the user's question in a natural, conversational tone (like talking to a colleague)
+1. Answer the user's question in a clear, professional, and informative tone
 2. Use ONLY the information from the context above - don't make up anything
 3. Cite your sources naturally (e.g., "According to the Building Act...", "Article 56 states...")
 4. If comparing national vs regional, explain the differences clearly
 5. If regional overrides national, mention that
 6. Keep it clear and easy to understand - avoid overly legal language unless necessary
 7. If the context doesn't fully answer the question, acknowledge what you can answer and what you can't
-8. Use examples or analogies if helpful
+8. Use bullet points or numbered lists when explaining multiple requirements
 
-YOUR RESPONSE (conversational and natural):`;
+STRICTLY AVOID (NEVER USE THESE):
+- Filler phrases: "Does that make sense?", "Let me know if you have questions!", "Feel free to ask!", "Hope that helps!", "Hope that clears things up!"
+- Casual greetings: "Hey there!", "Hi there!", "Great question!", "Good question!"
+- Rhetorical questions at the end of responses
+- Phrases like "So, you're asking about...", "right?", "you know?"
+- Redundant confirmations or unnecessary pleasantries
+
+Start your response directly with the information. Be concise and professional.
+
+YOUR RESPONSE:`;
 
     const result = await this.model!.generateContent(prompt);
     const responseText = result.response.text();
