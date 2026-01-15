@@ -1,0 +1,19 @@
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+files/
+draft/
+*.dwg
+*.dxf
+.git
+.gitignore
+README.md
+dxf_app.py
+fullaudit.py
+geometric.py
+legal.py
+# Exclude text files in files/ folder only
+files/*.txt

@@ -45,6 +45,12 @@ export default function CADPage() {
   
   // Layer Panel Toggle
   const [showLayerPanel, setShowLayerPanel] = useState(false);
+  
+  // Pan & Zoom for Viewer
+  const [viewTransform, setViewTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
 
   // API Helper
   const getApiUrl = () => {
@@ -187,6 +193,42 @@ export default function CADPage() {
     ? `${bounds.min_x} ${bounds.min_y} ${bounds.max_x - bounds.min_x} ${bounds.max_y - bounds.min_y}`
     : "0 0 100 100";
 
+  // Pan & Zoom handlers
+  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle mouse or Shift+Left
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - viewTransform.x, y: e.clientY - viewTransform.y });
+      e.preventDefault();
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (isPanning) {
+      setViewTransform(prev => ({
+        ...prev,
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y
+      }));
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setViewTransform(prev => ({
+      ...prev,
+      scale: Math.max(0.1, Math.min(10, prev.scale * delta))
+    }));
+  };
+
+  const resetView = () => {
+    setViewTransform({ x: 0, y: 0, scale: 1 });
+  };
+
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-orange-50 to-slate-100 flex flex-col">
       {/* Background Effects */}
@@ -286,8 +328,8 @@ export default function CADPage() {
                                 )}
                             </div>
                         ) : (
-                            <div className="animate-in fade-in zoom-in duration-300 flex-1 flex flex-col">
-                                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="animate-in fade-in zoom-in duration-300 flex-1 flex flex-col min-h-0">
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 flex-1 overflow-y-auto custom-scrollbar min-h-0 max-h-[calc(100vh-400px)]">
                                     {layers.length === 0 ? (
                                         <p className="text-slate-500 text-center py-8">No recognizable layers found.</p>
                                     ) : (
@@ -446,14 +488,44 @@ export default function CADPage() {
 
                     {/* BOTTOM ROW: FULL VIEWER (Added z-0 to sit behind layer dropdown) */}
                     <div className="flex-1 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl overflow-hidden shadow-lg relative min-h-[400px] z-0">
-                        <div className="absolute inset-0 bg-[#1e1e1e]">
+                        {/* Viewer Controls */}
+                        <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                            <button
+                                onClick={resetView}
+                                className="bg-white/90 backdrop-blur-sm hover:bg-white border border-slate-300 text-slate-700 p-2 rounded-lg shadow-lg transition-all hover:shadow-xl"
+                                title="Reset View (Fit to Screen)"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                            </button>
+                            <div className="bg-white/90 backdrop-blur-sm border border-slate-300 rounded-lg p-2 shadow-lg text-xs text-slate-600">
+                                <div className="font-mono">Zoom: {viewTransform.scale.toFixed(2)}x</div>
+                                <div className="text-[10px] mt-1 text-slate-500">
+                                    Scroll: Zoom<br/>
+                                    Shift+Drag: Pan
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="absolute inset-0 bg-[#1e1e1e] overflow-hidden">
                             <svg 
+                                ref={svgRef}
                                 viewBox={viewBox} 
-                                className="w-full h-full block"
+                                className="w-full h-full block select-none"
                                 preserveAspectRatio="xMidYMid meet"
                                 transform="scale(1, -1)"
-                                style={{ transformOrigin: 'center' }}
+                                style={{ 
+                                    transformOrigin: 'center',
+                                    cursor: isPanning ? 'grabbing' : 'default'
+                                }}
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}
+                                onWheel={handleWheel}
                             >
+                                <g transform={`translate(${viewTransform.x / viewTransform.scale}, ${viewTransform.y / viewTransform.scale}) scale(${1 / viewTransform.scale})`}>
                                 {polygons.map((poly) => {
                                     const selection = selections[poly.id];
                                     let fill = '#333333';
@@ -492,6 +564,7 @@ export default function CADPage() {
                                         />
                                     );
                                 })}
+                                </g>
                             </svg>
                         </div>
                     </div>

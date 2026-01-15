@@ -3,8 +3,8 @@ import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
 
-// Assumes python service is at port 7000, same as OCR
-const PYTHON_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://ocr-service:7000';
+// CAD service is at port 7001
+const CAD_SERVICE_URL = process.env.CAD_SERVICE_URL || 'http://cad-service:7001';
 
 export const getLayers = async (req: Request, res: Response) => {
   try {
@@ -13,9 +13,11 @@ export const getLayers = async (req: Request, res: Response) => {
     }
 
     const formData = new FormData();
-    formData.append('file', fs.createReadStream(req.file.path));
+    formData.append('file', fs.createReadStream(req.file.path), {
+      filename: req.file.originalname
+    });
 
-    const response = await axios.post(`${PYTHON_SERVICE_URL}/cad/layers`, formData, {
+    const response = await axios.post(`${CAD_SERVICE_URL}/cad/layers`, formData, {
       headers: { ...formData.getHeaders() },
     });
 
@@ -37,10 +39,12 @@ export const processCad = async (req: Request, res: Response) => {
     }
 
     const formData = new FormData();
-    formData.append('file', fs.createReadStream(req.file.path));
+    formData.append('file', fs.createReadStream(req.file.path), {
+      filename: req.file.originalname
+    });
     formData.append('layers', req.body.layers || '[]');
 
-    const response = await axios.post(`${PYTHON_SERVICE_URL}/cad/process`, formData, {
+    const response = await axios.post(`${CAD_SERVICE_URL}/cad/process`, formData, {
       headers: { ...formData.getHeaders() },
     });
 

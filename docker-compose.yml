@@ -65,6 +65,35 @@ services:
         reservations:
           memory: 4G
 
+  cad-service:
+    container_name: civilconstruction-cad
+    build:
+      context: ./CAD-parser
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - ${CAD_PORT:-7001}:7001
+    environment:
+      PYTHONUNBUFFERED: 1
+    networks:
+      - civilconstruction-network
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - '-c'
+        - import urllib.request; urllib.request.urlopen('http://localhost:7001/health')
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
   backend:
     container_name: civilconstruction-backend
     build:
@@ -74,6 +103,8 @@ services:
     depends_on:
       ocr-service:
         condition: service_healthy
+      cad-service:
+        condition: service_healthy
     ports:
       - ${BACKEND_PORT:-6969}:6969
     environment:
@@ -81,6 +112,7 @@ services:
       PORT: 6969
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?schema=public
       OCR_SERVICE_URL: https://host.docker.internal:7000
+      CAD_SERVICE_URL: http://cad-service:7001
     networks:
       - civilconstruction-network
     healthcheck:
