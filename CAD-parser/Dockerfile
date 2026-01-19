@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 COPY dxf_utils.py .
-COPY legal.py .
+COPY fullaudit.py .
 
 # Create uploads directory
 RUN mkdir -p /app/uploads

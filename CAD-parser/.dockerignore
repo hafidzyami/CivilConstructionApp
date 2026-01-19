@@ -12,7 +12,7 @@ draft/
 .gitignore
 README.md
 dxf_app.py
-fullaudit.py
 geometric.py
+legal.py
 # Exclude text files in files/ folder only
 files/*.txt

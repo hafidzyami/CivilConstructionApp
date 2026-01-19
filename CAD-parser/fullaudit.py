@@ -16,7 +16,7 @@ class FinalComplianceAuditor:
         self.SITE_KWS = ['지적', 'SITE', '대지', 'LND', 'BOUNDARY']
         self.FOOTPRINT_KWS = ['HH', 'FOOTPRINT', '건축면적']
         # Expanded Floor detection (Catching '1', '2', '층', 'FLR', 'FLOOR')
-        self.FLOOR_PATTERN = re.compile(r'([1-9]|B[1-9])(F|층|FLR|FLOOR|ND|ST|RD|TH)', re.IGNORECASE)
+        self.FLOOR_PATTERN = self.FLOOR_PATTERN = re.compile(r'(B?\d+)(F|층|FLR|FLOOR|ND|ST|RD|TH)', re.IGNORECASE)
 
     def _get_area(self, e):
         try:
@@ -120,13 +120,23 @@ class FinalComplianceAuditor:
             "far": (total_floor_area / site_area * 100) if site_area > 0 else 0
         }
 
-# Execution
-auditor = FinalComplianceAuditor('files/50Py2F R.C House.dxf')
-res = auditor.run_audit()
-
-print(f"\nSite: {res['site']:.2f} m² | Footprint: {res['footprint']:.2f} m²")
-print(f"Total Floor Area: {res['total_floor_area']:.2f} m²")
-print(f"BTL: {res['btl']:.2f}% | FAR: {res['far']:.2f}%")
-print("\nFloor Breakdown:")
-for fl, ar in res['floors'].items():
-    print(f"  {fl}: {ar:.2f} m²")
+if __name__ == "__main__":
+    import sys
+    import json
+    
+    # Accept file path as command line argument
+    file_path = sys.argv[1] if len(sys.argv) > 1 else 'files/50Py2F R.C House.dxf'
+    
+    auditor = FinalComplianceAuditor(file_path)
+    res = auditor.run_audit()
+    
+    # Output as JSON for parsing
+    print(json.dumps({
+        "site_area": res['site'],
+        "footprint_area": res['footprint'],
+        "total_floor_area": res['total_floor_area'],
+        "floors": res['floors'],
+        "btl": res['btl'],
+        "far": res['far'],
+        "materials_count": len(res['materials'])
+    }))

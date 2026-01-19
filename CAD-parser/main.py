@@ -225,13 +225,13 @@ async def process_cad_auto(file: UploadFile = File(...)):
         file_size_kb = temp_file_path.stat().st_size / 1024
         logger.info(f"[REQ {request_id}] File saved: {file_size_kb:.2f} KB")
         
-        # Run legal.py for automated analysis
+        # Run fullaudit.py for automated analysis
         start_time = time.time()
         logger.info(f"[REQ {request_id}] Running automated parser...")
         
         try:
             result = subprocess.run(
-                ['python', 'legal.py', str(temp_file_path)],
+                ['python', 'fullaudit.py', str(temp_file_path)],
                 capture_output=True,
                 text=True,
                 timeout=30,
