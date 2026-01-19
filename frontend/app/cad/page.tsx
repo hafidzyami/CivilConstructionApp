@@ -14,6 +14,7 @@ export default function CADPage() {
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
   const [step, setStep] = useState<AppStep>('upload');
   const [loading, setLoading] = useState(false);
+  const [parserMode, setParserMode] = useState<'manual' | 'auto'>('manual');
 
   // Analysis Data
   const [polygons, setPolygons] = useState<PolygonData[]>([]);
@@ -66,9 +67,16 @@ export default function CADPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('layers', JSON.stringify(selectedLayers));
+      
+      let endpoint = '/cad/process';
+      
+      if (parserMode === 'manual') {
+        formData.append('layers', JSON.stringify(selectedLayers));
+      } else {
+        endpoint = '/cad/process-auto';
+      }
 
-      const res = await fetch(`${getApiUrl()}/cad/process`, {
+      const res = await fetch(`${getApiUrl()}${endpoint}`, {
         method: 'POST',
         body: formData,
       });
@@ -92,6 +100,31 @@ export default function CADPage() {
 
         setPolygons(enhancedPolygons);
         setBounds(data.bounds);
+        
+        // If automated mode, parse and apply auto-analysis
+        if (parserMode === 'auto' && data.auto_analysis) {
+          try {
+            const analysis = JSON.parse(data.auto_analysis);
+            console.log('Auto-analysis:', analysis);
+            
+            // Show info about automated detection
+            alert(
+              `Automated Analysis Complete!\n\n` +
+              `Site Area: ${analysis.site_area.toFixed(2)} m²\n` +
+              `Building Area: ${analysis.building_area.toFixed(2)} m²\n` +
+              `BCR: ${analysis.bcr.toFixed(2)}%\n` +
+              `Detection Method: ${analysis.site_method}\n\n` +
+              `Note: You can still manually adjust selections in the viewer.`
+            );
+            
+            // TODO: Auto-select polygons based on analysis
+            // This would require matching polygon areas to detected areas
+            
+          } catch (e) {
+            console.error('Failed to parse auto-analysis:', e);
+          }
+        }
+        
         setStep('analyze');
       }
     } catch (err) {
@@ -218,8 +251,10 @@ export default function CADPage() {
                   loading={loading}
                   layers={layers}
                   selectedLayers={selectedLayers}
+                  parserMode={parserMode}
                   onFileSelect={handleFileSelect}
                   onLayerChange={setSelectedLayers}
+                  onParserModeChange={setParserMode}
                   onProcess={processFile}
                 />
               </div>

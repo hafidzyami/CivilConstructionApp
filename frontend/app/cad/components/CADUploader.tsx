@@ -6,8 +6,10 @@ interface CADUploaderProps {
   loading: boolean;
   layers: string[];
   selectedLayers: string[];
+  parserMode: 'manual' | 'auto';
   onFileSelect: (f: File) => void;
   onLayerChange: (layers: string[]) => void;
+  onParserModeChange: (mode: 'manual' | 'auto') => void;
   onProcess: () => void;
 }
 
@@ -16,8 +18,10 @@ export default function CADUploader({
   loading,
   layers,
   selectedLayers,
+  parserMode,
   onFileSelect,
   onLayerChange,
+  onParserModeChange,
   onProcess
 }: CADUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
@@ -95,9 +99,58 @@ export default function CADUploader({
 
   // Layers Step
   return (
-    <div className="w-full bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-xl flex-1 flex flex-col">
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">Select Layers to Import</h2>
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 flex-1 overflow-y-auto custom-scrollbar min-h-0">
+    <div className="w-full bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-xl flex-1 flex flex-col min-h-0">
+      <h2 className="text-2xl font-bold text-slate-900 mb-6 shrink-0">Select Layers to Import</h2>
+      
+      {/* Parser Mode Selection */}
+      <div className="mb-6 shrink-0">
+        <label className="block text-sm font-bold text-slate-700 mb-3">Parser Mode</label>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => onParserModeChange('manual')}
+            className={`p-4 rounded-lg border-2 transition-all text-left ${
+              parserMode === 'manual'
+                ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200'
+                : 'border-slate-200 hover:border-slate-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start">
+              <div className={`w-5 h-5 rounded-full border-2 mr-3 mt-0.5 flex items-center justify-center ${
+                parserMode === 'manual' ? 'border-orange-500' : 'border-slate-300'
+              }`}>
+                {parserMode === 'manual' && <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>}
+              </div>
+              <div>
+                <div className="font-bold text-slate-900">Manual Parser</div>
+                <div className="text-xs text-slate-600 mt-1">Select polygons manually for site and building areas</div>
+              </div>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => onParserModeChange('auto')}
+            className={`p-4 rounded-lg border-2 transition-all text-left ${
+              parserMode === 'auto'
+                ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                : 'border-slate-200 hover:border-slate-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start">
+              <div className={`w-5 h-5 rounded-full border-2 mr-3 mt-0.5 flex items-center justify-center ${
+                parserMode === 'auto' ? 'border-green-500' : 'border-slate-300'
+              }`}>
+                {parserMode === 'auto' && <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>}
+              </div>
+              <div>
+                <div className="font-bold text-slate-900">Automated Parser</div>
+                <div className="text-xs text-slate-600 mt-1">AI-powered auto-detection of site and building areas</div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 flex-1 overflow-y-auto custom-scrollbar min-h-0 max-h-[calc(100vh-500px)]">
         {layers.length === 0 ? (
           <p className="text-slate-500 text-center py-8">No recognizable layers found.</p>
         ) : (
@@ -131,7 +184,7 @@ export default function CADUploader({
       </div>
       <button
         onClick={onProcess}
-        disabled={loading || selectedLayers.length === 0}
+        disabled={loading || (parserMode === 'manual' && selectedLayers.length === 0)}
         className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl font-bold text-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:shadow-xl flex items-center justify-center shrink-0"
       >
         {loading ? (
@@ -143,7 +196,7 @@ export default function CADUploader({
             Processing...
           </span>
         ) : (
-          'Load Geometry'
+          parserMode === 'auto' ? 'Auto-Analyze & Load Geometry' : 'Load Geometry'
         )}
       </button>
     </div>

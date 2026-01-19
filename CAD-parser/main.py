@@ -13,6 +13,7 @@ import sys
 import time
 from pathlib import Path
 import shutil
+import subprocess
 
 # Configure logging for production
 logging.basicConfig(
@@ -183,6 +184,98 @@ async def process_cad(
         raise
     except Exception as e:
         logger.error(f"[REQ {request_id}] CAD processing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_file_path and temp_file_path.exists():
+            try:
+                temp_file_path.unlink()
+                logger.info(f"[REQ {request_id}] Temporary file cleaned up")
+            except Exception as e:
+                logger.warning(f"[REQ {request_id}] Failed to cleanup temp file: {e}")
+
+
+@app.post("/cad/process-auto")
+async def process_cad_auto(file: UploadFile = File(...)):
+    """
+    Process DXF file using automated legal.py parser
+    
+    Args:
+        file: DXF file upload
+    
+    Returns:
+        JSON response with polygons, auto-detected site/building areas, and suggestions
+    """
+    request_id = f"{int(time.time() * 1000)}"
+    logger.info(f"[REQ {request_id}] ========== AUTO-PROCESS REQUEST START ==========")
+    temp_file_path = None
+    
+    try:
+        # Validate file extension
+        if file.filename and not (file.filename.lower().endswith('.dxf') or file.filename.lower().endswith('.dwg')):
+            logger.error(f"[REQ {request_id}] Invalid file type: {file.filename}")
+            raise HTTPException(status_code=400, detail="File must be a DXF or DWG file")
+
+        logger.info(f"[REQ {request_id}] File: {file.filename or 'unknown'}")
+        
+        # Save uploaded file temporarily
+        temp_file_path = UPLOAD_DIR / f"{request_id}_{file.filename}"
+        with temp_file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        file_size_kb = temp_file_path.stat().st_size / 1024
+        logger.info(f"[REQ {request_id}] File saved: {file_size_kb:.2f} KB")
+        
+        # Run legal.py for automated analysis
+        start_time = time.time()
+        logger.info(f"[REQ {request_id}] Running automated parser...")
+        
+        try:
+            result = subprocess.run(
+                ['python', 'legal.py', str(temp_file_path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=Path(__file__).parent
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"[REQ {request_id}] Legal parser failed: {result.stderr}")
+                raise Exception(f"Automated parser failed: {result.stderr}")
+            
+            # Parse the output (expecting JSON)
+            legal_output = result.stdout.strip()
+            logger.info(f"[REQ {request_id}] Legal parser output: {legal_output}")
+            
+        except subprocess.TimeoutExpired:
+            raise Exception("Automated parser timeout")
+        except Exception as e:
+            logger.error(f"[REQ {request_id}] Legal parser error: {e}")
+            raise Exception(f"Automated parser error: {str(e)}")
+        
+        # Also get the geometry for visualization (all layers)
+        polygons, scale, bounds, error = process_dxf_geometry(str(temp_file_path), None)
+        
+        if error:
+            logger.error(f"[REQ {request_id}] Geometry extraction failed: {error}")
+            raise HTTPException(status_code=400, detail=error)
+        
+        process_duration = time.time() - start_time
+        logger.info(f"[REQ {request_id}] Auto-processing completed in {process_duration:.2f}s")
+        logger.info(f"[REQ {request_id}] Found {len(polygons)} polygons")
+        logger.info(f"[REQ {request_id}] ========== REQUEST COMPLETED ==========")
+        
+        return JSONResponse({
+            "polygons": polygons,
+            "scale": scale,
+            "bounds": bounds,
+            "auto_analysis": legal_output,
+            "mode": "automated"
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[REQ {request_id}] Auto-processing failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if temp_file_path and temp_file_path.exists():

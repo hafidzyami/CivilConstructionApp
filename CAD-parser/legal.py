@@ -87,11 +87,20 @@ class HybridPermitAuditor:
         }
 
 if __name__ == "__main__":
-    auditor = HybridPermitAuditor('files/50Py2F R.C House.dxf')
+    import sys
+    import json
+    
+    # Accept file path as command line argument
+    file_path = sys.argv[1] if len(sys.argv) > 1 else 'files/50Py2F R.C House.dxf'
+    
+    auditor = HybridPermitAuditor(file_path)
     res = auditor.audit()
     
-    print(f"--- Final Audit (Hybrid Logic) ---")
-    print(f"Site Area:      {res['site']:.2f} m2 ({res['site_method']})")
-    print(f"Building Area:  {res['building']:.2f} m2")
-    print(f"BTL Ratio:      {res['ratio']:.2f}%")
-    print(f"Materials:      {len(res['materials'])} found")
+    # Output as JSON for parsing
+    print(json.dumps({
+        "site_area": res['site'],
+        "building_area": res['building'],
+        "bcr": res['ratio'],
+        "materials": res['materials'],
+        "site_method": res['site_method']
+    }))
