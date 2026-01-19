@@ -27,23 +27,17 @@ export default function CADViewer({
   const [selectStart, setSelectStart] = useState({ x: 0, y: 0 });
   const [selectCurrent, setSelectCurrent] = useState({ x: 0, y: 0 });
 
-  // FIX 1 & 3: Touchpad Zoom & Large File Performance
   useEffect(() => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
 
     const onWheel = (e: WheelEvent) => {
-      // Prevents the browser tab from zooming/scrolling
       e.preventDefault(); 
-
-      // Zoom logic
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       setZoom(prevZoom => Math.max(0.1, Math.min(200, prevZoom * delta)));
     };
 
-    // { passive: false } is critical for preventing default browser behavior
     svgEl.addEventListener('wheel', onWheel, { passive: false });
-
     return () => {
       svgEl.removeEventListener('wheel', onWheel);
     };
@@ -59,7 +53,6 @@ export default function CADViewer({
   }, [bounds, zoom, panOffset]);
 
   // Helper: Convert screen coordinates to SVG coordinates
-  // Using matrixTransform ensures accuracy even when zoomed/panned
   const getSvgPoint = (clientX: number, clientY: number) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const pt = new DOMPoint(clientX, clientY);
@@ -70,7 +63,6 @@ export default function CADViewer({
   };
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    // CTRL + Left Click = Start Box Select
     if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
       setIsSelecting(true);
       const pt = getSvgPoint(e.clientX, e.clientY);
@@ -79,8 +71,6 @@ export default function CADViewer({
       e.stopPropagation();
       return;
     }
-
-    // Middle Mouse OR Shift+Left = Pan
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
       setIsPanning(true);
       setPanStart({ x: e.clientX, y: e.clientY });
@@ -110,19 +100,16 @@ export default function CADViewer({
   const handleMouseUp = () => {
     if (isSelecting) {
       setIsSelecting(false);
-      // Box calculation remains in Model Coordinates
       const box: Bounds = {
         min_x: Math.min(selectStart.x, selectCurrent.x),
         max_x: Math.max(selectStart.x, selectCurrent.x),
         min_y: Math.min(selectStart.y, selectCurrent.y),
         max_y: Math.max(selectStart.y, selectCurrent.y),
       };
-
       const dist = Math.sqrt(
         Math.pow(selectStart.x - selectCurrent.x, 2) + 
         Math.pow(selectStart.y - selectCurrent.y, 2)
       );
-      
       if (dist > 0.05) {
          onBoxSelect(box);
       }
@@ -134,6 +121,8 @@ export default function CADViewer({
     setZoom(1);
     setPanOffset({ x: 0, y: 0 });
   };
+
+  const baseStrokeWidth = bounds ? (bounds.max_x - bounds.min_x) * 0.002 : 0.1;
 
   return (
     <div className="flex-1 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl overflow-hidden shadow-lg relative min-h-[400px] z-0">
@@ -171,7 +160,6 @@ export default function CADViewer({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          // Removed inline onWheel (handled by useEffect)
         >
           <g>
             {polygons.map((poly) => {
@@ -182,34 +170,29 @@ export default function CADViewer({
 
               if (selection) {
                 if (selection.isSite && selection.isBuilding) {
-                  fill = '#9333ea'; // Purple
+                  fill = '#9333ea';
                   stroke = '#ffffff';
                   opacity = 0.8;
                 } else if (selection.isSite) {
-                  fill = '#06b6d4'; // Cyan
+                  fill = '#06b6d4';
                   stroke = '#ffffff';
                   opacity = 0.4;
                 } else if (selection.isBuilding) {
-                  fill = selection.isFootprint ? '#f97316' : '#fbbf24'; // Orange
+                  fill = selection.isFootprint ? '#f97316' : '#fbbf24';
                   stroke = '#ffffff';
                   opacity = 0.8;
                 }
               }
 
-              // Handle points array (from your simplified revert)
-              // If you revert to paths later, change this to d={poly.path}
-              const pointsStr = poly.points.map((p) => `${p[0]},${p[1]}`).join(' ');
-
               return (
-                <polygon
+                <path
                   key={poly.id}
-                  points={pointsStr}
+                  d={poly.path || ''} // Use the generated path with holes
                   fill={fill}
+                  fillRule="evenodd" // IMPORTANT: This creates the visual holes
                   stroke={stroke}
-                  // FIX 2: Chunkiness Fix. "non-scaling-stroke" keeps the line 1px on screen regardless of zoom.
+                  strokeWidth="1"
                   vectorEffect="non-scaling-stroke"
-                  // FIX 3: No thickness change on selection. Always 1px.
-                  strokeWidth="1" 
                   opacity={opacity}
                   className="hover:opacity-100 transition-colors duration-200"
                   onClick={() => !isSelecting && onTogglePoly(poly.id)}
@@ -226,9 +209,9 @@ export default function CADViewer({
               height={Math.abs(selectCurrent.y - selectStart.y)}
               fill="rgba(255, 255, 255, 0.1)"
               stroke="white"
-              strokeWidth="2" // Selection box is 2px
+              strokeWidth="2" 
               strokeDasharray="5,5" 
-              vectorEffect="non-scaling-stroke" // Keep selection box crisp too
+              vectorEffect="non-scaling-stroke"
             />
           )}
         </svg>

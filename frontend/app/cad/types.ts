@@ -1,6 +1,13 @@
 export interface PolygonData {
   id: number;
-  points: number[][];
+  points: number[][]; // Keep points for raw data
+  path?: string;      // NEW: SVG Path string for rendering with holes
+  bbox: {
+    min_x: number;
+    min_y: number;
+    max_x: number;
+    max_y: number;
+  };
   area_raw: number;
   area_m2: number;
 }
