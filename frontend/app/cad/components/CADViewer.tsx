@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { PolygonData, Bounds, Selection } from '../types';
 
 interface CADViewerProps {
@@ -27,6 +27,28 @@ export default function CADViewer({
   const [selectStart, setSelectStart] = useState({ x: 0, y: 0 });
   const [selectCurrent, setSelectCurrent] = useState({ x: 0, y: 0 });
 
+  // FIX 1 & 3: Touchpad Zoom & Large File Performance
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+
+    const onWheel = (e: WheelEvent) => {
+      // Prevents the browser tab from zooming/scrolling
+      e.preventDefault(); 
+
+      // Zoom logic
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setZoom(prevZoom => Math.max(0.1, Math.min(200, prevZoom * delta)));
+    };
+
+    // { passive: false } is critical for preventing default browser behavior
+    svgEl.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => {
+      svgEl.removeEventListener('wheel', onWheel);
+    };
+  }, []);
+
   const viewBox = useMemo(() => {
     if (!bounds) return "0 0 100 100";
     const width = (bounds.max_x - bounds.min_x) / zoom;
@@ -37,14 +59,14 @@ export default function CADViewer({
   }, [bounds, zoom, panOffset]);
 
   // Helper: Convert screen coordinates to SVG coordinates
+  // Using matrixTransform ensures accuracy even when zoomed/panned
   const getSvgPoint = (clientX: number, clientY: number) => {
     if (!svgRef.current) return { x: 0, y: 0 };
-    const CTM = svgRef.current.getScreenCTM();
-    if (!CTM) return { x: 0, y: 0 };
-    return {
-      x: (clientX - CTM.e) / CTM.a,
-      y: (clientY - CTM.f) / CTM.d
-    };
+    const pt = new DOMPoint(clientX, clientY);
+    const ctm = svgRef.current.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const svgP = pt.matrixTransform(ctm.inverse());
+    return { x: svgP.x, y: svgP.y };
   };
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -88,6 +110,7 @@ export default function CADViewer({
   const handleMouseUp = () => {
     if (isSelecting) {
       setIsSelecting(false);
+      // Box calculation remains in Model Coordinates
       const box: Bounds = {
         min_x: Math.min(selectStart.x, selectCurrent.x),
         max_x: Math.max(selectStart.x, selectCurrent.x),
@@ -100,28 +123,17 @@ export default function CADViewer({
         Math.pow(selectStart.y - selectCurrent.y, 2)
       );
       
-      if (dist > 0.5) {
+      if (dist > 0.05) {
          onBoxSelect(box);
       }
     }
     setIsPanning(false);
   };
 
-  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.95 : 1.05;
-    const newZoom = Math.max(0.5, Math.min(50, zoom * delta));
-    setZoom(newZoom);
-  };
-
   const resetView = () => {
     setZoom(1);
     setPanOffset({ x: 0, y: 0 });
   };
-
-  // Base stroke width relative to model size (not screen pixels)
-  // This ensures lines scale up/down naturally with the building
-  const baseStrokeWidth = bounds ? (bounds.max_x - bounds.min_x) * 0.002 : 0.1;
 
   return (
     <div className="flex-1 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl overflow-hidden shadow-lg relative min-h-[400px] z-0">
@@ -159,7 +171,7 @@ export default function CADViewer({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
+          // Removed inline onWheel (handled by useEffect)
         >
           <g>
             {polygons.map((poly) => {
@@ -184,6 +196,8 @@ export default function CADViewer({
                 }
               }
 
+              // Handle points array (from your simplified revert)
+              // If you revert to paths later, change this to d={poly.path}
               const pointsStr = poly.points.map((p) => `${p[0]},${p[1]}`).join(' ');
 
               return (
@@ -192,9 +206,10 @@ export default function CADViewer({
                   points={pointsStr}
                   fill={fill}
                   stroke={stroke}
-                  // FIX 1: Removed vectorEffect from polygons
-                  // FIX 2: Use Model-Relative stroke width
-                  strokeWidth={selection ? baseStrokeWidth * 2.5 : baseStrokeWidth}
+                  // FIX 2: Chunkiness Fix. "non-scaling-stroke" keeps the line 1px on screen regardless of zoom.
+                  vectorEffect="non-scaling-stroke"
+                  // FIX 3: No thickness change on selection. Always 1px.
+                  strokeWidth="1" 
                   opacity={opacity}
                   className="hover:opacity-100 transition-colors duration-200"
                   onClick={() => !isSelecting && onTogglePoly(poly.id)}
@@ -211,10 +226,9 @@ export default function CADViewer({
               height={Math.abs(selectCurrent.y - selectStart.y)}
               fill="rgba(255, 255, 255, 0.1)"
               stroke="white"
-              // FIX 3: Keep vectorEffect on Selection Box so it stays crisp (2px)
-              strokeWidth="2" 
+              strokeWidth="2" // Selection box is 2px
               strokeDasharray="5,5" 
-              vectorEffect="non-scaling-stroke"
+              vectorEffect="non-scaling-stroke" // Keep selection box crisp too
             />
           )}
         </svg>
