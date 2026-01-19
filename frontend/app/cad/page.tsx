@@ -24,6 +24,9 @@ export default function CADPage() {
   const [floorCount, setFloorCount] = useState(1);
   const [isFootprint, setIsFootprint] = useState(true);
 
+  // New Simplify Toggle
+  const [simplify, setSimplify] = useState(false);
+
   const getApiUrl = () => {
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') return '/api';
@@ -64,15 +67,14 @@ export default function CADPage() {
       
       if (parserMode === 'manual') {
         formData.append('layers', JSON.stringify(selectedLayers));
+        formData.append('simplify', String(simplify)); // Pass simplify flag
       }
 
       const res = await fetch(`${getApiUrl()}${endpoint}`, { method: 'POST', body: formData });
       const data = await res.json();
 
       if (data.polygons) {
-        // --- START HOLE DETECTION LOGIC ---
-        
-        // 1. Pre-calculate BBoxes
+        // --- 1. PRE-CALCULATE BBOXES ---
         let processed = data.polygons.map((p: any) => {
             const xs = p.points.map((pt: number[]) => pt[0]);
             const ys = p.points.map((pt: number[]) => pt[1]);
@@ -81,15 +83,14 @@ export default function CADPage() {
                 bbox: { 
                   min_x: Math.min(...xs), max_x: Math.max(...xs), 
                   min_y: Math.min(...ys), max_y: Math.max(...ys) 
-                },
-                holes: [] // Store indices of inner polygons
+                }
             };
         });
 
-        // 2. Sort by Area Descending (Largest First) to find parents easily
+        // --- 2. SORT BY AREA DESCENDING (Parent Candidates First) ---
         processed.sort((a: any, b: any) => b.area_raw - a.area_raw);
 
-        // 3. Helper: Ray-Casting Point-in-Polygon Check
+        // Helper: Check if point is inside poly (Ray Casting)
         const isPointInPoly = (pt: number[], polyPts: number[][]) => {
             const x = pt[0], y = pt[1];
             let inside = false;
@@ -102,36 +103,36 @@ export default function CADPage() {
             return inside;
         };
 
-        // 4. Assign Holes to Immediate Parents
-        // We iterate and assign each polygon to the *smallest* parent that contains it
-        // But since we sorted Descending, if we find the first (largest) container, 
-        // we might nesting issues. 
-        // Better strategy: For each polygon, check if it's inside any other.
-        // Actually, simplified approach:
-        // For every polygon, find ALL smaller polygons inside it and treat them as holes.
-        // SVG 'evenodd' rule handles nested holes (holes inside holes) automatically by toggling fill.
-        
+        // --- 3. ROBUST HOLE DETECTION ---
         const finalPolys = processed.map((outer: any, i: number) => {
             const holePaths: string[] = [];
 
-            // Check against all smaller polygons (j > i because sorted descending)
+            // Check against smaller polygons
             for (let j = i + 1; j < processed.length; j++) {
                 const inner = processed[j];
                 
-                // Fast BBox Check: Is inner strictly inside outer?
-                if (inner.bbox.max_x <= outer.bbox.min_x || inner.bbox.min_x >= outer.bbox.max_x ||
-                    inner.bbox.max_y <= outer.bbox.min_y || inner.bbox.min_y >= outer.bbox.max_y) {
-                    continue;
+                // CHECK 1: STRICT BBOX CONTAINMENT
+                // The inner poly's bbox must be FULLY inside the outer poly's bbox.
+                // This prevents neighbors or overlapping borders from being treated as holes.
+                if (inner.bbox.min_x < outer.bbox.min_x || 
+                    inner.bbox.max_x > outer.bbox.max_x ||
+                    inner.bbox.min_y < outer.bbox.min_y || 
+                    inner.bbox.max_y > outer.bbox.max_y) {
+                    continue; // Not a hole if it extends outside
                 }
 
-                // Detailed Check: Is the first point of inner inside outer?
+                // CHECK 2: GEOMETRIC CONTAINMENT
+                // Check if the FIRST point is inside.
+                // (Optimized: Checking one point is usually sufficient if BBox containment passes)
                 if (isPointInPoly(inner.points[0], outer.points)) {
-                    // It's a hole!
-                    // Convert hole points to SVG path string L ...
-                    const pts = inner.points;
-                    const d = `M ${pts[0][0]} ${pts[0][1]} ` + 
-                              pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + "Z";
-                    holePaths.push(d);
+                     // Check a second point (middle) to be super safe against self-intersections
+                     const midIdx = Math.floor(inner.points.length / 2);
+                     if (isPointInPoly(inner.points[midIdx], outer.points)) {
+                         const pts = inner.points;
+                         const d = `M ${pts[0][0]} ${pts[0][1]} ` + 
+                                   pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + "Z";
+                         holePaths.push(d);
+                     }
                 }
             }
 
@@ -140,7 +141,7 @@ export default function CADPage() {
             let pathString = `M ${pts[0][0]} ${pts[0][1]} ` + 
                              pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + "Z";
             
-            // Append holes to the same path string
+            // Append holes
             if (holePaths.length > 0) {
                 pathString += " " + holePaths.join(" ");
             }
@@ -148,14 +149,33 @@ export default function CADPage() {
             return { ...outer, path: pathString };
         });
 
-        // --- END HOLE DETECTION LOGIC ---
-
         setPolygons(finalPolys);
         setBounds(data.bounds);
         
+        // If automated mode, parse and apply auto-analysis
         if (parserMode === 'auto' && data.auto_analysis) {
-           // ... (keep existing auto-analysis alert logic) ...
+          try {
+            const analysis = JSON.parse(data.auto_analysis);
+            console.log('Auto-analysis:', analysis);
+            
+            // Show info about automated detection
+            alert(
+              `Automated Analysis Complete!\n\n` +
+              `Site Area: ${analysis.site_area.toFixed(2)} m²\n` +
+              `Building Area: ${analysis.building_area.toFixed(2)} m²\n` +
+              `BCR: ${analysis.bcr.toFixed(2)}%\n` +
+              `Detection Method: ${analysis.site_method}\n\n` +
+              `Note: You can still manually adjust selections in the viewer.`
+            );
+            
+            // TODO: Auto-select polygons based on analysis
+            // This would require matching polygon areas to detected areas
+            
+          } catch (e) {
+            console.error('Failed to parse auto-analysis:', e);
+          }
         }
+        
         setStep('analyze');
       }
     } catch (err) {
@@ -264,6 +284,8 @@ export default function CADPage() {
                     onLayerChange={setSelectedLayers}
                     onUpdateGeometry={processFile}
                     loading={loading}
+                    simplify={simplify}
+                    setSimplify={setSimplify}
                   />
                   <CADMetrics metrics={metrics} />
                 </div>
