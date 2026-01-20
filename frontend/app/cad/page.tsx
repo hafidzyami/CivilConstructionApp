@@ -16,17 +16,17 @@ export default function CADPage() {
   const [loading, setLoading] = useState(false);
   const [parserMode, setParserMode] = useState<'manual' | 'auto'>('manual');
 
-  // Analysis Data
   const [polygons, setPolygons] = useState<PolygonData[]>([]);
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selections, setSelections] = useState<Record<number, Selection>>({});
 
-  // Tools
   const [activeMode, setActiveMode] = useState<ActiveMode>('site');
   const [floorCount, setFloorCount] = useState(1);
   const [isFootprint, setIsFootprint] = useState(true);
 
-  // API Helper
+  // New Simplify Toggle
+  const [simplify, setSimplify] = useState(false);
+
   const getApiUrl = () => {
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') return '/api';
@@ -44,11 +44,7 @@ export default function CADPage() {
     try {
       const formData = new FormData();
       formData.append('file', f);
-
-      const res = await fetch(`${getApiUrl()}/cad/layers`, {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await fetch(`${getApiUrl()}/cad/layers`, { method: 'POST', body: formData });
       const data = await res.json();
       setLayers(data.layers || []);
       setSelectedLayers(data.layers || []);
@@ -67,38 +63,93 @@ export default function CADPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      
-      let endpoint = '/cad/process';
+      const endpoint = parserMode === 'manual' ? '/cad/process' : '/cad/process-auto';
       
       if (parserMode === 'manual') {
         formData.append('layers', JSON.stringify(selectedLayers));
-      } else {
-        endpoint = '/cad/process-auto';
+        formData.append('simplify', String(simplify)); // Pass simplify flag
       }
 
-      const res = await fetch(`${getApiUrl()}${endpoint}`, {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await fetch(`${getApiUrl()}${endpoint}`, { method: 'POST', body: formData });
       const data = await res.json();
 
       if (data.polygons) {
-        // Pre-calculate Bounding Boxes for fast selection
-        const enhancedPolygons = data.polygons.map((p: any) => {
+        // --- 1. PRE-CALCULATE BBOXES ---
+        let processed = data.polygons.map((p: any) => {
             const xs = p.points.map((pt: number[]) => pt[0]);
             const ys = p.points.map((pt: number[]) => pt[1]);
             return {
                 ...p,
-                bbox: {
-                    min_x: Math.min(...xs),
-                    max_x: Math.max(...xs),
-                    min_y: Math.min(...ys),
-                    max_y: Math.max(...ys),
+                bbox: { 
+                  min_x: Math.min(...xs), max_x: Math.max(...xs), 
+                  min_y: Math.min(...ys), max_y: Math.max(...ys) 
                 }
             };
         });
 
-        setPolygons(enhancedPolygons);
+        // --- 2. SORT BY AREA DESCENDING (Parent Candidates First) ---
+        processed.sort((a: any, b: any) => b.area_raw - a.area_raw);
+
+        // Helper: Check if point is inside poly (Ray Casting)
+        const isPointInPoly = (pt: number[], polyPts: number[][]) => {
+            const x = pt[0], y = pt[1];
+            let inside = false;
+            for (let i = 0, j = polyPts.length - 1; i < polyPts.length; j = i++) {
+                const xi = polyPts[i][0], yi = polyPts[i][1];
+                const xj = polyPts[j][0], yj = polyPts[j][1];
+                const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        };
+
+        // --- 3. ROBUST HOLE DETECTION ---
+        const finalPolys = processed.map((outer: any, i: number) => {
+            const holePaths: string[] = [];
+
+            // Check against smaller polygons
+            for (let j = i + 1; j < processed.length; j++) {
+                const inner = processed[j];
+                
+                // CHECK 1: STRICT BBOX CONTAINMENT
+                // The inner poly's bbox must be FULLY inside the outer poly's bbox.
+                // This prevents neighbors or overlapping borders from being treated as holes.
+                if (inner.bbox.min_x < outer.bbox.min_x || 
+                    inner.bbox.max_x > outer.bbox.max_x ||
+                    inner.bbox.min_y < outer.bbox.min_y || 
+                    inner.bbox.max_y > outer.bbox.max_y) {
+                    continue; // Not a hole if it extends outside
+                }
+
+                // CHECK 2: GEOMETRIC CONTAINMENT
+                // Check if the FIRST point is inside.
+                // (Optimized: Checking one point is usually sufficient if BBox containment passes)
+                if (isPointInPoly(inner.points[0], outer.points)) {
+                     // Check a second point (middle) to be super safe against self-intersections
+                     const midIdx = Math.floor(inner.points.length / 2);
+                     if (isPointInPoly(inner.points[midIdx], outer.points)) {
+                         const pts = inner.points;
+                         const d = `M ${pts[0][0]} ${pts[0][1]} ` + 
+                                   pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + "Z";
+                         holePaths.push(d);
+                     }
+                }
+            }
+
+            // Construct Main Path
+            const pts = outer.points;
+            let pathString = `M ${pts[0][0]} ${pts[0][1]} ` + 
+                             pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + "Z";
+            
+            // Append holes
+            if (holePaths.length > 0) {
+                pathString += " " + holePaths.join(" ");
+            }
+
+            return { ...outer, path: pathString };
+        });
+
+        setPolygons(finalPolys);
         setBounds(data.bounds);
         
         // If automated mode, parse and apply auto-analysis
@@ -137,72 +188,39 @@ export default function CADPage() {
   const togglePoly = (id: number) => {
     setSelections((prev) => {
       const next = { ...prev };
-      const current = next[id] 
-        ? { ...next[id] } 
-        : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
+      const current = next[id] ? { ...next[id] } : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
 
-      if (activeMode === 'site') {
-        current.isSite = !current.isSite;
-      } else {
-        // Apply settings if turning on
-        if (!current.isBuilding) {
-          current.floors = floorCount;
-          current.isFootprint = isFootprint;
-        }
+      if (activeMode === 'site') current.isSite = !current.isSite;
+      else {
+        if (!current.isBuilding) { current.floors = floorCount; current.isFootprint = isFootprint; }
         current.isBuilding = !current.isBuilding;
       }
 
-      if (!current.isSite && !current.isBuilding) {
-        delete next[id];
-      } else {
-        next[id] = current;
-      }
+      if (!current.isSite && !current.isBuilding) delete next[id];
+      else next[id] = current;
       return next;
     });
   };
 
-  // --- UPDATED: Toggle Logic for Box Selection ---
   const handleBoxSelect = (box: Bounds) => {
     setSelections(prev => {
         const next = { ...prev };
         let hasChanges = false;
-
         polygons.forEach(p => {
-            const pBox = (p as any).bbox; 
+            const pBox = p.bbox; 
             if (!pBox) return;
-
-            // Check if polygon is inside/intersecting selection box
-            const intersects = 
-                box.min_x <= pBox.max_x &&
-                box.max_x >= pBox.min_x &&
-                box.min_y <= pBox.max_y &&
-                box.max_y >= pBox.min_y;
-
+            const intersects = box.min_x <= pBox.max_x && box.max_x >= pBox.min_x &&
+                               box.min_y <= pBox.max_y && box.max_y >= pBox.min_y;
             if (intersects) {
                 hasChanges = true;
-                // Get existing selection or create new default
-                const current = next[p.id] 
-                    ? { ...next[p.id] } 
-                    : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
-
-                // TOGGLE LOGIC: Invert current state
-                if (activeMode === 'site') {
-                    current.isSite = !current.isSite;
-                } else {
-                    // If turning ON, apply current floor/footprint settings
-                    if (!current.isBuilding) {
-                        current.floors = floorCount;
-                        current.isFootprint = isFootprint;
-                    }
+                const current = next[p.id] ? { ...next[p.id] } : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
+                if (activeMode === 'site') current.isSite = !current.isSite;
+                else {
+                    if (!current.isBuilding) { current.floors = floorCount; current.isFootprint = isFootprint; }
                     current.isBuilding = !current.isBuilding;
                 }
-
-                // Remove key if no longer selected
-                if (!current.isSite && !current.isBuilding) {
-                    delete next[p.id];
-                } else {
-                    next[p.id] = current;
-                }
+                if (!current.isSite && !current.isBuilding) delete next[p.id];
+                else next[p.id] = current;
             }
         });
         return hasChanges ? next : prev;
@@ -213,23 +231,17 @@ export default function CADPage() {
     let siteArea = 0;
     let footprintArea = 0;
     let totalFloorArea = 0;
-
     Object.entries(selections).forEach(([idStr, sel]) => {
       const poly = polygons.find((p) => p.id === parseInt(idStr));
       if (!poly) return;
-
-      if (sel.isSite) {
-        siteArea += poly.area_m2;
-      }
+      if (sel.isSite) siteArea += poly.area_m2;
       if (sel.isBuilding) {
         if (sel.isFootprint) footprintArea += poly.area_m2;
         totalFloorArea += poly.area_m2 * sel.floors;
       }
     });
-
     const bcr = siteArea > 0 ? (footprintArea / siteArea) * 100 : 0;
     const far = siteArea > 0 ? (totalFloorArea / siteArea) : 0;
-
     return { siteArea, footprintArea, totalFloorArea, bcr, far };
   }, [selections, polygons]);
 
@@ -242,7 +254,6 @@ export default function CADPage() {
       <div className="flex-1 p-8 flex flex-col min-h-0">
         <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
           <CADHeader step={step} onReset={() => window.location.reload()} />
-
           <div className="flex-1 min-h-0 flex flex-col">
             {step !== 'analyze' ? (
               <div className="flex-1 flex flex-col">
@@ -273,6 +284,8 @@ export default function CADPage() {
                     onLayerChange={setSelectedLayers}
                     onUpdateGeometry={processFile}
                     loading={loading}
+                    // simplify={simplify}
+                    // setSimplify={setSimplify}
                   />
                   <CADMetrics metrics={metrics} />
                 </div>
