@@ -284,8 +284,8 @@ export default function CADPage() {
                     onLayerChange={setSelectedLayers}
                     onUpdateGeometry={processFile}
                     loading={loading}
-                    simplify={simplify}
-                    setSimplify={setSimplify}
+                    // simplify={simplify}
+                    // setSimplify={setSimplify}
                   />
                   <CADMetrics metrics={metrics} />
                 </div>
