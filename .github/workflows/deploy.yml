@@ -116,28 +116,6 @@ jobs:
             echo "📝 Generating docker-compose.yml..."
             cat > $APP_DIR/docker-compose.yml <<'COMPOSE_EOF'
             services:
-              minio:
-                image: minio/minio:latest
-                container_name: civilconstruction-minio
-                restart: unless-stopped
-                env_file: .env
-                ports:
-                  - "9000:9000"
-                  - "9001:9001"
-                environment:
-                  - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-                  - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-                volumes:
-                  - ./minio/data:/data
-                command: server /data --console-address ":9001"
-                networks:
-                  - civilconstruction-network
-                healthcheck:
-                  test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-                  interval: 30s
-                  timeout: 20s
-                  retries: 3
-
               neo4j:
                 image: neo4j:5-community
                 container_name: civilconstruction-neo4j
@@ -243,8 +221,6 @@ jobs:
                 networks:
                   - civilconstruction-network
                 depends_on:
-                  minio:
-                    condition: service_healthy
                   ocr-service:
                     condition: service_healthy
                   cad-service:
