@@ -8,6 +8,19 @@ export default function Home() {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl -z-10"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl -z-10"></div>
 
+      {/* Admin Login Button */}
+      <div className="absolute top-8 right-8">
+        <Link
+          href="/admin/login"
+          className="px-6 py-3 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-full font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Admin Login
+        </Link>
+      </div>
+
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
         <div className="max-w-6xl w-full">
           <div className="text-center mb-16 space-y-6">
@@ -24,6 +37,53 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            <Link
+              href="/demo"
+              className="group relative overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-300/60 rounded-3xl p-10 hover:shadow-2xl hover:shadow-pink-500/20 transition-all duration-500 hover:-translate-y-2"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-500/0 to-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              <div className="relative">
+                <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-pink-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <svg
+                    className="w-7 h-7 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                </div>
+
+                <h2 className="text-3xl font-bold text-slate-900 mb-4">Demo App</h2>
+                <p className="text-slate-600 text-lg leading-relaxed mb-6">
+                  Complete workflow demonstration: Upload documents, analyze CAD files, explore infrastructure, and extract text with OCR
+                </p>
+
+                <div className="flex items-center text-pink-600 font-semibold group-hover:gap-3 gap-2 transition-all duration-300">
+                  <span>Start Demo</span>
+                  <svg
+                    className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 8l4 4m0 0l-4 4m4-4H3"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </Link>
+
             <Link
               href="/map"
               className="group relative overflow-hidden bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-10 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 hover:-translate-y-2"

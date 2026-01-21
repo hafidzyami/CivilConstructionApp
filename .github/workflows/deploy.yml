@@ -43,6 +43,12 @@ jobs:
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           NEO4J_USER: ${{ secrets.NEO4J_USER }}
           NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+          MINIO_PUBLIC_URL: ${{ secrets.MINIO_PUBLIC_URL }}
           BACKEND_CHANGED: ${{ steps.changes.outputs.backend }}
           FRONTEND_CHANGED: ${{ steps.changes.outputs.frontend }}
           OCR_CHANGED: ${{ steps.changes.outputs.ocr }}
@@ -54,7 +60,7 @@ jobs:
           port: ${{ secrets.VM_PORT || 22 }}
           timeout: 24h
           command_timeout: 24h
-          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,NEO4J_USER,NEO4J_PASSWORD,BACKEND_CHANGED,FRONTEND_CHANGED,OCR_CHANGED,CAD_CHANGED
+          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,NEO4J_USER,NEO4J_PASSWORD,GEMINI_API_KEY,MINIO_ROOT_USER,MINIO_ROOT_PASSWORD,MINIO_ACCESS_KEY,MINIO_SECRET_KEY,MINIO_PUBLIC_URL,BACKEND_CHANGED,FRONTEND_CHANGED,OCR_CHANGED,CAD_CHANGED
           script: |
             set -e
 
@@ -62,6 +68,7 @@ jobs:
             REPO_DIR="$APP_DIR/repo"
 
             mkdir -p $APP_DIR/neo4j/data $APP_DIR/neo4j/logs $APP_DIR/neo4j/import $APP_DIR/neo4j/plugins
+            mkdir -p $APP_DIR/minio/data
             cd $APP_DIR
 
             echo "📥 Cloning/updating repository..."
@@ -82,6 +89,16 @@ jobs:
             POSTGRES_PORT=${POSTGRES_PORT:-5432}
             NEO4J_USER=$NEO4J_USER
             NEO4J_PASSWORD=$NEO4J_PASSWORD
+            GEMINI_API_KEY=$GEMINI_API_KEY
+            MINIO_ROOT_USER=$MINIO_ROOT_USER
+            MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD
+            MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY
+            MINIO_SECRET_KEY=$MINIO_SECRET_KEY
+            MINIO_PUBLIC_URL=$MINIO_PUBLIC_URL
+            MINIO_ENDPOINT=minio
+            MINIO_PORT=9000
+            MINIO_BUCKET_NAME=civil-llm
+            MINIO_USE_SSL=false
             BACKEND_PORT=6969
             FRONTEND_PORT=6968
             OCR_PORT=7000
@@ -92,12 +109,35 @@ jobs:
             OCR_SERVICE_URL=http://ocr-service:7000
             CAD_SERVICE_URL=http://cad-service:7001
             NEO4J_URI=bolt://neo4j:7687
+
             EOF
             chmod 600 $APP_DIR/.env
 
             echo "📝 Generating docker-compose.yml..."
             cat > $APP_DIR/docker-compose.yml <<'COMPOSE_EOF'
             services:
+              minio:
+                image: minio/minio:latest
+                container_name: civilconstruction-minio
+                restart: unless-stopped
+                env_file: .env
+                ports:
+                  - "9000:9000"
+                  - "9001:9001"
+                environment:
+                  - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+                  - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+                volumes:
+                  - ./minio/data:/data
+                command: server /data --console-address ":9001"
+                networks:
+                  - civilconstruction-network
+                healthcheck:
+                  test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+                  interval: 30s
+                  timeout: 20s
+                  retries: 3
+
               neo4j:
                 image: neo4j:5-community
                 container_name: civilconstruction-neo4j
@@ -164,13 +204,25 @@ jobs:
                   - PYTHONUNBUFFERED=1
                 networks:
                   - civilconstruction-network
-                healthcheck:
-                  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7001/health')"]
-                  interval: 30s
-                  timeout: 10s
-                  retries: 3
-                  start_period: 30s
-                deploy:
+                  - GEMINI_API_KEY=${GEMINI_API_KEY}
+                  - MINIO_ENDPOINT=minio
+                  - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL}
+                  - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+                  - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+                  - MINIO_PORT=9000
+                  - MINIO_BUCKET_NAME=civil-llm
+                  - MINIO_USE_SSL=false
+                  - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+                  - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+                ports:
+                  - "${BACKEND_PORT:-6969}:6969"
+                extra_hosts:
+                  - "host.docker.internal:host-gateway"
+                networks:
+                  - civilconstruction-network
+                depends_on:
+                  minio:
+                    condition: service_healthy
                   resources:
                     limits:
                       memory: 2G

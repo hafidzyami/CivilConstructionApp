@@ -1,0 +1,468 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+interface Session {
+  id: number;
+  userId: number;
+  createdAt: string;
+  updatedAt: string;
+  documents: any[];
+  cadData: any;
+  infrastructureData: any;
+  ocrData: any[];
+}
+
+export default function AdminDashboard() {
+  const router = useRouter();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+
+  useEffect(() => {
+    // Check if admin is logged in
+    const isLoggedIn = localStorage.getItem('adminLoggedIn');
+    if (!isLoggedIn) {
+      router.push('/admin/login');
+      return;
+    }
+
+    fetchSessions();
+  }, []);
+
+  const fetchSessions = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/sessions`);
+      const data = await res.json();
+      if (data.success) {
+        setSessions(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('adminEmail');
+    router.push('/admin/login');
+  };
+
+  const viewSessionDetail = (session: Session) => {
+    setSelectedSession(session);
+    setShowDetail(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-slate-900 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+      <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl -z-10"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl -z-10"></div>
+
+      {/* Header */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-10">
+        <div className="container mx-auto px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Home
+            </Link>
+            <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-8 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Total Sessions</p>
+                <p className="text-3xl font-bold text-slate-900">{sessions.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Unique Users</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {new Set(sessions.map((s) => s.userId)).size}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Total Documents</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {sessions.reduce((acc, s) => acc + s.documents.length, 0)}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">OCR Records</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {sessions.reduce((acc, s) => acc + s.ocrData.length, 0)}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sessions Table */}
+        <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-lg overflow-hidden">
+          <div className="p-6 border-b border-slate-200">
+            <h2 className="text-2xl font-bold text-slate-900">Demo Sessions History</h2>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    Session ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    User ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    Documents
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    CAD Data
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    Infrastructure
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    OCR Records
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    Created At
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {sessions.map((session) => (
+                  <tr key={session.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                      #{session.id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                      User {session.userId}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                      {session.documents.length} files
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                      {session.cadData ? (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                          ✓ Saved
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                          - None
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                      {session.infrastructureData ? (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                          ✓ Saved
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                          - None
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                      {session.ocrData.length} records
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                      {new Date(session.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => viewSessionDetail(session)}
+                        className="text-blue-600 hover:text-blue-800 font-semibold"
+                      >
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {sessions.length === 0 && (
+              <div className="text-center py-12">
+                <svg
+                  className="w-16 h-16 text-slate-300 mx-auto mb-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="text-slate-600 text-lg">No demo sessions yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Detail Modal */}
+      {showDetail && selectedSession && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-8 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between">
+              <h3 className="text-2xl font-bold text-slate-900">
+                Session #{selectedSession.id} Details
+              </h3>
+              <button
+                onClick={() => setShowDetail(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div>
+                <h4 className="font-semibold text-slate-900 mb-2">Basic Information</h4>
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
+                  <div>
+                    <p className="text-sm text-slate-600">User ID</p>
+                    <p className="font-semibold">{selectedSession.userId}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600">Session ID</p>
+                    <p className="font-semibold">{selectedSession.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600">Created At</p>
+                    <p className="font-semibold">
+                      {new Date(selectedSession.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600">Last Updated</p>
+                    <p className="font-semibold">
+                      {new Date(selectedSession.updatedAt).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Documents */}
+              <div>
+                <h4 className="font-semibold text-slate-900 mb-2">
+                  Documents ({selectedSession.documents.length})
+                </h4>
+                <div className="space-y-2">
+                  {selectedSession.documents.map((doc) => (
+                    <div key={doc.id} className="bg-slate-50 p-3 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-slate-900">{doc.fileName}</p>
+                        <p className="text-sm text-slate-600">
+                          {(doc.fileSize / 1024).toFixed(2)} KB • {doc.mimeType}
+                        </p>
+                      </div>
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors"
+                      >
+                        View
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* CAD Data */}
+              {selectedSession.cadData && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">CAD Analysis Data</h4>
+                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
+                    <div>
+                      <p className="text-sm text-slate-600">Site Area</p>
+                      <p className="font-semibold">
+                        {selectedSession.cadData.siteArea
+                          ? `${selectedSession.cadData.siteArea} m²`
+                          : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Building Area</p>
+                      <p className="font-semibold">
+                        {selectedSession.cadData.buildingArea
+                          ? `${selectedSession.cadData.buildingArea} m²`
+                          : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Floor Area</p>
+                      <p className="font-semibold">
+                        {selectedSession.cadData.floorArea
+                          ? `${selectedSession.cadData.floorArea} m²`
+                          : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">BCR</p>
+                      <p className="font-semibold">
+                        {selectedSession.cadData.bcr ? selectedSession.cadData.bcr : '-'}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-sm text-slate-600">FAR</p>
+                      <p className="font-semibold">
+                        {selectedSession.cadData.far ? selectedSession.cadData.far : '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Infrastructure Data */}
+              {selectedSession.infrastructureData && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">Infrastructure Data</h4>
+                  <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl">
+                    <div>
+                      <p className="text-sm text-slate-600">Latitude</p>
+                      <p className="font-semibold">
+                        {selectedSession.infrastructureData.latitude || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Longitude</p>
+                      <p className="font-semibold">
+                        {selectedSession.infrastructureData.longitude || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Radius</p>
+                      <p className="font-semibold">
+                        {selectedSession.infrastructureData.radius
+                          ? `${selectedSession.infrastructureData.radius} m`
+                          : '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* OCR Data */}
+              {selectedSession.ocrData.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">
+                    OCR Records ({selectedSession.ocrData.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {selectedSession.ocrData.map((ocr) => (
+                      <div key={ocr.id} className="bg-slate-50 p-3 rounded-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-medium text-slate-900">{ocr.fileName}</p>
+                          <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
+                            {ocr.engine}
+                          </span>
+                        </div>
+                        {ocr.extractedText && (
+                          <p className="text-sm text-slate-600 line-clamp-2">{ocr.extractedText}</p>
+                        )}
+                        {ocr.fileUrl && (
+                          <a
+                            href={ocr.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline mt-1 inline-block"
+                          >
+                            View File
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

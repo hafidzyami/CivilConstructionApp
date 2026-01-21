@@ -7,23 +7,70 @@ datasource db {
   provider = "postgresql"
 }
 
-enum AnalysisStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+model DemoSession {
+  id                    Int                    @id @default(autoincrement())
+  userId                Int
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  documents             DemoDocument[]
+  cadData               DemoCadData?
+  infrastructureData    DemoInfrastructure?
+  ocrData               DemoOcr[]
 }
 
-model Detail {
-  id          Int            @id @default(autoincrement())
-  latitude    Float
-  longitude   Float
-  address     String?
-  environment Json?
-  decision    String?
-  explanation String?
-  status      AnalysisStatus @default(PENDING)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  deletedAt   DateTime?
+model DemoDocument {
+  id            Int          @id @default(autoincrement())
+  sessionId     Int
+  fileName      String
+  fileUrl       String
+  mimeType      String
+  fileSize      Int
+  uploadedAt    DateTime     @default(now())
+  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model DemoCadData {
+  id            Int          @id @default(autoincrement())
+  sessionId     Int          @unique
+  siteArea      Float?
+  buildingArea  Float?
+  floorArea     Float?
+  bcr           Float?
+  far           Float?
+  rawData       Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model DemoInfrastructure {
+  id            Int          @id @default(autoincrement())
+  sessionId     Int          @unique
+  latitude      Float?
+  longitude     Float?
+  radius        Float?
+  buildings     Json?
+  roads         Json?
+  railways      Json?
+  waterways     Json?
+  rawData       Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model DemoOcr {
+  id            Int          @id @default(autoincrement())
+  sessionId     Int
+  fileName      String
+  fileUrl       String
+  extractedText String?
+  engine        String?
+  rawData       Json?
+  createdAt     DateTime     @default(now())
+  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }

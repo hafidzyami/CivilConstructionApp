@@ -5,12 +5,13 @@ import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
 import path from 'path';
 import { swaggerSpec } from './config/swagger';
-import detailRoutes from './routes/detail.routes';
 import ocrRoutes from './routes/ocr.routes';
 import osmRoutes from './routes/osm.routes';
 import chatbotRoutes from './routes/chatbot.routes';
 import cadRoutes from './routes/cad.routes';
+import demoRoutes from './routes/demo.routes';
 import initService from './services/init.service';
+import { initializeBucket } from './lib/minio';
 
 dotenv.config();
 
@@ -33,11 +34,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
-app.use('/api/details', detailRoutes);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/osm', osmRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/cad', cadRoutes);
+app.use('/api/demo', demoRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -74,6 +75,13 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+
+  // Initialize MinIO bucket
+  try {
+    await initializeBucket();
+  } catch (error) {
+    console.error('⚠️  MinIO initialization failed, but server will continue:', error);
+  }
 
   // Initialize knowledge base
   await initService.initialize();
