@@ -258,8 +258,23 @@ jobs:
 
             cd $APP_DIR
 
-            echo "🔨 Building all services..."
-            docker compose build --no-cache
+            # Build only changed services
+            if [ "$OCR_CHANGED" = "true" ]; then 
+              echo "🔨 Building OCR service..."
+              docker compose build ocr-service
+            fi
+            if [ "$CAD_CHANGED" = "true" ]; then 
+              echo "🔨 Building CAD service..."
+              docker compose build cad-service
+            fi
+            if [ "$BACKEND_CHANGED" = "true" ]; then 
+              echo "🔨 Building Backend..."
+              docker compose build backend
+            fi
+            if [ "$FRONTEND_CHANGED" = "true" ]; then 
+              echo "🔨 Building Frontend..."
+              docker compose build frontend
+            fi
 
             echo "🚀 Starting containers..."
             docker compose up -d --remove-orphans

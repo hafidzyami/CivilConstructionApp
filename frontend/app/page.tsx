@@ -36,6 +36,7 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Main Features Grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             <Link
               href="/demo"
