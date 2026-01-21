@@ -204,6 +204,28 @@ jobs:
                   - PYTHONUNBUFFERED=1
                 networks:
                   - civilconstruction-network
+                healthcheck:
+                  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7001/health')"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 30s
+                deploy:
+                  resources:
+                    limits:
+                      memory: 2G
+
+              backend:
+                build:
+                  context: ./repo/backend
+                  dockerfile: Dockerfile
+                image: civilconstruction-backend:latest
+                container_name: civilconstruction-backend
+                restart: unless-stopped
+                env_file: .env
+                environment:
+                  - PORT=6969
+                  - NODE_ENV=production
                   - GEMINI_API_KEY=${GEMINI_API_KEY}
                   - MINIO_ENDPOINT=minio
                   - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL}
@@ -223,28 +245,6 @@ jobs:
                 depends_on:
                   minio:
                     condition: service_healthy
-                  resources:
-                    limits:
-                      memory: 2G
-
-              backend:
-                build:
-                  context: ./repo/backend
-                  dockerfile: Dockerfile
-                image: civilconstruction-backend:latest
-                container_name: civilconstruction-backend
-                restart: unless-stopped
-                env_file: .env
-                environment:
-                  - PORT=6969
-                  - NODE_ENV=production
-                ports:
-                  - "${BACKEND_PORT:-6969}:6969"
-                extra_hosts:
-                  - "host.docker.internal:host-gateway"
-                networks:
-                  - civilconstruction-network
-                depends_on:
                   ocr-service:
                     condition: service_healthy
                   cad-service:
