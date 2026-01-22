@@ -239,6 +239,8 @@ jobs:
                 build:
                   context: ./repo/frontend
                   dockerfile: Dockerfile
+                  args:
+                    NEXT_PUBLIC_API_URL: /api
                 image: civilconstruction-frontend:latest
                 container_name: civilconstruction-frontend
                 restart: unless-stopped
