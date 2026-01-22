@@ -39,18 +39,21 @@ export default function DemoPage() {
   const [ocrText, setOcrText] = useState('');
   const [ocrEngine, setOcrEngine] = useState('paddleocr');
 
+  // API base URL - use environment variable or fallback to /api
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
   useEffect(() => {
     initializeDemo();
   }, []);
 
   const initializeDemo = async () => {
-    try {
-      setLoading(true);
-      // Get next user ID
-      const userIdRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/next-user-id`);
+    try {API_URL}/demo/next-user-id`);
       const userIdData = await userIdRes.json();
       const newUserId = userIdData.data.userId;
       setUserId(newUserId);
+
+      // Create session
+      const sessionRes = await fetch(`${
 
       // Create session
       const sessionRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/session`, {
@@ -84,7 +87,7 @@ export default function DemoPage() {
         formData.append('documents', doc);
       });
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/upload-documents`, {
+      const res = await fetch(`${API_URL}/demo/upload-documents`, {
         method: 'POST',
         body: formData,
       });
@@ -109,7 +112,7 @@ export default function DemoPage() {
       setLoading(true);
       setError('');
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/cad-data`, {
+      const res = await fetch(`${API_URL}/demo/cad-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -137,7 +140,7 @@ export default function DemoPage() {
       setLoading(true);
       setError('');
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/infrastructure-data`, {
+      const res = await fetch(`${API_URL}/demo/infrastructure-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,7 +177,7 @@ export default function DemoPage() {
         formData.append('fileName', ocrFile.name);
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/ocr-data`, {
+      const res = await fetch(`${API_URL}/demo/ocr-data`, {
         method: 'POST',
         body: formData,
       });
