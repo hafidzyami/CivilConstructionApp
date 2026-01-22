@@ -4,41 +4,124 @@ import { Readable } from 'stream';
 
 dotenv.config();
 
-const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT || 'localhost',
-  port: parseInt(process.env.MINIO_PORT || '9000'),
-  useSSL: process.env.MINIO_USE_SSL === 'true',
-  accessKey: process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER || '',
-  secretKey: process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD || '',
-});
+// MinIO Configuration Class
+class MinioConfig {
+  private static instance: MinioConfig;
+  private client: Minio.Client;
+  private publicClient: Minio.Client | null = null;
+  private bucketName: string;
+  private bucketInitialized = false;
 
-const BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'civil-llm';
+  private constructor() {
+    const endpoint = process.env.MINIO_ENDPOINT || 'localhost';
+    const port = parseInt(process.env.MINIO_PORT || '9000');
+    const useSSL = process.env.MINIO_USE_SSL === 'true';
+    const accessKey = process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER || '';
+    const secretKey = process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD || '';
+
+    console.log('🔧 MinIO Configuration:', {
+      endpoint,
+      port,
+      useSSL,
+      accessKey: accessKey ? `${accessKey.substring(0, 4)}...` : 'NOT SET',
+      secretKey: secretKey ? '***SET***' : 'NOT SET',
+    });
+
+    // Internal client
+    this.client = new Minio.Client({
+      endPoint: endpoint,
+      port: port,
+      useSSL: useSSL,
+      accessKey: accessKey,
+      secretKey: secretKey,
+    });
+
+    // Public client for presigned URLs (if public URL is set)
+    const publicUrl = process.env.MINIO_PUBLIC_URL;
+    if (publicUrl) {
+      try {
+        const url = new URL(publicUrl);
+        this.publicClient = new Minio.Client({
+          endPoint: url.hostname,
+          port: url.port ? parseInt(url.port) : (url.protocol === 'https:' ? 443 : 80),
+          useSSL: url.protocol === 'https:',
+          accessKey: accessKey,
+          secretKey: secretKey,
+        });
+        console.log('✅ Public MinIO client initialized for:', url.hostname);
+      } catch (error) {
+        console.warn('⚠️  Failed to parse MINIO_PUBLIC_URL, using internal client for URLs');
+      }
+    }
+
+    this.bucketName = process.env.MINIO_BUCKET_NAME || 'civil-llm';
+  }
+
+  public static getInstance(): MinioConfig {
+    if (!MinioConfig.instance) {
+      MinioConfig.instance = new MinioConfig();
+    }
+    return MinioConfig.instance;
+  }
+
+  public getClient(): Minio.Client {
+    return this.client;
+  }
+
+  public getPublicClient(): Minio.Client {
+    return this.publicClient || this.client;
+  }
+
+  public getBucketName(): string {
+    return this.bucketName;
+  }
+
+  public async ensureBucketExists(): Promise<void> {
+    if (this.bucketInitialized) {
+      return;
+    }
+
+    try {
+      const exists = await this.client.bucketExists(this.bucketName);
+      if (!exists) {
+        await this.client.makeBucket(this.bucketName, 'us-east-1');
+        console.log(`✅ MinIO bucket '${this.bucketName}' created`);
+
+        // Set bucket policy to public read
+        const policy = {
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Principal: { AWS: ['*'] },
+              Action: ['s3:GetObject'],
+              Resource: [`arn:aws:s3:::${this.bucketName}/*`],
+            },
+          ],
+        };
+        await this.client.setBucketPolicy(this.bucketName, JSON.stringify(policy));
+        console.log(`✅ MinIO bucket policy set to public read`);
+      } else {
+        console.log(`✅ MinIO bucket '${this.bucketName}' already exists`);
+      }
+      this.bucketInitialized = true;
+    } catch (error: any) {
+      console.error('❌ Error ensuring MinIO bucket exists:', error);
+      throw error;
+    }
+  }
+}
+
+// Export singleton instance
+const minioConfig = MinioConfig.getInstance();
+const minioClient = minioConfig.getClient();
+const BUCKET_NAME = minioConfig.getBucketName();
 
 // Initialize bucket
 export const initializeBucket = async () => {
   try {
-    const exists = await minioClient.bucketExists(BUCKET_NAME);
-    if (!exists) {
-      await minioClient.makeBucket(BUCKET_NAME, 'us-east-1');
-      console.log(`✅ MinIO bucket '${BUCKET_NAME}' created`);
-
-      // Set bucket policy to public read
-      const policy = {
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Principal: { AWS: ['*'] },
-            Action: ['s3:GetObject'],
-            Resource: [`arn:aws:s3:::${BUCKET_NAME}/*`],
-          },
-        ],
-      };
-      await minioClient.setBucketPolicy(BUCKET_NAME, JSON.stringify(policy));
-    } else {
-      console.log(`✅ MinIO bucket '${BUCKET_NAME}' already exists`);
-    }
-  } catch (error) {
+    await minioConfig.ensureBucketExists();
+  } catch (error: any) {
     console.error('❌ Error initializing MinIO bucket:', error);
     throw error;
   }
@@ -51,6 +134,9 @@ export const uploadFile = async (
   metadata?: Record<string, string>
 ): Promise<string> => {
   try {
+    // Ensure bucket exists
+    await minioConfig.ensureBucketExists();
+
     const objectName = `demo/${Date.now()}-${fileName}`;
     
     await minioClient.putObject(
@@ -64,12 +150,17 @@ export const uploadFile = async (
       }
     );
 
-    // Generate public URL
-    const publicUrl = process.env.MINIO_PUBLIC_URL
-      ? `${process.env.MINIO_PUBLIC_URL}${objectName}`
-      : `http://${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT}/${BUCKET_NAME}/${objectName}`;
+    // Generate presigned URL using public client
+    const publicClient = minioConfig.getPublicClient();
+    const presignedUrl = await publicClient.presignedGetObject(
+      BUCKET_NAME,
+      objectName,
+      7 * 24 * 60 * 60 // 7 days
+    );
 
-    return publicUrl;
+    console.log('✅ File uploaded:', { objectName, url: presignedUrl });
+
+    return presignedUrl;
   } catch (error) {
     console.error('❌ Error uploading file to MinIO:', error);
     throw error;
@@ -79,6 +170,7 @@ export const uploadFile = async (
 export const deleteFile = async (objectName: string): Promise<void> => {
   try {
     await minioClient.removeObject(BUCKET_NAME, objectName);
+    console.log('✅ File deleted:', objectName);
   } catch (error) {
     console.error('❌ Error deleting file from MinIO:', error);
     throw error;
