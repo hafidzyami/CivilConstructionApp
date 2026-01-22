@@ -1,61 +1,80 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 
-type Step = 'documents' | 'cad' | 'infrastructure' | 'ocr' | 'complete';
+// Dynamic import for map to avoid SSR
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Marker),
+  { ssr: false }
+);
+const Circle = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Circle),
+  { ssr: false }
+);
+
+type Step = 'ocr' | 'cad' | 'infrastructure' | 'complete';
+
+interface OCRResult {
+  fileName: string;
+  textContent: string;
+  fileUrl: string;
+}
 
 export default function DemoPage() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState<Step>('documents');
+  const [currentStep, setCurrentStep] = useState<Step>('ocr');
   const [userId, setUserId] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Document upload state
-  const [documents, setDocuments] = useState<File[]>([]);
-  const [uploadedDocs, setUploadedDocs] = useState<any[]>([]);
+  // OCR state
+  const [ocrFiles, setOcrFiles] = useState<File[]>([]);
+  const [ocrEngine, setOcrEngine] = useState<'surya' | 'paddle' | 'hybrid'>('hybrid');
+  const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
 
-  // CAD data state
-  const [cadData, setCadData] = useState({
-    siteArea: '',
-    buildingArea: '',
-    floorArea: '',
-    bcr: '',
-    far: '',
-  });
+  // CAD state
+  const [cadFile, setCadFile] = useState<File | null>(null);
+  const [cadLayers, setCadLayers] = useState<string[]>([]);
+  const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
+  const [cadStep, setCadStep] = useState<'upload' | 'layers' | 'process'>('upload');
+  const [cadResult, setCadResult] = useState<any>(null);
 
-  // Infrastructure data state
-  const [infraData, setInfraData] = useState({
-    latitude: '',
-    longitude: '',
-    radius: '500',
-  });
+  // Infrastructure state
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-6.358137, 106.835432]);
+  const [mapRadius, setMapRadius] = useState(500);
+  const [infraData, setInfraData] = useState<any>(null);
 
-  // OCR data state
-  const [ocrFile, setOcrFile] = useState<File | null>(null);
-  const [ocrText, setOcrText] = useState('');
-  const [ocrEngine, setOcrEngine] = useState('paddleocr');
-
-  // API base URL - use environment variable or fallback to /api
   const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
   useEffect(() => {
     initializeDemo();
+    // Import leaflet CSS
+    if (typeof window !== 'undefined') {
+      import('leaflet/dist/leaflet.css');
+    }
   }, []);
 
   const initializeDemo = async () => {
     try {
       setLoading(true);
-      // Get next user ID
       const userIdRes = await fetch(`${API_URL}/demo/next-user-id`);
       const userIdData = await userIdRes.json();
       const newUserId = userIdData.data.userId;
       setUserId(newUserId);
 
-      // Create session
       const sessionRes = await fetch(`${API_URL}/demo/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,125 +90,216 @@ export default function DemoPage() {
     }
   };
 
-  const handleDocumentUpload = async () => {
-    if (documents.length === 0) {
-      setError('Please select at least one document');
+  // OCR Handlers
+  const handleOcrFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const validTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ];
+      
+      const validFiles = files.filter(f => validTypes.includes(f.type));
+      if (validFiles.length !== files.length) {
+        setError('Some files were skipped. Only PDF, DOC, DOCX, and images are allowed');
+      }
+      setOcrFiles(validFiles);
+    }
+  };
+
+  const processOCR = async () => {
+    if (ocrFiles.length === 0) {
+      setError('Please select at least one file');
       return;
     }
 
+    setOcrProcessing(true);
+    setError('');
+    const results: OCRResult[] = [];
+
     try {
-      setLoading(true);
-      setError('');
+      for (const file of ocrFiles) {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('preprocessing', 'true');
+        formData.append('engine', ocrEngine);
 
-      const formData = new FormData();
-      formData.append('sessionId', sessionId!.toString());
-      documents.forEach((doc) => {
-        formData.append('documents', doc);
+        const response = await fetch(`${API_URL}/ocr/process`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+        
+        if (data.success && data.textContent) {
+          results.push({
+            fileName: file.name,
+            textContent: data.textContent,
+            fileUrl: '', // Will be set after upload
+          });
+        }
+      }
+
+      // Upload to MinIO and save to database
+      const uploadFormData = new FormData();
+      uploadFormData.append('sessionId', sessionId!.toString());
+      ocrFiles.forEach(file => {
+        uploadFormData.append('documents', file);
       });
 
-      const res = await fetch(`${API_URL}/demo/upload-documents`, {
+      const uploadRes = await fetch(`${API_URL}/demo/upload-documents`, {
         method: 'POST',
-        body: formData,
+        body: uploadFormData,
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setUploadedDocs(data.data);
+      const uploadData = await uploadRes.json();
+      
+      if (uploadData.success) {
+        // Update results with file URLs
+        const uploadedDocs = uploadData.data;
+        results.forEach((result, idx) => {
+          result.fileUrl = uploadedDocs[idx]?.fileUrl || '';
+        });
+
+        // Save OCR results to database
+        for (const result of results) {
+          const ocrFormData = new FormData();
+          ocrFormData.append('sessionId', sessionId!.toString());
+          ocrFormData.append('extractedText', result.textContent);
+          ocrFormData.append('engine', ocrEngine);
+          ocrFormData.append('fileName', result.fileName);
+          ocrFormData.append('fileUrl', result.fileUrl);
+
+          await fetch(`${API_URL}/demo/ocr-data`, {
+            method: 'POST',
+            body: ocrFormData,
+          });
+        }
+
+        setOcrResults(results);
         setCurrentStep('cad');
-      } else {
-        setError(data.message);
       }
     } catch (err: any) {
-      setError('Failed to upload documents');
-      console.error(err);
+      setError('Failed to process OCR: ' + err.message);
     } finally {
-      setLoading(false);
+      setOcrProcessing(false);
     }
   };
 
-  const handleSaveCadData = async () => {
-    try {
-      setLoading(true);
-      setError('');
+  // CAD Handlers
+  const handleCadFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const res = await fetch(`${API_URL}/demo/cad-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          ...cadData,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setCurrentStep('infrastructure');
-      } else {
-        setError(data.message);
-      }
-    } catch (err: any) {
-      setError('Failed to save CAD data');
-      console.error(err);
-    } finally {
-      setLoading(false);
+    if (!file.name.toLowerCase().endsWith('.dxf')) {
+      setError('Please select a valid .dxf file');
+      return;
     }
-  };
 
-  const handleSaveInfrastructure = async () => {
+    setCadFile(file);
+    setLoading(true);
+
     try {
-      setLoading(true);
-      setError('');
-
-      const res = await fetch(`${API_URL}/demo/infrastructure-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          ...infraData,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setCurrentStep('ocr');
-      } else {
-        setError(data.message);
-      }
-    } catch (err: any) {
-      setError('Failed to save infrastructure data');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveOcr = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
       const formData = new FormData();
-      formData.append('sessionId', sessionId!.toString());
-      formData.append('extractedText', ocrText);
-      formData.append('engine', ocrEngine);
-      if (ocrFile) {
-        formData.append('documents', ocrFile);
+      formData.append('file', file);
+      const res = await fetch(`${API_URL}/cad/layers`, { method: 'POST', body: formData });
+      const data = await res.json();
+      setCadLayers(data.layers || []);
+      setSelectedLayers(data.layers || []);
+      setCadStep('layers');
+    } catch (err) {
+      setError('Failed to load CAD layers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const processCad = async () => {
+    if (!cadFile) return;
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', cadFile);
+      formData.append('layers', JSON.stringify(selectedLayers));
+      formData.append('simplify', 'false');
+
+      const res = await fetch(`${API_URL}/cad/process`, { method: 'POST', body: formData });
+      const data = await res.json();
+
+      setCadResult(data);
+
+      // Save to database
+      if (data.polygons && data.polygons.length > 0) {
+        const areas = data.polygons.map((p: any) => p.area_raw);
+        const totalArea = areas.reduce((a: number, b: number) => a + b, 0);
+
+        await fetch(`${API_URL}/demo/cad-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            siteArea: totalArea,
+            buildingArea: data.polygons[0]?.area_raw || 0,
+            floorArea: totalArea,
+            rawData: data,
+          }),
+        });
       }
 
-      const res = await fetch(`${API_URL}/demo/ocr-data`, {
+      setCurrentStep('infrastructure');
+    } catch (err) {
+      setError('Failed to process CAD file');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Infrastructure Handlers
+  const handleMapClick = useCallback((e: any) => {
+    if (e?.latlng) {
+      setMapCenter([e.latlng.lat, e.latlng.lng]);
+    }
+  }, []);
+
+  const queryInfrastructure = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/osm', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat: mapCenter[0],
+          lon: mapCenter[1],
+          radius: mapRadius,
+        }),
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setCurrentStep('complete');
-      } else {
-        setError(data.message);
-      }
+      const data = await response.json();
+      setInfraData(data);
+
+      // Save to database
+      await fetch(`${API_URL}/demo/infrastructure-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          latitude: mapCenter[0],
+          longitude: mapCenter[1],
+          radius: mapRadius,
+          results: data,
+        }),
+      });
+
+      setCurrentStep('complete');
     } catch (err: any) {
-      setError('Failed to save OCR data');
-      console.error(err);
+      setError('Failed to query infrastructure: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -197,73 +307,68 @@ export default function DemoPage() {
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 'documents':
+      case 'ocr':
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Step 1: Upload Documents</h3>
-              <p className="text-slate-600 mb-6">Upload your building documents to get started</p>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Step 1: Document OCR</h3>
+              <p className="text-slate-600 mb-6">Upload documents and extract text automatically</p>
 
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center">
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => setDocuments(Array.from(e.target.files || []))}
-                  className="hidden"
-                  id="document-upload"
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                />
-                <label
-                  htmlFor="document-upload"
-                  className="cursor-pointer flex flex-col items-center"
-                >
-                  <svg
-                    className="w-16 h-16 text-slate-400 mb-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                  <span className="text-lg font-semibold text-slate-700">
-                    Click to upload documents
-                  </span>
-                  <span className="text-sm text-slate-500 mt-2">
-                    PDF, DOC, DOCX, PNG, JPG (Max 10 files)
-                  </span>
-                </label>
-              </div>
-
-              {documents.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="font-semibold text-slate-700">Selected files:</p>
-                  {documents.map((doc, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-slate-600">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      {doc.name} ({(doc.size / 1024).toFixed(2)} KB)
-                    </div>
-                  ))}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Select Documents (PDF, DOC, DOCX, Images)
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleOcrFileSelect}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
+                  />
                 </div>
-              )}
+
+                {ocrFiles.length > 0 && (
+                  <div className="bg-slate-50 p-4 rounded-xl">
+                    <p className="font-semibold text-slate-700 mb-2">{ocrFiles.length} file(s) selected:</p>
+                    {ocrFiles.map((file, idx) => (
+                      <div key={idx} className="text-sm text-slate-600">
+                        • {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    OCR Engine
+                  </label>
+                  <select
+                    value={ocrEngine}
+                    onChange={(e) => setOcrEngine(e.target.value as any)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
+                  >
+                    <option value="hybrid">Hybrid (Best)</option>
+                    <option value="surya">Surya</option>
+                    <option value="paddle">PaddleOCR</option>
+                  </select>
+                </div>
+
+                {ocrResults.length > 0 && (
+                  <div className="bg-green-50 p-4 rounded-xl">
+                    <p className="font-semibold text-green-700 mb-2">✓ OCR Complete!</p>
+                    <p className="text-sm text-green-600">Processed {ocrResults.length} document(s)</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
-              onClick={handleDocumentUpload}
-              disabled={loading || documents.length === 0}
-              className="w-full px-6 py-3 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={processOCR}
+              disabled={ocrProcessing || ocrFiles.length === 0}
+              className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Uploading...' : 'Upload & Continue'}
+              {ocrProcessing ? 'Processing OCR...' : 'Process & Continue'}
             </button>
           </div>
         );
@@ -273,83 +378,70 @@ export default function DemoPage() {
           <div className="space-y-6">
             <div>
               <h3 className="text-2xl font-bold text-slate-900 mb-4">Step 2: CAD Analysis</h3>
-              <p className="text-slate-600 mb-6">Enter site and building measurements</p>
+              <p className="text-slate-600 mb-6">Upload DXF file for building analysis</p>
 
-              <div className="grid grid-cols-2 gap-4">
+              {cadStep === 'upload' && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Site Area (m²)
+                    Select DXF File
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    value={cadData.siteArea}
-                    onChange={(e) => setCadData({ ...cadData, siteArea: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all outline-none"
+                    type="file"
+                    onChange={handleCadFileSelect}
+                    accept=".dxf"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all outline-none"
                   />
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Building Area (m²)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={cadData.buildingArea}
-                    onChange={(e) => setCadData({ ...cadData, buildingArea: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all outline-none"
-                  />
+              {cadStep === 'layers' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">Found {cadLayers.length} layers. Select layers to process:</p>
+                  <div className="max-h-60 overflow-y-auto bg-slate-50 p-4 rounded-xl space-y-2">
+                    {cadLayers.map((layer) => (
+                      <label key={layer} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedLayers.includes(layer)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedLayers([...selectedLayers, layer]);
+                            } else {
+                              setSelectedLayers(selectedLayers.filter(l => l !== layer));
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-slate-700">{layer}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    onClick={processCad}
+                    disabled={loading || selectedLayers.length === 0}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Processing...' : 'Process CAD & Continue'}
+                  </button>
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Floor Area (m²)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={cadData.floorArea}
-                    onChange={(e) => setCadData({ ...cadData, floorArea: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all outline-none"
-                  />
+              {cadResult && (
+                <div className="bg-green-50 p-4 rounded-xl">
+                  <p className="font-semibold text-green-700 mb-2">✓ CAD Analysis Complete!</p>
+                  <p className="text-sm text-green-600">Found {cadResult.polygons?.length || 0} polygon(s)</p>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    BCR (Building Coverage Ratio)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={cadData.bcr}
-                    onChange={(e) => setCadData({ ...cadData, bcr: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all outline-none"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    FAR (Floor Area Ratio)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={cadData.far}
-                    onChange={(e) => setCadData({ ...cadData, far: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all outline-none"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
-            <button
-              onClick={handleSaveCadData}
-              disabled={loading}
-              className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Saving...' : 'Save & Continue'}
-            </button>
+            {cadStep === 'upload' && (
+              <button
+                onClick={() => setCurrentStep('infrastructure')}
+                className="w-full px-6 py-3 bg-slate-300 text-slate-700 rounded-xl font-semibold hover:bg-slate-400 transition-all"
+              >
+                Skip CAD Analysis
+              </button>
+            )}
           </div>
         );
 
@@ -357,119 +449,83 @@ export default function DemoPage() {
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                Step 3: Infrastructure Explorer
-              </h3>
-              <p className="text-slate-600 mb-6">Enter location to explore nearby infrastructure</p>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Step 3: Infrastructure Explorer</h3>
+              <p className="text-slate-600 mb-6">Select location and query nearby infrastructure</p>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Latitude
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={infraData.latitude}
-                    onChange={(e) => setInfraData({ ...infraData, latitude: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                    placeholder="-7.250445"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Latitude</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={mapCenter[0]}
+                      onChange={(e) => setMapCenter([parseFloat(e.target.value), mapCenter[1]])}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Longitude</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={mapCenter[1]}
+                      onChange={(e) => setMapCenter([mapCenter[0], parseFloat(e.target.value)])}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Longitude
+                    Radius (meters): {mapRadius}m
                   </label>
                   <input
-                    type="number"
-                    step="0.000001"
-                    value={infraData.longitude}
-                    onChange={(e) => setInfraData({ ...infraData, longitude: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                    placeholder="112.768845"
+                    type="range"
+                    min="100"
+                    max="2000"
+                    step="100"
+                    value={mapRadius}
+                    onChange={(e) => setMapRadius(parseInt(e.target.value))}
+                    className="w-full"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Radius (meters)
-                  </label>
-                  <input
-                    type="number"
-                    value={infraData.radius}
-                    onChange={(e) => setInfraData({ ...infraData, radius: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                  />
-                </div>
+                {typeof window !== 'undefined' && (
+                  <div className="h-96 rounded-xl overflow-hidden border-2 border-slate-300">
+                    <MapContainer
+                      center={mapCenter}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                      eventHandlers={{ click: handleMapClick }}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={mapCenter} />
+                      <Circle center={mapCenter} radius={mapRadius} />
+                    </MapContainer>
+                  </div>
+                )}
+
+                {infraData && (
+                  <div className="bg-green-50 p-4 rounded-xl">
+                    <p className="font-semibold text-green-700 mb-2">✓ Infrastructure Query Complete!</p>
+                    <p className="text-sm text-green-600">
+                      Found {infraData.features?.length || 0} infrastructure feature(s)
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
             <button
-              onClick={handleSaveInfrastructure}
+              onClick={queryInfrastructure}
               disabled={loading}
               className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Saving...' : 'Save & Continue'}
-            </button>
-          </div>
-        );
-
-      case 'ocr':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Step 4: Document OCR</h3>
-              <p className="text-slate-600 mb-6">Extract text from documents</p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Upload Document (Optional)
-                  </label>
-                  <input
-                    type="file"
-                    onChange={(e) => setOcrFile(e.target.files?.[0] || null)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    OCR Engine
-                  </label>
-                  <select
-                    value={ocrEngine}
-                    onChange={(e) => setOcrEngine(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
-                  >
-                    <option value="paddleocr">PaddleOCR</option>
-                    <option value="surya">Surya</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Extracted Text
-                  </label>
-                  <textarea
-                    value={ocrText}
-                    onChange={(e) => setOcrText(e.target.value)}
-                    rows={6}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
-                    placeholder="Enter or paste extracted text..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSaveOcr}
-              disabled={loading}
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Saving...' : 'Complete Demo'}
+              {loading ? 'Querying...' : 'Query & Complete Demo'}
             </button>
           </div>
         );
@@ -484,8 +540,19 @@ export default function DemoPage() {
             </div>
             <h3 className="text-3xl font-bold text-slate-900">Demo Completed!</h3>
             <p className="text-slate-600 text-lg">
-              Your data has been saved successfully with User ID: <strong>{userId}</strong>
+              All data has been saved successfully with User ID: <strong>{userId}</strong>
             </p>
+            <div className="bg-slate-50 p-6 rounded-xl text-left space-y-2">
+              <p className="text-sm text-slate-600">
+                <strong>OCR:</strong> {ocrResults.length} document(s) processed
+              </p>
+              <p className="text-sm text-slate-600">
+                <strong>CAD:</strong> {cadResult ? `${cadResult.polygons?.length || 0} polygon(s) analyzed` : 'Skipped'}
+              </p>
+              <p className="text-sm text-slate-600">
+                <strong>Infrastructure:</strong> {infraData?.features?.length || 0} feature(s) found
+              </p>
+            </div>
             <div className="flex gap-4 justify-center">
               <Link
                 href="/"
@@ -495,12 +562,12 @@ export default function DemoPage() {
               </Link>
               <button
                 onClick={() => {
-                  setCurrentStep('documents');
-                  setDocuments([]);
-                  setCadData({ siteArea: '', buildingArea: '', floorArea: '', bcr: '', far: '' });
-                  setInfraData({ latitude: '', longitude: '', radius: '500' });
-                  setOcrFile(null);
-                  setOcrText('');
+                  setCurrentStep('ocr');
+                  setOcrFiles([]);
+                  setOcrResults([]);
+                  setCadFile(null);
+                  setCadResult(null);
+                  setInfraData(null);
                   initializeDemo();
                 }}
                 className="px-6 py-3 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
@@ -514,10 +581,9 @@ export default function DemoPage() {
   };
 
   const steps = [
-    { id: 'documents', label: 'Documents', icon: '📄' },
-    { id: 'cad', label: 'CAD', icon: '📐' },
-    { id: 'infrastructure', label: 'Infrastructure', icon: '🗺️' },
     { id: 'ocr', label: 'OCR', icon: '🔍' },
+    { id: 'cad', label: 'CAD', icon: '📐' },
+    { id: 'infrastructure', label: 'Map', icon: '🗺️' },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
@@ -541,13 +607,13 @@ export default function DemoPage() {
       </div>
 
       <div className="container mx-auto px-8 py-16">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 mb-4">
-              Demo Workflow
+              Integrated Demo Workflow
             </h1>
             <p className="text-slate-600 text-lg">
-              Complete all steps to demonstrate the full system capabilities
+              Experience the complete system: OCR → CAD → Infrastructure
             </p>
             {userId && (
               <p className="text-sm text-slate-500 mt-2">
@@ -556,7 +622,6 @@ export default function DemoPage() {
             )}
           </div>
 
-          {/* Progress Steps */}
           {currentStep !== 'complete' && (
             <div className="mb-12">
               <div className="flex items-center justify-between">
@@ -595,7 +660,6 @@ export default function DemoPage() {
             </div>
           )}
 
-          {/* Content */}
           <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-10 shadow-2xl">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6">
