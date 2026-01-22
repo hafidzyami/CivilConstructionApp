@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import type { Feature, FeatureCollection } from 'geojson';
 
 // Dynamic import for map to avoid SSR
@@ -34,16 +33,6 @@ const Rectangle = dynamic(
   () => import('react-leaflet').then((mod) => mod.Rectangle),
   { ssr: false }
 );
-
-// Fix Leaflet icon issues
-if (typeof window !== 'undefined') {
-  delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  });
-}
 
 type Step = 'ocr' | 'cad' | 'infrastructure' | 'complete';
 type CADStep = 'upload' | 'layers' | 'analyze';
@@ -174,6 +163,18 @@ export default function DemoPage() {
 
   useEffect(() => {
     initializeDemo();
+    
+    // Fix Leaflet icon issues on client-side only
+    if (typeof window !== 'undefined') {
+      import('leaflet').then((L) => {
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
+      });
+    }
   }, []);
 
   const initializeDemo = async () => {
