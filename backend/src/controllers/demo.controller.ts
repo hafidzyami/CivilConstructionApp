@@ -171,7 +171,7 @@ export const saveCadData = async (req: Request, res: Response) => {
 // Save infrastructure data
 export const saveInfrastructureData = async (req: Request, res: Response) => {
   try {
-    const { sessionId, latitude, longitude, radius, buildings, roads, railways, waterways, rawData } = req.body;
+    const { sessionId, latitude, longitude, radius, buildings, roads, railways, waterways, results, rawData } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({
@@ -190,7 +190,7 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
         roads: roads || null,
         railways: railways || null,
         waterways: waterways || null,
-        rawData: rawData || null,
+        rawData: results || rawData || null, // Use results if provided, fallback to rawData
       },
       create: {
         sessionId: parseInt(sessionId),
@@ -201,7 +201,7 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
         roads: roads || null,
         railways: railways || null,
         waterways: waterways || null,
-        rawData: rawData || null,
+        rawData: results || rawData || null, // Use results if provided, fallback to rawData
       },
     });
 
@@ -222,7 +222,7 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
 // Save OCR data
 export const saveOcrData = async (req: Request, res: Response) => {
   try {
-    const { sessionId, fileName, extractedText, engine, rawData } = req.body;
+    const { sessionId, fileName, fileUrl, extractedText, engine, rawData } = req.body;
     const file = req.file as Express.Multer.File;
 
     if (!sessionId) {
@@ -232,9 +232,10 @@ export const saveOcrData = async (req: Request, res: Response) => {
       });
     }
 
-    let fileUrl = '';
-    if (file) {
-      fileUrl = await uploadFile(
+    let finalFileUrl = fileUrl || ''; // Use provided fileUrl first
+    if (file && !finalFileUrl) {
+      // Only upload if file provided and no fileUrl
+      finalFileUrl = await uploadFile(
         file.buffer,
         file.originalname,
         file.mimetype,
@@ -249,7 +250,7 @@ export const saveOcrData = async (req: Request, res: Response) => {
       data: {
         sessionId: parseInt(sessionId),
         fileName: fileName || file?.originalname || 'unknown',
-        fileUrl,
+        fileUrl: finalFileUrl,
         extractedText: extractedText || null,
         engine: engine || null,
         rawData: rawData || null,
