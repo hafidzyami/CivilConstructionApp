@@ -263,9 +263,9 @@ export default function DemoPage() {
     setOcrProcessing(true);
     setError('');
     const results: OCRResult[] = [];
-    const fileUrls: string[] = [];
 
     try {
+      // Process each file
       for (const file of ocrFiles) {
         const formData = new FormData();
         formData.append('image', file);
@@ -281,7 +281,7 @@ export default function DemoPage() {
         results.push(data);
       }
 
-      // Upload to MinIO
+      // Upload all files to MinIO
       const uploadFormData = new FormData();
       uploadFormData.append('sessionId', sessionId!.toString());
       ocrFiles.forEach(file => {
@@ -298,7 +298,7 @@ export default function DemoPage() {
       if (uploadData.success) {
         const uploadedDocs = uploadData.data;
         
-        // Save OCR results to database
+        // Save OCR results to database for each document
         for (let i = 0; i < results.length; i++) {
           const result = results[i];
           const ocrFormData = new FormData();
@@ -805,7 +805,7 @@ export default function DemoPage() {
                   disabled={ocrProcessing || ocrFiles.length === 0}
                   className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                 >
-                  {ocrProcessing ? 'Processing...' : 'Process & Continue to CAD'}
+                  {ocrProcessing ? 'Processing...' : 'Process Documents'}
                 </button>
               </div>
             </div>
@@ -862,6 +862,14 @@ export default function DemoPage() {
                       )}
                     </div>
                   ))}
+
+                  {/* Continue to CAD Button */}
+                  <button
+                    onClick={() => setCurrentStep('cad')}
+                    className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                  >
+                    Continue to CAD Analysis →
+                  </button>
                 </>
               )}
 
