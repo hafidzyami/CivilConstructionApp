@@ -173,8 +173,7 @@ export default function DemoPage() {
       formData.append('extractedText', ocrText);
       formData.append('engine', ocrEngine);
       if (ocrFile) {
-        formData.append('file', ocrFile);
-        formData.append('fileName', ocrFile.name);
+        formData.append('documents', ocrFile);
       }
 
       const res = await fetch(`${API_URL}/demo/ocr-data`, {
