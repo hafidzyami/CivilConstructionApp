@@ -47,16 +47,16 @@ export default function DemoPage() {
   }, []);
 
   const initializeDemo = async () => {
-    try {API_URL}/demo/next-user-id`);
+    try {
+      setLoading(true);
+      // Get next user ID
+      const userIdRes = await fetch(`${API_URL}/demo/next-user-id`);
       const userIdData = await userIdRes.json();
       const newUserId = userIdData.data.userId;
       setUserId(newUserId);
 
       // Create session
-      const sessionRes = await fetch(`${
-
-      // Create session
-      const sessionRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/session`, {
+      const sessionRes = await fetch(`${API_URL}/demo/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: newUserId }),
