@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Dynamic import for map to avoid SSR
@@ -21,10 +22,6 @@ const Marker = dynamic(
 );
 const Circle = dynamic(
   () => import('react-leaflet').then((mod) => mod.Circle),
-  { ssr: false }
-);
-const useMapEvents = dynamic(
-  () => import('react-leaflet').then((mod) => mod.useMapEvents),
   { ssr: false }
 );
 
