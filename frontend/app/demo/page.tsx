@@ -146,6 +146,11 @@ export default function DemoPage() {
   const [floorCount, setFloorCount] = useState(1);
   const [isFootprint, setIsFootprint] = useState(true);
   const [simplify, setSimplify] = useState(false);
+  const [svgViewBox, setSvgViewBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [svgZoom, setSvgZoom] = useState(1);
+  const [svgPan, setSvgPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   // Infrastructure state
   const [mapCenter, setMapCenter] = useState<[number, number]>([-6.358137, 106.835432]);
@@ -446,11 +451,18 @@ export default function DemoPage() {
         setBounds(data.bounds);
         setCadStep('analyze');
 
+        // Initialize SVG viewBox
+        const width = data.bounds.max_x - data.bounds.min_x;
+        const height = data.bounds.max_y - data.bounds.min_y;
+        setSvgViewBox({ x: data.bounds.min_x, y: data.bounds.min_y, width, height });
+        setSvgZoom(1);
+        setSvgPan({ x: 0, y: 0 });
+
         // Save to database
         const areas = finalPolys.map((p: any) => p.area_raw);
         const totalArea = areas.reduce((a: number, b: number) => a + b, 0);
 
-        await fetch(`${API_URL}/demo/cad-data`, {
+        const cadSaveRes = await fetch(`${API_URL}/demo/cad-data`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -461,6 +473,14 @@ export default function DemoPage() {
             rawData: data,
           }),
         });
+
+        const cadSaveData = await cadSaveRes.json();
+        console.log('CAD data saved:', cadSaveData);
+        
+        if (!cadSaveData.success) {
+          console.error('CAD save failed:', cadSaveData);
+          setError('Warning: CAD data may not have been saved properly');
+        }
       }
     } catch (err) {
       setError('Failed to process CAD file');
@@ -503,6 +523,51 @@ export default function DemoPage() {
     const far = siteArea > 0 ? (totalFloorArea / siteArea) : 0;
     return { siteArea, footprintArea, totalFloorArea, bcr, far };
   }, [selections, polygons]);
+
+  const handleSvgWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+    setSvgZoom(prev => Math.max(0.1, Math.min(10, prev * zoomFactor)));
+  };
+
+  const handleSvgMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 1 || e.shiftKey) { // Middle mouse or Shift+Click
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - svgPan.x, y: e.clientY - svgPan.y });
+    }
+  };
+
+  const handleSvgMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      e.preventDefault();
+      setSvgPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+    }
+  };
+
+  const handleSvgMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const resetSvgView = () => {
+    setSvgZoom(1);
+    setSvgPan({ x: 0, y: 0 });
+  };
+
+  const currentViewBox = useMemo(() => {
+    const centerX = svgViewBox.x + svgViewBox.width / 2;
+    const centerY = svgViewBox.y + svgViewBox.height / 2;
+    const newWidth = svgViewBox.width / svgZoom;
+    const newHeight = svgViewBox.height / svgZoom;
+    const panOffsetX = (svgPan.x / 100) * newWidth;
+    const panOffsetY = (svgPan.y / 100) * newHeight;
+    return {
+      x: centerX - newWidth / 2 - panOffsetX,
+      y: centerY - newHeight / 2 - panOffsetY,
+      width: newWidth,
+      height: newHeight
+    };
+  }, [svgViewBox, svgZoom, svgPan]);
 
   // Infrastructure Handlers
   const calculateZoom = (dist: number): number => {
@@ -628,7 +693,7 @@ export default function DemoPage() {
     const featuresArray = Array.from(selectedFeatures.values());
     
     try {
-      await fetch(`${API_URL}/demo/infrastructure-data`, {
+      const infraRes = await fetch(`${API_URL}/demo/infrastructure-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -643,8 +708,18 @@ export default function DemoPage() {
         }),
       });
 
+      const infraData = await infraRes.json();
+      console.log('Infrastructure data saved:', infraData);
+      
+      if (!infraData.success) {
+        console.error('Infrastructure save failed:', infraData);
+        setError('Warning: Infrastructure data may not have been saved properly');
+        return;
+      }
+
       setCurrentStep('complete');
     } catch (err: any) {
+      console.error('Infrastructure save error:', err);
       setError('Failed to submit infrastructure data: ' + err.message);
     }
   };
@@ -1046,35 +1121,63 @@ export default function DemoPage() {
 
                 {/* SVG Viewer */}
                 <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                  <h3 className="text-xl font-bold text-slate-900 mb-4">Geometry Viewer</h3>
-                  <p className="text-sm text-slate-600 mb-4">Click polygons to select them for site or building analysis</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900">Geometry Viewer</h3>
+                      <p className="text-sm text-slate-600">Click polygons to select • Scroll to zoom • Shift+Drag to pan</p>
+                    </div>
+                    <button
+                      onClick={resetSvgView}
+                      className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors"
+                    >
+                      Reset View
+                    </button>
+                  </div>
                   
                   {bounds && (
-                    <svg
-                      viewBox={`${bounds.min_x} ${bounds.min_y} ${bounds.max_x - bounds.min_x} ${bounds.max_y - bounds.min_y}`}
-                      className="w-full h-[600px] border rounded-xl bg-slate-50"
-                      style={{ transform: 'scale(1, -1)' }}
-                    >
-                      {polygons.map((poly) => {
-                        const sel = selections[poly.id];
-                        let fill = '#E5E7EB';
-                        if (sel?.isSite && sel?.isBuilding) fill = '#A78BFA';
-                        else if (sel?.isSite) fill = '#60A5FA';
-                        else if (sel?.isBuilding) fill = '#34D399';
+                    <div className="relative">
+                      <div className="absolute top-2 right-2 bg-white/90 px-3 py-1 rounded-lg text-xs font-medium text-slate-700 shadow">
+                        Zoom: {(svgZoom * 100).toFixed(0)}%
+                      </div>
+                      <svg
+                        viewBox={`${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`}
+                        className="w-full h-[600px] border rounded-xl bg-slate-50"
+                        style={{ 
+                          transform: 'scale(1, -1)',
+                          cursor: isPanning ? 'grabbing' : 'grab'
+                        }}
+                        onWheel={handleSvgWheel}
+                        onMouseDown={handleSvgMouseDown}
+                        onMouseMove={handleSvgMouseMove}
+                        onMouseUp={handleSvgMouseUp}
+                        onMouseLeave={handleSvgMouseUp}
+                      >
+                        {polygons.map((poly) => {
+                          const sel = selections[poly.id];
+                          let fill = '#E5E7EB';
+                          if (sel?.isSite && sel?.isBuilding) fill = '#A78BFA';
+                          else if (sel?.isSite) fill = '#60A5FA';
+                          else if (sel?.isBuilding) fill = '#34D399';
 
-                        return (
-                          <path
-                            key={poly.id}
-                            d={poly.path}
-                            fill={fill}
-                            stroke="#1F2937"
-                            strokeWidth={(bounds.max_x - bounds.min_x) * 0.001}
-                            className="cursor-pointer hover:opacity-70 transition-opacity"
-                            onClick={() => togglePoly(poly.id)}
-                          />
-                        );
-                      })}
-                    </svg>
+                          return (
+                            <path
+                              key={poly.id}
+                              d={poly.path}
+                              fill={fill}
+                              stroke="#1F2937"
+                              strokeWidth={(bounds.max_x - bounds.min_x) * 0.001}
+                              className="cursor-pointer hover:opacity-70 transition-opacity"
+                              onClick={(e) => {
+                                if (!isPanning) {
+                                  e.stopPropagation();
+                                  togglePoly(poly.id);
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                      </svg>
+                    </div>
                   )}
                 </div>
 
