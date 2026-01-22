@@ -23,8 +23,14 @@ class MinioConfig {
       endpoint,
       port,
       useSSL,
-      accessKey: accessKey ? `${accessKey.substring(0, 4)}...` : 'NOT SET',
-      secretKey: secretKey ? '***SET***' : 'NOT SET',
+      accessKey: accessKey ? `${accessKey}` : 'NOT SET',
+      secretKey: secretKey ? `${secretKey.substring(0, 10)}...` : 'NOT SET',
+      fromEnv: {
+        MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ? 'SET' : 'NOT SET',
+        MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ? 'SET' : 'NOT SET',
+        MINIO_ROOT_USER: process.env.MINIO_ROOT_USER ? 'SET' : 'NOT SET',
+        MINIO_ROOT_PASSWORD: process.env.MINIO_ROOT_PASSWORD ? 'SET' : 'NOT SET',
+      },
     });
 
     // Internal client
