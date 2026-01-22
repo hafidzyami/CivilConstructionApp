@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -139,6 +139,7 @@ export default function DemoPage() {
   const [cadLayers, setCadLayers] = useState<string[]>([]);
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
   const [cadStep, setCadStep] = useState<CADStep>('upload');
+  const [cadParserMode, setCadParserMode] = useState<'manual' | 'auto'>('manual');
   const [polygons, setPolygons] = useState<PolygonData[]>([]);
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selections, setSelections] = useState<Record<number, Selection>>({});
@@ -151,6 +152,10 @@ export default function DemoPage() {
   const [svgPan, setSvgPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectStart, setSelectStart] = useState({ x: 0, y: 0 });
+  const [selectCurrent, setSelectCurrent] = useState({ x: 0, y: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
 
   // Infrastructure state
   const [mapCenter, setMapCenter] = useState<[number, number]>([-6.358137, 106.835432]);
@@ -378,10 +383,14 @@ export default function DemoPage() {
     try {
       const formData = new FormData();
       formData.append('file', cadFile);
-      formData.append('layers', JSON.stringify(selectedLayers));
-      formData.append('simplify', String(simplify));
+      const endpoint = cadParserMode === 'manual' ? '/cad/process' : '/cad/process-auto';
+      
+      if (cadParserMode === 'manual') {
+        formData.append('layers', JSON.stringify(selectedLayers));
+        formData.append('simplify', String(simplify));
+      }
 
-      const res = await fetch(`${API_URL}/cad/process`, { method: 'POST', body: formData });
+      const res = await fetch(`${API_URL}${endpoint}`, { method: 'POST', body: formData });
       const data = await res.json();
 
       if (data.polygons) {
@@ -506,6 +515,31 @@ export default function DemoPage() {
     });
   };
 
+  const handleBoxSelect = (box: Bounds) => {
+    setSelections(prev => {
+      const next = { ...prev };
+      let hasChanges = false;
+      polygons.forEach(p => {
+        const pBox = p.bbox;
+        if (!pBox) return;
+        const intersects = box.min_x <= pBox.max_x && box.max_x >= pBox.min_x &&
+                         box.min_y <= pBox.max_y && box.max_y >= pBox.min_y;
+        if (intersects) {
+          hasChanges = true;
+          const current = next[p.id] ? { ...next[p.id] } : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
+          if (activeMode === 'site') current.isSite = !current.isSite;
+          else {
+            if (!current.isBuilding) { current.floors = floorCount; current.isFootprint = isFootprint; }
+            current.isBuilding = !current.isBuilding;
+          }
+          if (!current.isSite && !current.isBuilding) delete next[p.id];
+          else next[p.id] = current;
+        }
+      });
+      return hasChanges ? next : prev;
+    });
+  };
+
   const cadMetrics = useMemo(() => {
     let siteArea = 0;
     let footprintArea = 0;
@@ -524,28 +558,64 @@ export default function DemoPage() {
     return { siteArea, footprintArea, totalFloorArea, bcr, far };
   }, [selections, polygons]);
 
+  const getSvgPoint = (clientX: number, clientY: number) => {
+    if (!svgRef.current) return { x: 0, y: 0 };
+    const pt = new DOMPoint(clientX, clientY);
+    const ctm = svgRef.current.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const svgP = pt.matrixTransform(ctm.inverse());
+    return { x: svgP.x, y: svgP.y };
+  };
+
   const handleSvgWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
     setSvgZoom(prev => Math.max(0.1, Math.min(10, prev * zoomFactor)));
   };
 
-  const handleSvgMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 1 || e.shiftKey) { // Middle mouse or Shift+Click
+  const handleSvgMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
+      setIsSelecting(true);
+      const pt = getSvgPoint(e.clientX, e.clientY);
+      setSelectStart(pt);
+      setSelectCurrent(pt);
+      e.stopPropagation();
+      return;
+    }
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX - svgPan.x, y: e.clientY - svgPan.y });
     }
   };
 
-  const handleSvgMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
+  const handleSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (isSelecting) {
+      const pt = getSvgPoint(e.clientX, e.clientY);
+      setSelectCurrent(pt);
+    } else if (isPanning) {
       e.preventDefault();
       setSvgPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
   };
 
   const handleSvgMouseUp = () => {
+    if (isSelecting) {
+      setIsSelecting(false);
+      const box: Bounds = {
+        min_x: Math.min(selectStart.x, selectCurrent.x),
+        max_x: Math.max(selectStart.x, selectCurrent.x),
+        min_y: Math.min(selectStart.y, selectCurrent.y),
+        max_y: Math.max(selectStart.y, selectCurrent.y),
+      };
+      const dist = Math.sqrt(
+        Math.pow(selectStart.x - selectCurrent.x, 2) + 
+        Math.pow(selectStart.y - selectCurrent.y, 2)
+      );
+      if (dist > 0.05) {
+        handleBoxSelect(box);
+      }
+    }
     setIsPanning(false);
   };
 
@@ -978,43 +1048,91 @@ export default function DemoPage() {
 
             {cadStep === 'layers' && (
               <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">Select Layers</h2>
-                <p className="text-sm text-slate-600 mb-4">Found {cadLayers.length} layers. Select layers to process:</p>
+                <h2 className="text-2xl font-bold text-slate-900 mb-4">Processing Mode</h2>
                 
-                <div className="max-h-96 overflow-y-auto bg-slate-50 p-4 rounded-xl space-y-2 mb-6">
-                  {cadLayers.map((layer) => (
-                    <label key={layer} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-white rounded">
-                      <input
-                        type="checkbox"
-                        checked={selectedLayers.includes(layer)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedLayers([...selectedLayers, layer]);
-                          } else {
-                            setSelectedLayers(selectedLayers.filter(l => l !== layer));
-                          }
-                        }}
-                        className="rounded"
-                      />
-                      <span className="text-sm text-slate-700">{layer}</span>
-                    </label>
-                  ))}
+                {/* Parser Mode Toggle */}
+                <div className="mb-6 p-4 bg-slate-50 rounded-xl">
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">Parser Mode</label>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setCadParserMode('manual')}
+                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                        cadParserMode === 'manual'
+                          ? 'bg-orange-600 text-white shadow-lg'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="font-bold">Manual</div>
+                        <div className="text-xs opacity-90 mt-1">Select layers yourself</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setCadParserMode('auto')}
+                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                        cadParserMode === 'auto'
+                          ? 'bg-orange-600 text-white shadow-lg'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="font-bold">Automated</div>
+                        <div className="text-xs opacity-90 mt-1">AI detection (experimental)</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 mb-6">
-                  <input
-                    type="checkbox"
-                    checked={simplify}
-                    onChange={(e) => setSimplify(e.target.checked)}
-                    className="rounded"
-                  />
-                  <label className="text-sm text-slate-700">Simplify geometry (faster but less accurate)</label>
-                </div>
+                {cadParserMode === 'manual' && (
+                  <>
+                    <h3 className="text-xl font-bold text-slate-900 mb-3">Select Layers</h3>
+                    <p className="text-sm text-slate-600 mb-4">Found {cadLayers.length} layers. Select layers to process:</p>
+                    
+                    <div className="max-h-96 overflow-y-auto bg-slate-50 p-4 rounded-xl space-y-2 mb-6">
+                      {cadLayers.map((layer) => (
+                        <label key={layer} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-white rounded">
+                          <input
+                            type="checkbox"
+                            checked={selectedLayers.includes(layer)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLayers([...selectedLayers, layer]);
+                              } else {
+                                setSelectedLayers(selectedLayers.filter(l => l !== layer));
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-slate-700">{layer}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-6">
+                      <input
+                        type="checkbox"
+                        checked={simplify}
+                        onChange={(e) => setSimplify(e.target.checked)}
+                        className="rounded"
+                      />
+                      <label className="text-sm text-slate-700">Simplify geometry (faster but less accurate)</label>
+                    </div>
+                  </>
+                )}
+
+                {cadParserMode === 'auto' && (
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                    <p className="text-sm text-blue-800">
+                      <strong>Automated Mode:</strong> The system will automatically detect and analyze building structures using AI.
+                      This is experimental and may not work for all file types.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-4">
                   <button
                     onClick={processCad}
-                    disabled={loading || selectedLayers.length === 0}
+                    disabled={loading || (cadParserMode === 'manual' && selectedLayers.length === 0)}
                     className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? 'Processing...' : 'Process & Analyze'}
@@ -1124,7 +1242,7 @@ export default function DemoPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-xl font-bold text-slate-900">Geometry Viewer</h3>
-                      <p className="text-sm text-slate-600">Click polygons to select • Scroll to zoom • Shift+Drag to pan</p>
+                      <p className="text-sm text-slate-600">Click polygons • Scroll: zoom • Shift+Drag: pan • Ctrl+Drag: box select</p>
                     </div>
                     <button
                       onClick={resetSvgView}
@@ -1136,15 +1254,16 @@ export default function DemoPage() {
                   
                   {bounds && (
                     <div className="relative">
-                      <div className="absolute top-2 right-2 bg-white/90 px-3 py-1 rounded-lg text-xs font-medium text-slate-700 shadow">
+                      <div className="absolute top-2 right-2 bg-white/90 px-3 py-1 rounded-lg text-xs font-medium text-slate-700 shadow z-10">
                         Zoom: {(svgZoom * 100).toFixed(0)}%
                       </div>
                       <svg
+                        ref={svgRef}
                         viewBox={`${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`}
-                        className="w-full h-[600px] border rounded-xl bg-slate-50"
+                        className="w-full h-[600px] border rounded-xl bg-[#1e1e1e]"
                         style={{ 
                           transform: 'scale(1, -1)',
-                          cursor: isPanning ? 'grabbing' : 'grab'
+                          cursor: isSelecting ? 'crosshair' : isPanning ? 'grabbing' : 'grab'
                         }}
                         onWheel={handleSvgWheel}
                         onMouseDown={handleSvgMouseDown}
@@ -1154,7 +1273,7 @@ export default function DemoPage() {
                       >
                         {polygons.map((poly) => {
                           const sel = selections[poly.id];
-                          let fill = '#E5E7EB';
+                          let fill = '#3a3a3a';
                           if (sel?.isSite && sel?.isBuilding) fill = '#A78BFA';
                           else if (sel?.isSite) fill = '#60A5FA';
                           else if (sel?.isBuilding) fill = '#34D399';
@@ -1164,11 +1283,11 @@ export default function DemoPage() {
                               key={poly.id}
                               d={poly.path}
                               fill={fill}
-                              stroke="#1F2937"
-                              strokeWidth={(bounds.max_x - bounds.min_x) * 0.001}
+                              stroke="#ffffff"
+                              strokeWidth={(bounds.max_x - bounds.min_x) * 0.002}
                               className="cursor-pointer hover:opacity-70 transition-opacity"
                               onClick={(e) => {
-                                if (!isPanning) {
+                                if (!isPanning && !isSelecting) {
                                   e.stopPropagation();
                                   togglePoly(poly.id);
                                 }
@@ -1176,6 +1295,20 @@ export default function DemoPage() {
                             />
                           );
                         })}
+                        
+                        {/* Selection Box */}
+                        {isSelecting && (
+                          <rect
+                            x={Math.min(selectStart.x, selectCurrent.x)}
+                            y={Math.min(selectStart.y, selectCurrent.y)}
+                            width={Math.abs(selectCurrent.x - selectStart.x)}
+                            height={Math.abs(selectCurrent.y - selectStart.y)}
+                            fill="rgba(147, 51, 234, 0.2)"
+                            stroke="#9333EA"
+                            strokeWidth={(bounds.max_x - bounds.min_x) * 0.002}
+                            strokeDasharray="5,5"
+                          />
+                        )}
                       </svg>
                     </div>
                   )}
