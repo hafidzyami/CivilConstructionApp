@@ -84,7 +84,7 @@ class MinioConfig {
     try {
       const exists = await this.client.bucketExists(this.bucketName);
       if (!exists) {
-        await this.client.makeBucket(this.bucketName, 'us-east-1');
+        await this.client.makeBucket(this.bucketName, 'ap-southeast-3');
         console.log(`✅ MinIO bucket '${this.bucketName}' created`);
 
         // Set bucket policy to public read
