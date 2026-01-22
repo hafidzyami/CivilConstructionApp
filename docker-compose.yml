@@ -143,8 +143,6 @@ services:
       retries: 3
       start_period: 10s
     command: sh -c "npx prisma migrate deploy && node dist/index.js"
-    extra_hosts:
-      - host.docker.internal:host-gateway
 
   frontend:
     container_name: civilconstruction-frontend

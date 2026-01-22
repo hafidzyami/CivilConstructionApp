@@ -279,6 +279,19 @@ jobs:
             echo "🚀 Starting containers..."
             docker compose up -d --remove-orphans
 
+            # --- Connect standalone MinIO to network ---
+            echo "🔗 Connecting MinIO to civilconstruction network..."
+            NETWORK_NAME="civilconstruction_civilconstruction-network"
+            if docker network inspect $NETWORK_NAME >/dev/null 2>&1; then
+              if docker inspect minio >/dev/null 2>&1; then
+                docker network connect $NETWORK_NAME minio 2>/dev/null && echo "✅ MinIO connected to network" || echo "⚠️  MinIO already connected or connection failed"
+              else
+                echo "⚠️  MinIO container not found"
+              fi
+            else
+              echo "⚠️  Network $NETWORK_NAME not found"
+            fi
+
             # --- Health Check Neo4j ---
             echo "🔍 Checking Neo4j health..."
             for i in {1..20}; do
