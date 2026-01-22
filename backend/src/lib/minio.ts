@@ -157,8 +157,10 @@ export const uploadFile = async (
     );
 
     // Construct public URL directly (bucket is public read)
+    // MINIO_PUBLIC_URL should be base URL without bucket name
+    // Example: https://civil.ganeshait.com/civil-storage/
     const publicUrl = process.env.MINIO_PUBLIC_URL || 'http://localhost:9000';
-    const fileUrl = `${publicUrl}/${BUCKET_NAME}/${objectName}`;
+    const fileUrl = `${publicUrl}${BUCKET_NAME}/${objectName}`;
 
     console.log('✅ File uploaded:', { objectName, url: fileUrl });
 
