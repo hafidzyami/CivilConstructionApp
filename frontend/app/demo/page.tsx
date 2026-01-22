@@ -23,6 +23,10 @@ const Circle = dynamic(
   () => import('react-leaflet').then((mod) => mod.Circle),
   { ssr: false }
 );
+const useMapEvents = dynamic(
+  () => import('react-leaflet').then((mod) => mod.useMapEvents),
+  { ssr: false }
+);
 
 type Step = 'ocr' | 'cad' | 'infrastructure' | 'complete';
 
@@ -30,6 +34,16 @@ interface OCRResult {
   fileName: string;
   textContent: string;
   fileUrl: string;
+}
+
+// Map click handler component
+function MapClickHandler({ onClick }: { onClick: (e: any) => void }) {
+  const map = useMapEvents({
+    click: (e) => {
+      onClick(e);
+    },
+  });
+  return null;
 }
 
 export default function DemoPage() {
@@ -494,8 +508,8 @@ export default function DemoPage() {
                       center={mapCenter}
                       zoom={15}
                       style={{ height: '100%', width: '100%' }}
-                      eventHandlers={{ click: handleMapClick }}
                     >
+                      <MapClickHandler onClick={handleMapClick} />
                       <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
