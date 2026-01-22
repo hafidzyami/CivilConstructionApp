@@ -92,8 +92,8 @@ jobs:
             GEMINI_API_KEY=$GEMINI_API_KEY
             MINIO_ROOT_USER=$MINIO_ROOT_USER
             MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD
-            MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY
-            MINIO_SECRET_KEY=$MINIO_SECRET_KEY
+            MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-$MINIO_ROOT_USER}
+            MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-$MINIO_ROOT_PASSWORD}
             MINIO_PUBLIC_URL=$MINIO_PUBLIC_URL
             MINIO_ENDPOINT=minio
             MINIO_PORT=9000
@@ -285,6 +285,8 @@ jobs:
             if docker network inspect $NETWORK_NAME >/dev/null 2>&1; then
               if docker inspect minio >/dev/null 2>&1; then
                 docker network connect $NETWORK_NAME minio 2>/dev/null && echo "✅ MinIO connected to network" || echo "⚠️  MinIO already connected or connection failed"
+                echo "🔄 Restarting backend to reconnect to MinIO..."
+                docker restart civilconstruction-backend
               else
                 echo "⚠️  MinIO container not found"
               fi
