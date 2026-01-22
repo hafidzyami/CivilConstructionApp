@@ -150,17 +150,13 @@ export const uploadFile = async (
       }
     );
 
-    // Generate presigned URL using public client
-    const publicClient = minioConfig.getPublicClient();
-    const presignedUrl = await publicClient.presignedGetObject(
-      BUCKET_NAME,
-      objectName,
-      7 * 24 * 60 * 60 // 7 days
-    );
+    // Construct public URL directly (bucket is public read)
+    const publicUrl = process.env.MINIO_PUBLIC_URL || 'http://localhost:9000';
+    const fileUrl = `${publicUrl}/${BUCKET_NAME}/${objectName}`;
 
-    console.log('✅ File uploaded:', { objectName, url: presignedUrl });
+    console.log('✅ File uploaded:', { objectName, url: fileUrl });
 
-    return presignedUrl;
+    return fileUrl;
   } catch (error) {
     console.error('❌ Error uploading file to MinIO:', error);
     throw error;
