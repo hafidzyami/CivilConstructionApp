@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import 'leaflet/dist/leaflet.css';
 
 // Dynamic import for map to avoid SSR
 const MapContainer = dynamic(
@@ -61,10 +62,6 @@ export default function DemoPage() {
 
   useEffect(() => {
     initializeDemo();
-    // Import leaflet CSS
-    if (typeof window !== 'undefined') {
-      import('leaflet/dist/leaflet.css');
-    }
   }, []);
 
   const initializeDemo = async () => {
