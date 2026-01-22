@@ -205,4 +205,24 @@ router.get('/sessions', demoController.getAllSessions);
  */
 router.get('/sessions/:id', demoController.getSessionById);
 
+/**
+ * @swagger
+ * /api/demo/sessions/{id}:
+ *   delete:
+ *     summary: Delete demo session by ID (Admin only)
+ *     tags: [Demo]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Session deleted successfully
+ *       404:
+ *         description: Session not found
+ */
+router.delete('/sessions/:id', demoController.deleteSession);
+
 export default router;

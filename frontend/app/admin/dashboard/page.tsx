@@ -48,6 +48,34 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteSession = async (sessionId: number) => {
+    if (!confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/demo/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        // Refresh sessions list
+        fetchSessions();
+        // Close detail modal if viewing deleted session
+        if (selectedSession?.id === sessionId) {
+          setShowDetail(false);
+          setSelectedSession(null);
+        }
+      } else {
+        alert('Failed to delete session: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      alert('Failed to delete session');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('adminLoggedIn');
     localStorage.removeItem('adminEmail');
@@ -245,12 +273,20 @@ export default function AdminDashboard() {
                       {new Date(session.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => viewSessionDetail(session)}
-                        className="text-blue-600 hover:text-blue-800 font-semibold"
-                      >
-                        View Details
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => viewSessionDetail(session)}
+                          className="text-blue-600 hover:text-blue-800 font-semibold"
+                        >
+                          View Details
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSession(session.id)}
+                          className="text-red-600 hover:text-red-800 font-semibold"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -332,6 +332,41 @@ export const getSessionById = async (req: Request, res: Response) => {
   }
 };
 
+// Delete session
+export const deleteSession = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Check if session exists
+    const session = await prisma.demoSession.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found',
+      });
+    }
+
+    // Delete session (cascade will delete related records)
+    await prisma.demoSession.delete({
+      where: { id: parseInt(id) },
+    });
+
+    res.json({
+      success: true,
+      message: 'Session deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Error deleting session:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // Get next user ID
 export const getNextUserId = async (req: Request, res: Response) => {
   try {
