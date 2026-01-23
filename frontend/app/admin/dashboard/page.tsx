@@ -62,6 +62,27 @@ export default function AdminDashboard() {
   const [mapKey, setMapKey] = useState(0);
 
   useEffect(() => {
+    // Invalidate map size when modal opens
+    if (showDetail && selectedSession?.infrastructureData) {
+      const timer = setTimeout(() => {
+        // Trigger map resize by incrementing key slightly
+        const mapElement = document.querySelector('.leaflet-container');
+        if (mapElement && (window as any).L) {
+          const maps = (window as any).L._maps;
+          if (maps) {
+            Object.values(maps).forEach((map: any) => {
+              if (map && map.invalidateSize) {
+                map.invalidateSize();
+              }
+            });
+          }
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [showDetail, selectedSession]);
+
+  useEffect(() => {
     // Check if admin is logged in
     const isLoggedIn = localStorage.getItem('adminLoggedIn');
     if (!isLoggedIn) {
