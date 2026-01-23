@@ -1,62 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import type { Feature, FeatureCollection } from 'geojson';
 import CADSection from './components/CADSection';
 
-// Dynamic import for map to avoid SSR
-const MapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
-const Circle = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Circle),
-  { ssr: false }
-);
-const GeoJSON = dynamic(
-  () => import('react-leaflet').then((mod) => mod.GeoJSON),
-  { ssr: false }
-);
-const Rectangle = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Rectangle),
+// Dynamic import InfrastructureSection to avoid SSR issues with Leaflet
+const InfrastructureSection = dynamic(
+  () => import('./components/InfrastructureSection'),
   { ssr: false }
 );
 
 type Step = 'ocr' | 'cad' | 'infrastructure' | 'complete';
-type BuildingType = 'Hospital' | 'School' | 'Residential Housing' | 'River' | 'Lake' | 'Office' | 'Others';
 
-const BUILDING_TYPES: BuildingType[] = [
-  'Hospital',
-  'School',
-  'Residential Housing',
-  'River',
-  'Lake',
-  'Office',
-  'Others'
-];
 
-const TYPE_COLORS: Record<BuildingType, { color: string; fillColor: string }> = {
-  'Hospital': { color: '#DC2626', fillColor: '#FCA5A5' },
-  'School': { color: '#D97706', fillColor: '#FCD34D' },
-  'Residential Housing': { color: '#059669', fillColor: '#6EE7B7' },
-  'River': { color: '#0284C7', fillColor: '#7DD3FC' },
-  'Lake': { color: '#1D4ED8', fillColor: '#93C5FD' },
-  'Office': { color: '#7C3AED', fillColor: '#C4B5FD' },
-  'Others': { color: '#6B7280', fillColor: '#D1D5DB' }
-};
 
 interface OCRResult {
   success: boolean;
@@ -75,23 +33,7 @@ interface OCRResult {
   error?: string;
 }
 
-interface SelectedFeature {
-  featureId: string;
-  type: BuildingType;
-  customType?: string;
-  lat: number;
-  lon: number;
-}
 
-// Map click handler component
-function MapClickHandler({ onClick }: { onClick: (e: any) => void }) {
-  const map = useMapEvents({
-    click: (e) => {
-      onClick(e);
-    },
-  });
-  return null;
-}
 
 export default function DemoPage() {
   const router = useRouter();
@@ -110,34 +52,12 @@ export default function DemoPage() {
   const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
   const [ocrProcessing, setOcrProcessing] = useState(false);
 
-  // Infrastructure state
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-6.358137, 106.835432]);
-  const [mapZoom, setMapZoom] = useState(16);
-  const [mapRadius, setMapRadius] = useState(300);
-  const [searchInput, setSearchInput] = useState('');
-  const [osmData, setOsmData] = useState<FeatureCollection | null>(null);
-  const [selectedFeatures, setSelectedFeatures] = useState<Map<string, SelectedFeature>>(new Map());
-  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
-  const [tempBuildingType, setTempBuildingType] = useState<BuildingType>('Hospital');
-  const [tempCustomType, setTempCustomType] = useState('');
-  const [geoJsonKey, setGeoJsonKey] = useState(0);
+
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
   useEffect(() => {
     initializeDemo();
-    
-    // Fix Leaflet icon issues on client-side only
-    if (typeof window !== 'undefined') {
-      import('leaflet').then((L) => {
-        delete (L.Icon.Default.prototype as any)._getIconUrl;
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        });
-      });
-    }
   }, []);
 
   const initializeDemo = async () => {
@@ -302,182 +222,7 @@ export default function DemoPage() {
   };
 
   // CAD Handlers
-  // Infrastructure Handlers
-  const calculateZoom = (dist: number): number => {
-    return Math.max(13, 19 - Math.floor(Math.log2(dist / 50)));
-  };
-
-  const fetchOSMData = useCallback(async () => {
-    setLoading(true);
-    setOsmData(null);
-    setError('');
-
-    try {
-      const response = await fetch(`${API_URL}/osm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lat: mapCenter[0],
-          lon: mapCenter[1],
-          radius: mapRadius,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch OSM data: ${response.statusText}`);
-      }
-
-      const data = (await response.json()) as FeatureCollection;
-      setOsmData(data);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [mapCenter, mapRadius, API_URL]);
-
-  const handleSearchLocation = async () => {
-    setError('');
-
-    const coordMatch = searchInput.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-    if (coordMatch) {
-      const lat = parseFloat(coordMatch[1]);
-      const lon = parseFloat(coordMatch[2]);
-      setMapCenter([lat, lon]);
-      setMapZoom(calculateZoom(mapRadius));
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchInput)}&limit=1`
-      );
-      const results = await response.json();
-
-      if (results.length > 0) {
-        const lat = parseFloat(results[0].lat);
-        const lon = parseFloat(results[0].lon);
-        setMapCenter([lat, lon]);
-        setMapZoom(calculateZoom(mapRadius));
-      } else {
-        setError('Location not found');
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(`Geocoding error: ${message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getFeatureId = (feature: Feature): string => {
-    const props = feature.properties as Record<string, unknown>;
-    return props.osm_id ? String(props.osm_id) : JSON.stringify(feature.geometry);
-  };
-
-  const getFeatureCoordinates = (feature: Feature): { lat: number; lon: number } => {
-    if (feature.geometry.type === 'Point') {
-      const coords = (feature.geometry as any).coordinates;
-      return { lat: coords[1], lon: coords[0] };
-    } else if (feature.geometry.type === 'Polygon') {
-      const coords = (feature.geometry as any).coordinates[0];
-      const lats = coords.map((c: number[]) => c[1]);
-      const lons = coords.map((c: number[]) => c[0]);
-      return {
-        lat: lats.reduce((a: number, b: number) => a + b, 0) / lats.length,
-        lon: lons.reduce((a: number, b: number) => a + b, 0) / lons.length,
-      };
-    }
-    return { lat: mapCenter[0], lon: mapCenter[1] };
-  };
-
-  const assignFeatureType = () => {
-    if (!selectedFeatureId) return;
-    if (tempBuildingType === 'Others' && !tempCustomType.trim()) {
-      setError('Please enter a custom type name');
-      return;
-    }
-
-    const feature = osmData?.features.find(f => getFeatureId(f) === selectedFeatureId);
-    if (!feature) return;
-
-    const coords = getFeatureCoordinates(feature);
-    
-    setSelectedFeatures(prev => {
-      const newMap = new Map(prev);
-      newMap.set(selectedFeatureId, {
-        featureId: selectedFeatureId,
-        type: tempBuildingType,
-        customType: tempBuildingType === 'Others' ? tempCustomType : undefined,
-        lat: coords.lat,
-        lon: coords.lon,
-      });
-      return newMap;
-    });
-
-    setGeoJsonKey(prev => prev + 1);
-    setSelectedFeatureId(null);
-    setTempCustomType('');
-  };
-
-  const submitInfrastructureData = async () => {
-    const featuresArray = Array.from(selectedFeatures.values());
-    
-    try {
-      const infraRes = await fetch(`${API_URL}/demo/infrastructure-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          latitude: mapCenter[0],
-          longitude: mapCenter[1],
-          radius: mapRadius,
-          results: {
-            features: osmData?.features || [],
-            labeled: featuresArray,
-          },
-        }),
-      });
-
-      const infraData = await infraRes.json();
-      console.log('Infrastructure data saved:', infraData);
-      
-      if (!infraData.success) {
-        console.error('Infrastructure save failed:', infraData);
-        setError('Warning: Infrastructure data may not have been saved properly');
-        return;
-      }
-
-      setCurrentStep('complete');
-    } catch (err: any) {
-      console.error('Infrastructure save error:', err);
-      setError('Failed to submit infrastructure data: ' + err.message);
-    }
-  };
-
-  const geoJsonStyle = (feature: any) => {
-    const featureId = getFeatureId(feature);
-    const selectedFeature = selectedFeatures.get(featureId);
-
-    if (selectedFeature) {
-      const colors = TYPE_COLORS[selectedFeature.type];
-      return {
-        color: colors.color,
-        fillColor: colors.fillColor,
-        weight: 2,
-        fillOpacity: 0.5,
-      };
-    }
-
-    return {
-      color: '#3B82F6',
-      fillColor: '#93C5FD',
-      weight: 2,
-      fillOpacity: 0.3,
-    };
-  };
+  // (Handled by CADSection component)
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -777,235 +522,7 @@ export default function DemoPage() {
         return <CADSection sessionId={sessionId} onComplete={() => setCurrentStep('infrastructure')} />;
 
       case 'infrastructure':
-        return (
-          <div className="space-y-6">
-            {/* Search Controls */}
-            <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Location & Search</h2>
-              
-              <div className="grid md:grid-cols-3 gap-4 mb-4">
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearchLocation()}
-                  placeholder="Search location or lat,lon"
-                  className="md:col-span-2 px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                />
-                <button
-                  onClick={handleSearchLocation}
-                  disabled={loading || !searchInput}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Search
-                </button>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Latitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={mapCenter[0]}
-                    onChange={(e) => setMapCenter([parseFloat(e.target.value), mapCenter[1]])}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Longitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={mapCenter[1]}
-                    onChange={(e) => setMapCenter([mapCenter[0], parseFloat(e.target.value)])}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Radius: {mapRadius}m
-                </label>
-                <input
-                  type="range"
-                  min="50"
-                  max="1000"
-                  step="50"
-                  value={mapRadius}
-                  onChange={(e) => {
-                    setMapRadius(parseInt(e.target.value));
-                    setMapZoom(calculateZoom(parseInt(e.target.value)));
-                  }}
-                  className="w-full"
-                />
-              </div>
-
-              <button
-                onClick={fetchOSMData}
-                disabled={loading}
-                className="w-full mt-4 px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Loading...' : 'Fetch OSM Data'}
-              </button>
-            </div>
-
-            {/* Map */}
-            {typeof window !== 'undefined' && (
-              <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">
-                  Map Viewer
-                  {osmData && (
-                    <span className="ml-3 text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                      {osmData.features.length} features
-                    </span>
-                  )}
-                </h2>
-                
-                <div className="h-[600px] rounded-xl overflow-hidden border-2 border-slate-300">
-                  <MapContainer
-                    center={mapCenter}
-                    zoom={mapZoom}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='&copy; CARTO'
-                      url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                    />
-                    <Marker position={mapCenter} />
-                    <Rectangle
-                      bounds={[
-                        [mapCenter[0] - mapRadius / 111000, mapCenter[1] - mapRadius / (111000 * Math.cos(mapCenter[0] * Math.PI / 180))],
-                        [mapCenter[0] + mapRadius / 111000, mapCenter[1] + mapRadius / (111000 * Math.cos(mapCenter[0] * Math.PI / 180))],
-                      ]}
-                      pathOptions={{ color: '#3B82F6', weight: 2, fillOpacity: 0.1, dashArray: '5, 5' }}
-                    />
-                    {osmData && (
-                      <GeoJSON
-                        key={geoJsonKey}
-                        data={osmData}
-                        style={geoJsonStyle}
-                        onEachFeature={(feature, layer) => {
-                          const featureId = getFeatureId(feature);
-                          const selectedFeature = selectedFeatures.get(featureId);
-                          
-                          layer.on('click', () => {
-                            setSelectedFeatureId(featureId);
-                            setTempBuildingType(selectedFeature?.type || 'Hospital');
-                            setTempCustomType(selectedFeature?.customType || '');
-                          });
-
-                          if (selectedFeature) {
-                            layer.bindPopup(
-                              selectedFeature.customType || selectedFeature.type
-                            );
-                          }
-                        }}
-                      />
-                    )}
-                  </MapContainer>
-                </div>
-              </div>
-            )}
-
-            {/* Feature Type Assignment Modal */}
-            {selectedFeatureId && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
-                  <h3 className="text-2xl font-bold text-slate-900 mb-4">Assign Building Type</h3>
-                  
-                  <div className="space-y-4 mb-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">Type</label>
-                      <select
-                        value={tempBuildingType}
-                        onChange={(e) => setTempBuildingType(e.target.value as BuildingType)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                      >
-                        {BUILDING_TYPES.map((type) => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {tempBuildingType === 'Others' && (
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Custom Type Name</label>
-                        <input
-                          type="text"
-                          value={tempCustomType}
-                          onChange={(e) => setTempCustomType(e.target.value)}
-                          placeholder="Enter custom type"
-                          className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-                        />
-                      </div>
-                    )}
-
-                    <div className="p-4 rounded-xl" style={{ backgroundColor: TYPE_COLORS[tempBuildingType].fillColor }}>
-                      <p className="text-sm font-medium" style={{ color: TYPE_COLORS[tempBuildingType].color }}>
-                        Color Preview
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => setSelectedFeatureId(null)}
-                      className="flex-1 px-6 py-3 bg-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-300 transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={assignFeatureType}
-                      disabled={tempBuildingType === 'Others' && !tempCustomType.trim()}
-                      className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Assign Type
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Legend */}
-            {selectedFeatures.size > 0 && (
-              <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                <h3 className="text-xl font-bold text-slate-900 mb-4">
-                  Labeled Features ({selectedFeatures.size})
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {BUILDING_TYPES.map((type) => {
-                    const count = Array.from(selectedFeatures.values()).filter(f => f.type === type).length;
-                    if (count === 0) return null;
-                    return (
-                      <div
-                        key={type}
-                        className="flex items-center gap-2 p-3 rounded-lg"
-                        style={{ backgroundColor: TYPE_COLORS[type].fillColor }}
-                      >
-                        <div
-                          className="w-4 h-4 rounded"
-                          style={{ backgroundColor: TYPE_COLORS[type].color }}
-                        ></div>
-                        <span className="text-sm font-medium text-slate-900">
-                          {type} ({count})
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={submitInfrastructureData}
-                  className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
-                >
-                  Complete Demo ({selectedFeatures.size} features labeled)
-                </button>
-              </div>
-            )}
-          </div>
-        );
+        return <InfrastructureSection sessionId={sessionId} onComplete={() => setCurrentStep('complete')} />;
 
       case 'complete':
         return (
@@ -1048,7 +565,7 @@ export default function DemoPage() {
                   <div>
                     <p className="font-semibold text-slate-900">Infrastructure Mapping</p>
                     <p className="text-sm text-slate-600">
-                      {selectedFeatures.size} feature(s) labeled from {osmData?.features.length || 0} total features
+                      Infrastructure features labeled and analyzed
                     </p>
                   </div>
                 </div>
