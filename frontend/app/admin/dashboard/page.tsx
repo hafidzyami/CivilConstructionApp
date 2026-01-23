@@ -50,7 +50,7 @@ const TYPE_COLORS: Record<string, { color: string; fillColor: string }> = {
   'River': { color: '#0284C7', fillColor: '#7DD3FC' },
   'Lake': { color: '#1D4ED8', fillColor: '#93C5FD' },
   'Office': { color: '#7C3AED', fillColor: '#C4B5FD' },
-  'Others': { color: '#6B7280', fillColor: '#D1D5DB' }
+  'Others': { color: '#14B8A6', fillColor: '#5EEAD4' }
 };
 
 export default function AdminDashboard() {
@@ -603,27 +603,32 @@ export default function AdminDashboard() {
                    selectedSession.infrastructureData.labeledFeatures.length > 0 && (
                     <>
                       <div className="bg-slate-50 p-4 rounded-xl mb-4">
-                        <p className="text-sm text-slate-600 mb-2">Labeled Features ({selectedSession.infrastructureData.labeledFeatures.length})</p>
-                        <div className="flex flex-wrap gap-2">
+                        <p className="text-sm text-slate-600 mb-3 font-semibold">Labeled Features ({selectedSession.infrastructureData.labeledFeatures.length})</p>
+                        <div className="space-y-2">
                           {selectedSession.infrastructureData.labeledFeatures.map((feature: any, idx: number) => {
                             const getTypeColor = (type: string) => {
                               const colors: Record<string, string> = {
-                                'Hospital': 'bg-red-100 text-red-700',
-                                'School': 'bg-amber-100 text-amber-700',
-                                'Residential Housing': 'bg-green-100 text-green-700',
-                                'River': 'bg-cyan-100 text-cyan-700',
-                                'Lake': 'bg-blue-100 text-blue-700',
-                                'Office': 'bg-purple-100 text-purple-700',
-                                'Others': 'bg-gray-100 text-gray-700',
+                                'Hospital': 'bg-red-50 border-red-200 text-red-700',
+                                'School': 'bg-amber-50 border-amber-200 text-amber-700',
+                                'Residential Housing': 'bg-green-50 border-green-200 text-green-700',
+                                'River': 'bg-cyan-50 border-cyan-200 text-cyan-700',
+                                'Lake': 'bg-blue-50 border-blue-200 text-blue-700',
+                                'Office': 'bg-purple-50 border-purple-200 text-purple-700',
+                                'Others': 'bg-teal-50 border-teal-200 text-teal-700',
                               };
-                              return colors[type] || 'bg-gray-100 text-gray-700';
+                              return colors[type] || 'bg-teal-50 border-teal-200 text-teal-700';
                             };
 
                             const displayType = feature.customType || feature.type;
                             return (
-                              <span key={idx} className={`px-3 py-1 rounded-full text-xs font-semibold ${getTypeColor(feature.type)}`}>
-                                {displayType}
-                              </span>
+                              <div key={idx} className={`px-3 py-2 rounded-lg border ${getTypeColor(feature.type)} flex items-center justify-between`}>
+                                <div>
+                                  <span className="font-semibold text-sm">{displayType}</span>
+                                </div>
+                                <div className="text-xs opacity-75 ml-4">
+                                  <span className="font-mono">{feature.lat?.toFixed(6)}, {feature.lon?.toFixed(6)}</span>
+                                </div>
+                              </div>
                             );
                           })}
                         </div>
@@ -634,7 +639,18 @@ export default function AdminDashboard() {
                        selectedSession.infrastructureData.latitude && 
                        selectedSession.infrastructureData.longitude && (
                         <div className="bg-slate-50 p-4 rounded-xl">
-                          <p className="text-sm text-slate-600 mb-3">Map View (Read-only)</p>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm text-slate-600 font-semibold">Map View (Read-only)</p>
+                            <button
+                              onClick={() => setMapKey(prev => prev + 1)}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Refresh Map
+                            </button>
+                          </div>
                           <div style={{ height: '400px' }} className="rounded-lg overflow-hidden border-2 border-slate-300">
                             <MapContainer
                               key={mapKey}
