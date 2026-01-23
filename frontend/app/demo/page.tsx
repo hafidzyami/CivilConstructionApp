@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Feature, FeatureCollection } from 'geojson';
+import CADSection from './components/CADSection';
 
 // Dynamic import for map to avoid SSR
 const MapContainer = dynamic(
@@ -35,8 +36,6 @@ const Rectangle = dynamic(
 );
 
 type Step = 'ocr' | 'cad' | 'infrastructure' | 'complete';
-type CADStep = 'upload' | 'layers' | 'analyze';
-type ActiveMode = 'site' | 'building';
 type BuildingType = 'Hospital' | 'School' | 'Residential Housing' | 'River' | 'Lake' | 'Office' | 'Others';
 
 const BUILDING_TYPES: BuildingType[] = [
@@ -76,35 +75,12 @@ interface OCRResult {
   error?: string;
 }
 
-interface PolygonData {
-  id: number;
-  area_m2: number;
-  area_raw: number;
-  points: number[][];
-  path: string;
-  bbox?: { min_x: number; max_x: number; min_y: number; max_y: number };
-}
-
-interface Selection {
-  isSite: boolean;
-  isBuilding: boolean;
-  floors: number;
-  isFootprint: boolean;
-}
-
 interface SelectedFeature {
   featureId: string;
   type: BuildingType;
   customType?: string;
   lat: number;
   lon: number;
-}
-
-interface Bounds {
-  min_x: number;
-  max_x: number;
-  min_y: number;
-  max_y: number;
 }
 
 // Map click handler component
@@ -133,29 +109,6 @@ export default function DemoPage() {
   const [usePreprocessing, setUsePreprocessing] = useState(true);
   const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
   const [ocrProcessing, setOcrProcessing] = useState(false);
-
-  // CAD state
-  const [cadFile, setCadFile] = useState<File | null>(null);
-  const [cadLayers, setCadLayers] = useState<string[]>([]);
-  const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
-  const [cadStep, setCadStep] = useState<CADStep>('upload');
-  const [cadParserMode, setCadParserMode] = useState<'manual' | 'auto'>('manual');
-  const [polygons, setPolygons] = useState<PolygonData[]>([]);
-  const [bounds, setBounds] = useState<Bounds | null>(null);
-  const [selections, setSelections] = useState<Record<number, Selection>>({});
-  const [activeMode, setActiveMode] = useState<ActiveMode>('site');
-  const [floorCount, setFloorCount] = useState(1);
-  const [isFootprint, setIsFootprint] = useState(true);
-  const [simplify, setSimplify] = useState(false);
-  const [svgViewBox, setSvgViewBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [svgZoom, setSvgZoom] = useState(1);
-  const [svgPan, setSvgPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectStart, setSelectStart] = useState({ x: 0, y: 0 });
-  const [selectCurrent, setSelectCurrent] = useState({ x: 0, y: 0 });
-  const svgRef = useRef<SVGSVGElement>(null);
 
   // Infrastructure state
   const [mapCenter, setMapCenter] = useState<[number, number]>([-6.358137, 106.835432]);
@@ -349,296 +302,6 @@ export default function DemoPage() {
   };
 
   // CAD Handlers
-  const handleCadFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.toLowerCase().endsWith('.dxf')) {
-      setError('Please select a valid .dxf file');
-      return;
-    }
-
-    setCadFile(file);
-    setLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch(`${API_URL}/cad/layers`, { method: 'POST', body: formData });
-      const data = await res.json();
-      setCadLayers(data.layers || []);
-      setSelectedLayers(data.layers || []);
-      setCadStep('layers');
-    } catch (err) {
-      setError('Failed to load CAD layers');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const processCad = async () => {
-    if (!cadFile) return;
-    setLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', cadFile);
-      const endpoint = cadParserMode === 'manual' ? '/cad/process' : '/cad/process-auto';
-      
-      if (cadParserMode === 'manual') {
-        formData.append('layers', JSON.stringify(selectedLayers));
-        formData.append('simplify', String(simplify));
-      }
-
-      const res = await fetch(`${API_URL}${endpoint}`, { method: 'POST', body: formData });
-      const data = await res.json();
-
-      if (data.polygons) {
-        // Process polygons with bbox and hole detection
-        let processed = data.polygons.map((p: any) => {
-          const xs = p.points.map((pt: number[]) => pt[0]);
-          const ys = p.points.map((pt: number[]) => pt[1]);
-          return {
-            ...p,
-            bbox: { 
-              min_x: Math.min(...xs), max_x: Math.max(...xs), 
-              min_y: Math.min(...ys), max_y: Math.max(...ys) 
-            }
-          };
-        });
-
-        processed.sort((a: any, b: any) => b.area_raw - a.area_raw);
-
-        const isPointInPoly = (pt: number[], polyPts: number[][]) => {
-          const x = pt[0], y = pt[1];
-          let inside = false;
-          for (let i = 0, j = polyPts.length - 1; i < polyPts.length; j = i++) {
-            const xi = polyPts[i][0], yi = polyPts[i][1];
-            const xj = polyPts[j][0], yj = polyPts[j][1];
-            const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-          }
-          return inside;
-        };
-
-        const finalPolys = processed.map((outer: any, i: number) => {
-          const holePaths: string[] = [];
-
-          for (let j = i + 1; j < processed.length; j++) {
-            const inner = processed[j];
-            
-            if (inner.bbox.min_x < outer.bbox.min_x || 
-                inner.bbox.max_x > outer.bbox.max_x ||
-                inner.bbox.min_y < outer.bbox.min_y || 
-                inner.bbox.max_y > outer.bbox.max_y) {
-              continue;
-            }
-
-            if (isPointInPoly(inner.points[0], outer.points)) {
-              const midIdx = Math.floor(inner.points.length / 2);
-              if (isPointInPoly(inner.points[midIdx], outer.points)) {
-                const pts = inner.points;
-                const d = `M ${pts[0][0]} ${pts[0][1]} ` + 
-                          pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + "Z";
-                holePaths.push(d);
-              }
-            }
-          }
-
-          const pts = outer.points;
-          let pathString = `M ${pts[0][0]} ${pts[0][1]} ` + 
-                           pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + "Z";
-          
-          if (holePaths.length > 0) {
-            pathString += " " + holePaths.join(" ");
-          }
-
-          return { ...outer, path: pathString };
-        });
-
-        setPolygons(finalPolys);
-        setBounds(data.bounds);
-        setCadStep('analyze');
-
-        // Initialize SVG viewBox
-        const width = data.bounds.max_x - data.bounds.min_x;
-        const height = data.bounds.max_y - data.bounds.min_y;
-        setSvgViewBox({ x: data.bounds.min_x, y: data.bounds.min_y, width, height });
-        setSvgZoom(1);
-        setSvgPan({ x: 0, y: 0 });
-
-        // Save to database
-        const areas = finalPolys.map((p: any) => p.area_raw);
-        const totalArea = areas.reduce((a: number, b: number) => a + b, 0);
-
-        const cadSaveRes = await fetch(`${API_URL}/demo/cad-data`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            siteArea: totalArea,
-            buildingArea: finalPolys[0]?.area_raw || 0,
-            floorArea: totalArea,
-            rawData: data,
-          }),
-        });
-
-        const cadSaveData = await cadSaveRes.json();
-        console.log('CAD data saved:', cadSaveData);
-        
-        if (!cadSaveData.success) {
-          console.error('CAD save failed:', cadSaveData);
-          setError('Warning: CAD data may not have been saved properly');
-        }
-      }
-    } catch (err) {
-      setError('Failed to process CAD file');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const togglePoly = (id: number) => {
-    setSelections((prev) => {
-      const next = { ...prev };
-      const current = next[id] ? { ...next[id] } : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
-
-      if (activeMode === 'site') current.isSite = !current.isSite;
-      else {
-        if (!current.isBuilding) { current.floors = floorCount; current.isFootprint = isFootprint; }
-        current.isBuilding = !current.isBuilding;
-      }
-
-      if (!current.isSite && !current.isBuilding) delete next[id];
-      else next[id] = current;
-      return next;
-    });
-  };
-
-  const handleBoxSelect = (box: Bounds) => {
-    setSelections(prev => {
-      const next = { ...prev };
-      let hasChanges = false;
-      polygons.forEach(p => {
-        const pBox = p.bbox;
-        if (!pBox) return;
-        const intersects = box.min_x <= pBox.max_x && box.max_x >= pBox.min_x &&
-                         box.min_y <= pBox.max_y && box.max_y >= pBox.min_y;
-        if (intersects) {
-          hasChanges = true;
-          const current = next[p.id] ? { ...next[p.id] } : { isSite: false, isBuilding: false, floors: 1, isFootprint: true };
-          if (activeMode === 'site') current.isSite = !current.isSite;
-          else {
-            if (!current.isBuilding) { current.floors = floorCount; current.isFootprint = isFootprint; }
-            current.isBuilding = !current.isBuilding;
-          }
-          if (!current.isSite && !current.isBuilding) delete next[p.id];
-          else next[p.id] = current;
-        }
-      });
-      return hasChanges ? next : prev;
-    });
-  };
-
-  const cadMetrics = useMemo(() => {
-    let siteArea = 0;
-    let footprintArea = 0;
-    let totalFloorArea = 0;
-    Object.entries(selections).forEach(([idStr, sel]) => {
-      const poly = polygons.find((p) => p.id === parseInt(idStr));
-      if (!poly) return;
-      if (sel.isSite) siteArea += poly.area_m2;
-      if (sel.isBuilding) {
-        if (sel.isFootprint) footprintArea += poly.area_m2;
-        totalFloorArea += poly.area_m2 * sel.floors;
-      }
-    });
-    const bcr = siteArea > 0 ? (footprintArea / siteArea) * 100 : 0;
-    const far = siteArea > 0 ? (totalFloorArea / siteArea) : 0;
-    return { siteArea, footprintArea, totalFloorArea, bcr, far };
-  }, [selections, polygons]);
-
-  const getSvgPoint = (clientX: number, clientY: number) => {
-    if (!svgRef.current) return { x: 0, y: 0 };
-    const pt = new DOMPoint(clientX, clientY);
-    const ctm = svgRef.current.getScreenCTM();
-    if (!ctm) return { x: 0, y: 0 };
-    const svgP = pt.matrixTransform(ctm.inverse());
-    return { x: svgP.x, y: svgP.y };
-  };
-
-  const handleSvgWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
-    setSvgZoom(prev => Math.max(0.1, Math.min(10, prev * zoomFactor)));
-  };
-
-  const handleSvgMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
-      setIsSelecting(true);
-      const pt = getSvgPoint(e.clientX, e.clientY);
-      setSelectStart(pt);
-      setSelectCurrent(pt);
-      e.stopPropagation();
-      return;
-    }
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-      e.preventDefault();
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - svgPan.x, y: e.clientY - svgPan.y });
-    }
-  };
-
-  const handleSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (isSelecting) {
-      const pt = getSvgPoint(e.clientX, e.clientY);
-      setSelectCurrent(pt);
-    } else if (isPanning) {
-      e.preventDefault();
-      setSvgPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
-    }
-  };
-
-  const handleSvgMouseUp = () => {
-    if (isSelecting) {
-      setIsSelecting(false);
-      const box: Bounds = {
-        min_x: Math.min(selectStart.x, selectCurrent.x),
-        max_x: Math.max(selectStart.x, selectCurrent.x),
-        min_y: Math.min(selectStart.y, selectCurrent.y),
-        max_y: Math.max(selectStart.y, selectCurrent.y),
-      };
-      const dist = Math.sqrt(
-        Math.pow(selectStart.x - selectCurrent.x, 2) + 
-        Math.pow(selectStart.y - selectCurrent.y, 2)
-      );
-      if (dist > 0.05) {
-        handleBoxSelect(box);
-      }
-    }
-    setIsPanning(false);
-  };
-
-  const resetSvgView = () => {
-    setSvgZoom(1);
-    setSvgPan({ x: 0, y: 0 });
-  };
-
-  const currentViewBox = useMemo(() => {
-    const centerX = svgViewBox.x + svgViewBox.width / 2;
-    const centerY = svgViewBox.y + svgViewBox.height / 2;
-    const newWidth = svgViewBox.width / svgZoom;
-    const newHeight = svgViewBox.height / svgZoom;
-    const panOffsetX = (svgPan.x / 100) * newWidth;
-    const panOffsetY = (svgPan.y / 100) * newHeight;
-    return {
-      x: centerX - newWidth / 2 - panOffsetX,
-      y: centerY - newHeight / 2 - panOffsetY,
-      width: newWidth,
-      height: newHeight
-    };
-  }, [svgViewBox, svgZoom, svgPan]);
-
   // Infrastructure Handlers
   const calculateZoom = (dist: number): number => {
     return Math.max(13, 19 - Math.floor(Math.log2(dist / 50)));
@@ -982,27 +645,107 @@ export default function DemoPage() {
                   </div>
 
                   {ocrResults.map((result, idx) => (
-                    <div key={idx} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center justify-between mb-4">
+                    <div key={idx} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg space-y-4">
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                         <h2 className="text-xl font-bold text-slate-900">Document {idx + 1}: {ocrFiles[idx]?.name}</h2>
-                        {result.success && (
-                          <button
-                            onClick={() => downloadOCRText(idx)}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
-                          >
-                            Download TXT
-                          </button>
-                        )}
+                        <span className="text-xs text-slate-500">{(ocrFiles[idx].size / 1024).toFixed(2)} KB</span>
                       </div>
+                      
                       {result.success ? (
-                        <div className="bg-slate-50 rounded-lg p-4 max-h-64 overflow-y-auto">
-                          <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono">
-                            {result.textContent || 'No text detected'}
-                          </pre>
-                        </div>
+                        <>
+                          {/* Image Preview */}
+                          {ocrPreviews[idx] && (
+                            <div>
+                              <h3 className="text-sm font-semibold text-slate-700 mb-2">Original Image</h3>
+                              <img
+                                src={ocrPreviews[idx]}
+                                alt={`Preview ${idx + 1}`}
+                                className="max-h-48 mx-auto rounded-lg shadow-md border border-slate-200"
+                              />
+                            </div>
+                          )}
+
+                          {/* Preprocessed Image */}
+                          {result.preprocessedImage && (
+                            <div>
+                              <h3 className="text-sm font-semibold text-slate-700 mb-2">Preprocessed Image</h3>
+                              <img
+                                src={result.preprocessedImage}
+                                alt={`Preprocessed ${idx + 1}`}
+                                className="max-h-48 mx-auto rounded-lg shadow-md border border-slate-200"
+                              />
+                              {result.preprocessingMetadata?.rotation_applied !== undefined && (
+                                <p className="text-xs text-slate-500 mt-2 text-center">
+                                  Rotation applied: {result.preprocessingMetadata.rotation_applied.toFixed(2)}°
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Extracted Text */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="text-sm font-semibold text-slate-700">Extracted Text</h3>
+                              <button
+                                onClick={() => downloadOCRText(idx)}
+                                className="px-3 py-1 bg-purple-600 text-white rounded-md text-xs font-medium hover:bg-purple-700 transition-colors"
+                              >
+                                Download TXT
+                              </button>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-4 max-h-64 overflow-y-auto border border-slate-200">
+                              <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono">
+                                {result.textContent || 'No text detected'}
+                              </pre>
+                            </div>
+                            {result.results?.text_lines && (
+                              <p className="text-xs text-slate-500 mt-2">
+                                Found {result.results.text_lines.length} text lines
+                              </p>
+                            )}
+                          </div>
+
+                          {/* JSON Results */}
+                          {result.results && (
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-semibold text-slate-700">JSON Results</h3>
+                                <button
+                                  onClick={() => {
+                                    const blob = new Blob([JSON.stringify(result.results, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `ocr-result-${idx + 1}-${Date.now()}.json`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                  }}
+                                  className="px-3 py-1 bg-purple-600 text-white rounded-md text-xs font-medium hover:bg-purple-700 transition-colors"
+                                >
+                                  Download JSON
+                                </button>
+                              </div>
+                              <div className="bg-slate-50 rounded-lg p-4 max-h-64 overflow-y-auto border border-slate-200">
+                                <pre className="text-xs text-slate-700 whitespace-pre-wrap font-mono">
+                                  {JSON.stringify(result.results, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+                          )}
+                        </>
                       ) : (
-                        <div className="bg-red-50 p-4 rounded-lg">
-                          <p className="text-red-700">{result.error}</p>
+                        <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                          <div className="flex items-start">
+                            <svg className="w-5 h-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div>
+                              <p className="text-sm font-semibold text-red-900">OCR Failed</p>
+                              <p className="text-sm text-red-700 mt-1">{result.error}</p>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1031,299 +774,7 @@ export default function DemoPage() {
         );
 
       case 'cad':
-        return (
-          <div className="space-y-6">
-            {cadStep === 'upload' && (
-              <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-6">Upload CAD File</h2>
-                <input
-                  type="file"
-                  accept=".dxf"
-                  onChange={handleCadFileSelect}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all outline-none"
-                />
-                <p className="text-sm text-slate-500 mt-4">Supported format: DXF files only</p>
-              </div>
-            )}
-
-            {cadStep === 'layers' && (
-              <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">Processing Mode</h2>
-                
-                {/* Parser Mode Toggle */}
-                <div className="mb-6 p-4 bg-slate-50 rounded-xl">
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">Parser Mode</label>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setCadParserMode('manual')}
-                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                        cadParserMode === 'manual'
-                          ? 'bg-orange-600 text-white shadow-lg'
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
-                      }`}
-                    >
-                      <div className="text-center">
-                        <div className="font-bold">Manual</div>
-                        <div className="text-xs opacity-90 mt-1">Select layers yourself</div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => setCadParserMode('auto')}
-                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                        cadParserMode === 'auto'
-                          ? 'bg-orange-600 text-white shadow-lg'
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
-                      }`}
-                    >
-                      <div className="text-center">
-                        <div className="font-bold">Automated</div>
-                        <div className="text-xs opacity-90 mt-1">AI detection (experimental)</div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {cadParserMode === 'manual' && (
-                  <>
-                    <h3 className="text-xl font-bold text-slate-900 mb-3">Select Layers</h3>
-                    <p className="text-sm text-slate-600 mb-4">Found {cadLayers.length} layers. Select layers to process:</p>
-                    
-                    <div className="max-h-96 overflow-y-auto bg-slate-50 p-4 rounded-xl space-y-2 mb-6">
-                      {cadLayers.map((layer) => (
-                        <label key={layer} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-white rounded">
-                          <input
-                            type="checkbox"
-                            checked={selectedLayers.includes(layer)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedLayers([...selectedLayers, layer]);
-                              } else {
-                                setSelectedLayers(selectedLayers.filter(l => l !== layer));
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <span className="text-sm text-slate-700">{layer}</span>
-                        </label>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-6">
-                      <input
-                        type="checkbox"
-                        checked={simplify}
-                        onChange={(e) => setSimplify(e.target.checked)}
-                        className="rounded"
-                      />
-                      <label className="text-sm text-slate-700">Simplify geometry (faster but less accurate)</label>
-                    </div>
-                  </>
-                )}
-
-                {cadParserMode === 'auto' && (
-                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                    <p className="text-sm text-blue-800">
-                      <strong>Automated Mode:</strong> The system will automatically detect and analyze building structures using AI.
-                      This is experimental and may not work for all file types.
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex gap-4">
-                  <button
-                    onClick={processCad}
-                    disabled={loading || (cadParserMode === 'manual' && selectedLayers.length === 0)}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? 'Processing...' : 'Process & Analyze'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCadFile(null);
-                      setCadLayers([]);
-                      setCadStep('upload');
-                    }}
-                    className="px-6 py-3 bg-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-300 transition-all"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {cadStep === 'analyze' && (
-              <>
-                <div className="grid lg:grid-cols-12 gap-6">
-                  {/* Tools */}
-                  <div className="lg:col-span-4 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">Selection Tools</h3>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Mode</label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setActiveMode('site')}
-                            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-                              activeMode === 'site'
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                          >
-                            Site
-                          </button>
-                          <button
-                            onClick={() => setActiveMode('building')}
-                            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-                              activeMode === 'building'
-                                ? 'bg-green-600 text-white shadow-lg'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                          >
-                            Building
-                          </button>
-                        </div>
-                      </div>
-
-                      {activeMode === 'building' && (
-                        <>
-                          <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Floors: {floorCount}</label>
-                            <input
-                              type="range"
-                              min="1"
-                              max="20"
-                              value={floorCount}
-                              onChange={(e) => setFloorCount(parseInt(e.target.value))}
-                              className="w-full"
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={isFootprint}
-                              onChange={(e) => setIsFootprint(e.target.checked)}
-                              className="rounded"
-                            />
-                            <label className="text-sm text-slate-700">Count as footprint</label>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Metrics */}
-                  <div className="lg:col-span-8 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">Metrics</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-blue-50 rounded-xl p-4">
-                        <p className="text-xs text-blue-600 font-semibold mb-1">Site Area</p>
-                        <p className="text-2xl font-bold text-blue-900">{cadMetrics.siteArea.toFixed(2)} m²</p>
-                      </div>
-                      <div className="bg-green-50 rounded-xl p-4">
-                        <p className="text-xs text-green-600 font-semibold mb-1">Footprint</p>
-                        <p className="text-2xl font-bold text-green-900">{cadMetrics.footprintArea.toFixed(2)} m²</p>
-                      </div>
-                      <div className="bg-purple-50 rounded-xl p-4">
-                        <p className="text-xs text-purple-600 font-semibold mb-1">BCR</p>
-                        <p className="text-2xl font-bold text-purple-900">{cadMetrics.bcr.toFixed(2)}%</p>
-                      </div>
-                      <div className="bg-orange-50 rounded-xl p-4">
-                        <p className="text-xs text-orange-600 font-semibold mb-1">FAR</p>
-                        <p className="text-2xl font-bold text-orange-900">{cadMetrics.far.toFixed(2)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* SVG Viewer */}
-                <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900">Geometry Viewer</h3>
-                      <p className="text-sm text-slate-600">Click polygons • Scroll: zoom • Shift+Drag: pan • Ctrl+Drag: box select</p>
-                    </div>
-                    <button
-                      onClick={resetSvgView}
-                      className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors"
-                    >
-                      Reset View
-                    </button>
-                  </div>
-                  
-                  {bounds && (
-                    <div className="relative">
-                      <div className="absolute top-2 right-2 bg-white/90 px-3 py-1 rounded-lg text-xs font-medium text-slate-700 shadow z-10">
-                        Zoom: {(svgZoom * 100).toFixed(0)}%
-                      </div>
-                      <svg
-                        ref={svgRef}
-                        viewBox={`${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`}
-                        className="w-full h-[600px] border rounded-xl bg-[#1e1e1e]"
-                        style={{ 
-                          transform: 'scale(1, -1)',
-                          cursor: isSelecting ? 'crosshair' : isPanning ? 'grabbing' : 'grab'
-                        }}
-                        onWheel={handleSvgWheel}
-                        onMouseDown={handleSvgMouseDown}
-                        onMouseMove={handleSvgMouseMove}
-                        onMouseUp={handleSvgMouseUp}
-                        onMouseLeave={handleSvgMouseUp}
-                      >
-                        {polygons.map((poly) => {
-                          const sel = selections[poly.id];
-                          let fill = '#3a3a3a';
-                          if (sel?.isSite && sel?.isBuilding) fill = '#A78BFA';
-                          else if (sel?.isSite) fill = '#60A5FA';
-                          else if (sel?.isBuilding) fill = '#34D399';
-
-                          return (
-                            <path
-                              key={poly.id}
-                              d={poly.path}
-                              fill={fill}
-                              stroke="#ffffff"
-                              strokeWidth={(bounds.max_x - bounds.min_x) * 0.002}
-                              className="cursor-pointer hover:opacity-70 transition-opacity"
-                              onClick={(e) => {
-                                if (!isPanning && !isSelecting) {
-                                  e.stopPropagation();
-                                  togglePoly(poly.id);
-                                }
-                              }}
-                            />
-                          );
-                        })}
-                        
-                        {/* Selection Box */}
-                        {isSelecting && (
-                          <rect
-                            x={Math.min(selectStart.x, selectCurrent.x)}
-                            y={Math.min(selectStart.y, selectCurrent.y)}
-                            width={Math.abs(selectCurrent.x - selectStart.x)}
-                            height={Math.abs(selectCurrent.y - selectStart.y)}
-                            fill="rgba(147, 51, 234, 0.2)"
-                            stroke="#9333EA"
-                            strokeWidth={(bounds.max_x - bounds.min_x) * 0.002}
-                            strokeDasharray="5,5"
-                          />
-                        )}
-                      </svg>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setCurrentStep('infrastructure')}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
-                >
-                  Continue to Infrastructure
-                </button>
-              </>
-            )}
-          </div>
-        );
+        return <CADSection sessionId={sessionId} onComplete={() => setCurrentStep('infrastructure')} />;
 
       case 'infrastructure':
         return (
@@ -1587,7 +1038,7 @@ export default function DemoPage() {
                   <div>
                     <p className="font-semibold text-slate-900">CAD Analysis</p>
                     <p className="text-sm text-slate-600">
-                      Site: {cadMetrics.siteArea.toFixed(2)} m² | BCR: {cadMetrics.bcr.toFixed(2)}% | FAR: {cadMetrics.far.toFixed(2)}
+                      CAD geometry processed and analyzed successfully
                     </p>
                   </div>
                 </div>
