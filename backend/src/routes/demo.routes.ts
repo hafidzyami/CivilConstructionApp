@@ -69,6 +69,33 @@ router.post('/upload-documents', demoController.uploadMiddleware, demoController
 
 /**
  * @swagger
+ * /api/demo/upload-dxf:
+ *   post:
+ *     summary: Upload DXF file for CAD analysis
+ *     tags: [Demo]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sessionId
+ *               - dxfFile
+ *             properties:
+ *               sessionId:
+ *                 type: integer
+ *               dxfFile:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: DXF file uploaded successfully
+ */
+router.post('/upload-dxf', demoController.uploadDxfMiddleware, demoController.uploadDxf);
+
+/**
+ * @swagger
  * /api/demo/cad-data:
  *   post:
  *     summary: Save CAD analysis data

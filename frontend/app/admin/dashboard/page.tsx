@@ -397,7 +397,7 @@ export default function AdminDashboard() {
                       <p className="text-sm text-slate-600">Site Area</p>
                       <p className="font-semibold">
                         {selectedSession.cadData.siteArea
-                          ? `${selectedSession.cadData.siteArea} m²`
+                          ? `${selectedSession.cadData.siteArea.toFixed(2)} m²`
                           : '-'}
                       </p>
                     </div>
@@ -405,7 +405,7 @@ export default function AdminDashboard() {
                       <p className="text-sm text-slate-600">Building Area</p>
                       <p className="font-semibold">
                         {selectedSession.cadData.buildingArea
-                          ? `${selectedSession.cadData.buildingArea} m²`
+                          ? `${selectedSession.cadData.buildingArea.toFixed(2)} m²`
                           : '-'}
                       </p>
                     </div>
@@ -413,22 +413,35 @@ export default function AdminDashboard() {
                       <p className="text-sm text-slate-600">Floor Area</p>
                       <p className="font-semibold">
                         {selectedSession.cadData.floorArea
-                          ? `${selectedSession.cadData.floorArea} m²`
+                          ? `${selectedSession.cadData.floorArea.toFixed(2)} m²`
                           : '-'}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-slate-600">BCR</p>
                       <p className="font-semibold">
-                        {selectedSession.cadData.bcr ? selectedSession.cadData.bcr : '-'}
+                        {selectedSession.cadData.bcr ? `${selectedSession.cadData.bcr.toFixed(2)}%` : '-'}
                       </p>
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <p className="text-sm text-slate-600">FAR</p>
                       <p className="font-semibold">
-                        {selectedSession.cadData.far ? selectedSession.cadData.far : '-'}
+                        {selectedSession.cadData.far ? selectedSession.cadData.far.toFixed(2) : '-'}
                       </p>
                     </div>
+                    {selectedSession.cadData.dxfFileUrl && (
+                      <div>
+                        <p className="text-sm text-slate-600">DXF File</p>
+                        <a
+                          href={selectedSession.cadData.dxfFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline font-semibold"
+                        >
+                          View DXF File
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -437,7 +450,7 @@ export default function AdminDashboard() {
               {selectedSession.infrastructureData && (
                 <div>
                   <h4 className="font-semibold text-slate-900 mb-2">Infrastructure Data</h4>
-                  <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl">
+                  <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl mb-3">
                     <div>
                       <p className="text-sm text-slate-600">Latitude</p>
                       <p className="font-semibold">
@@ -459,6 +472,37 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                   </div>
+                  
+                  {selectedSession.infrastructureData.labeledFeatures && 
+                   Array.isArray(selectedSession.infrastructureData.labeledFeatures) && 
+                   selectedSession.infrastructureData.labeledFeatures.length > 0 && (
+                    <div className="bg-slate-50 p-4 rounded-xl">
+                      <p className="text-sm text-slate-600 mb-2">Labeled Features ({selectedSession.infrastructureData.labeledFeatures.length})</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedSession.infrastructureData.labeledFeatures.map((feature: any, idx: number) => {
+                          const getTypeColor = (type: string) => {
+                            const colors: Record<string, string> = {
+                              'Hospital': 'bg-red-100 text-red-700',
+                              'School': 'bg-amber-100 text-amber-700',
+                              'Residential Housing': 'bg-green-100 text-green-700',
+                              'River': 'bg-cyan-100 text-cyan-700',
+                              'Lake': 'bg-blue-100 text-blue-700',
+                              'Office': 'bg-purple-100 text-purple-700',
+                              'Others': 'bg-gray-100 text-gray-700',
+                            };
+                            return colors[type] || 'bg-gray-100 text-gray-700';
+                          };
+
+                          const displayType = feature.customType || feature.type;
+                          return (
+                            <span key={idx} className={`px-3 py-1 rounded-full text-xs font-semibold ${getTypeColor(feature.type)}`}>
+                              {displayType}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

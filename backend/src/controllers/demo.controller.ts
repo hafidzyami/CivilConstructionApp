@@ -12,6 +12,7 @@ const upload = multer({
 });
 
 export const uploadMiddleware = upload.array('documents', 10);
+export const uploadDxfMiddleware = upload.single('dxfFile');
 
 // Get or create demo session
 export const getOrCreateSession = async (req: Request, res: Response) => {
@@ -124,7 +125,7 @@ export const uploadDocuments = async (req: Request, res: Response) => {
 // Save CAD data
 export const saveCadData = async (req: Request, res: Response) => {
   try {
-    const { sessionId, siteArea, buildingArea, floorArea, bcr, far, rawData } = req.body;
+    const { sessionId, siteArea, buildingArea, floorArea, bcr, far, rawData, dxfFileUrl } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({
@@ -136,6 +137,7 @@ export const saveCadData = async (req: Request, res: Response) => {
     const cadData = await prisma.demoCadData.upsert({
       where: { sessionId: parseInt(sessionId) },
       update: {
+        dxfFileUrl: dxfFileUrl || undefined,
         siteArea: siteArea ? parseFloat(siteArea) : null,
         buildingArea: buildingArea ? parseFloat(buildingArea) : null,
         floorArea: floorArea ? parseFloat(floorArea) : null,
@@ -145,6 +147,7 @@ export const saveCadData = async (req: Request, res: Response) => {
       },
       create: {
         sessionId: parseInt(sessionId),
+        dxfFileUrl: dxfFileUrl || null,
         siteArea: siteArea ? parseFloat(siteArea) : null,
         buildingArea: buildingArea ? parseFloat(buildingArea) : null,
         floorArea: floorArea ? parseFloat(floorArea) : null,
@@ -180,6 +183,12 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
       });
     }
 
+    // Extract labeled features from results
+    let labeledFeatures = null;
+    if (results && results.labeled) {
+      labeledFeatures = results.labeled;
+    }
+
     const infraData = await prisma.demoInfrastructure.upsert({
       where: { sessionId: parseInt(sessionId) },
       update: {
@@ -190,6 +199,7 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
         roads: roads || null,
         railways: railways || null,
         waterways: waterways || null,
+        labeledFeatures: labeledFeatures,
         rawData: results || rawData || null, // Use results if provided, fallback to rawData
       },
       create: {
@@ -201,6 +211,7 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
         roads: roads || null,
         railways: railways || null,
         waterways: waterways || null,
+        labeledFeatures: labeledFeatures,
         rawData: results || rawData || null, // Use results if provided, fallback to rawData
       },
     });
@@ -383,6 +394,63 @@ export const getNextUserId = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error getting next user ID:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Upload DXF file
+export const uploadDxf = async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.body;
+    const file = req.file as Express.Multer.File;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID is required',
+      });
+    }
+
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No DXF file uploaded',
+      });
+    }
+
+    // Upload DXF file to MinIO
+    const fileUrl = await uploadFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      {
+        sessionId: sessionId.toString(),
+        type: 'cad',
+      }
+    );
+
+    // Update CAD data with DXF file URL
+    const cadData = await prisma.demoCadData.upsert({
+      where: { sessionId: parseInt(sessionId) },
+      update: {
+        dxfFileUrl: fileUrl,
+      },
+      create: {
+        sessionId: parseInt(sessionId),
+        dxfFileUrl: fileUrl,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: { fileUrl, cadData },
+      message: 'DXF file uploaded successfully',
+    });
+  } catch (error: any) {
+    console.error('Error uploading DXF file:', error);
     res.status(500).json({
       success: false,
       message: error.message,

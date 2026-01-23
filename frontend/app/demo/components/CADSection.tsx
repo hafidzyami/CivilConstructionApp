@@ -89,6 +89,22 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
     setLoading(true);
 
     try {
+      // Upload DXF file to MinIO first
+      if (sessionId && file) {
+        const uploadFormData = new FormData();
+        uploadFormData.append('sessionId', sessionId.toString());
+        uploadFormData.append('dxfFile', file);
+        
+        try {
+          await fetch(`${API_URL}/demo/upload-dxf`, {
+            method: 'POST',
+            body: uploadFormData,
+          });
+        } catch (err) {
+          console.error('Failed to upload DXF file:', err);
+        }
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       const endpoint = parserMode === 'manual' ? '/cad/process' : '/cad/process-auto';
@@ -296,7 +312,28 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
           />
           
           <button
-            onClick={onComplete}
+            onClick={async () => {
+              // Save final metrics before completing
+              if (sessionId) {
+                try {
+                  await fetch(`${API_URL}/demo/cad-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      sessionId,
+                      siteArea: metrics.siteArea,
+                      buildingArea: metrics.footprintArea,
+                      floorArea: metrics.totalFloorArea,
+                      bcr: metrics.bcr,
+                      far: metrics.far,
+                    }),
+                  });
+                } catch (err) {
+                  console.error('Failed to save final CAD metrics:', err);
+                }
+              }
+              onComplete();
+            }}
             className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
             Continue to Infrastructure →

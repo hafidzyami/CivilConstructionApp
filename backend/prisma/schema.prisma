@@ -34,6 +34,7 @@ model DemoDocument {
 model DemoCadData {
   id            Int          @id @default(autoincrement())
   sessionId     Int          @unique
+  dxfFileUrl    String?
   siteArea      Float?
   buildingArea  Float?
   floorArea     Float?
@@ -55,6 +56,7 @@ model DemoInfrastructure {
   roads         Json?
   railways      Json?
   waterways     Json?
+  labeledFeatures Json?
   rawData       Json?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
