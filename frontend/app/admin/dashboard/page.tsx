@@ -3,6 +3,29 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+// Dynamic import for map components to avoid SSR issues
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Marker),
+  { ssr: false }
+);
+const Rectangle = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Rectangle),
+  { ssr: false }
+);
+const GeoJSON = dynamic(
+  () => import('react-leaflet').then((mod) => mod.GeoJSON),
+  { ssr: false }
+);
 
 interface Session {
   id: number;
@@ -14,6 +37,17 @@ interface Session {
   infrastructureData: any;
   ocrData: any[];
 }
+
+// Color mapping for building types (read-only)
+const TYPE_COLORS: Record<string, { color: string; fillColor: string }> = {
+  'Hospital': { color: '#DC2626', fillColor: '#FCA5A5' },
+  'School': { color: '#D97706', fillColor: '#FCD34D' },
+  'Residential Housing': { color: '#059669', fillColor: '#6EE7B7' },
+  'River': { color: '#0284C7', fillColor: '#7DD3FC' },
+  'Lake': { color: '#1D4ED8', fillColor: '#93C5FD' },
+  'Office': { color: '#7C3AED', fillColor: '#C4B5FD' },
+  'Others': { color: '#6B7280', fillColor: '#D1D5DB' }
+};
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -476,32 +510,158 @@ export default function AdminDashboard() {
                   {selectedSession.infrastructureData.labeledFeatures && 
                    Array.isArray(selectedSession.infrastructureData.labeledFeatures) && 
                    selectedSession.infrastructureData.labeledFeatures.length > 0 && (
-                    <div className="bg-slate-50 p-4 rounded-xl">
-                      <p className="text-sm text-slate-600 mb-2">Labeled Features ({selectedSession.infrastructureData.labeledFeatures.length})</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedSession.infrastructureData.labeledFeatures.map((feature: any, idx: number) => {
-                          const getTypeColor = (type: string) => {
-                            const colors: Record<string, string> = {
-                              'Hospital': 'bg-red-100 text-red-700',
-                              'School': 'bg-amber-100 text-amber-700',
-                              'Residential Housing': 'bg-green-100 text-green-700',
-                              'River': 'bg-cyan-100 text-cyan-700',
-                              'Lake': 'bg-blue-100 text-blue-700',
-                              'Office': 'bg-purple-100 text-purple-700',
-                              'Others': 'bg-gray-100 text-gray-700',
+                    <>
+                      <div className="bg-slate-50 p-4 rounded-xl mb-4">
+                        <p className="text-sm text-slate-600 mb-2">Labeled Features ({selectedSession.infrastructureData.labeledFeatures.length})</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedSession.infrastructureData.labeledFeatures.map((feature: any, idx: number) => {
+                            const getTypeColor = (type: string) => {
+                              const colors: Record<string, string> = {
+                                'Hospital': 'bg-red-100 text-red-700',
+                                'School': 'bg-amber-100 text-amber-700',
+                                'Residential Housing': 'bg-green-100 text-green-700',
+                                'River': 'bg-cyan-100 text-cyan-700',
+                                'Lake': 'bg-blue-100 text-blue-700',
+                                'Office': 'bg-purple-100 text-purple-700',
+                                'Others': 'bg-gray-100 text-gray-700',
+                              };
+                              return colors[type] || 'bg-gray-100 text-gray-700';
                             };
-                            return colors[type] || 'bg-gray-100 text-gray-700';
-                          };
 
-                          const displayType = feature.customType || feature.type;
-                          return (
-                            <span key={idx} className={`px-3 py-1 rounded-full text-xs font-semibold ${getTypeColor(feature.type)}`}>
-                              {displayType}
-                            </span>
-                          );
-                        })}
+                            const displayType = feature.customType || feature.type;
+                            return (
+                              <span key={idx} className={`px-3 py-1 rounded-full text-xs font-semibold ${getTypeColor(feature.type)}`}>
+                                {displayType}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+
+                      {/* Map Viewer */}
+                      {typeof window !== 'undefined' && 
+                       selectedSession.infrastructureData.latitude && 
+                       selectedSession.infrastructureData.longitude && (
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-sm text-slate-600 mb-3">Map View (Read-only)</p>
+                          <div style={{ height: '400px' }} className="rounded-lg overflow-hidden border-2 border-slate-300">
+                            <MapContainer
+                              center={[
+                                selectedSession.infrastructureData.latitude,
+                                selectedSession.infrastructureData.longitude
+                              ]}
+                              zoom={16}
+                              style={{ height: '100%', width: '100%' }}
+                              dragging={true}
+                              scrollWheelZoom={false}
+                              doubleClickZoom={true}
+                            >
+                              <TileLayer
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                              />
+
+                              {/* Center Marker */}
+                              <Marker 
+                                position={[
+                                  selectedSession.infrastructureData.latitude,
+                                  selectedSession.infrastructureData.longitude
+                                ]} 
+                              />
+
+                              {/* Search Radius */}
+                              {selectedSession.infrastructureData.radius && (
+                                <Rectangle
+                                  bounds={[
+                                    [
+                                      selectedSession.infrastructureData.latitude - selectedSession.infrastructureData.radius / 111000,
+                                      selectedSession.infrastructureData.longitude - selectedSession.infrastructureData.radius / (111000 * Math.cos((selectedSession.infrastructureData.latitude * Math.PI) / 180)),
+                                    ],
+                                    [
+                                      selectedSession.infrastructureData.latitude + selectedSession.infrastructureData.radius / 111000,
+                                      selectedSession.infrastructureData.longitude + selectedSession.infrastructureData.radius / (111000 * Math.cos((selectedSession.infrastructureData.latitude * Math.PI) / 180)),
+                                    ],
+                                  ]}
+                                  pathOptions={{
+                                    color: '#3b82f6',
+                                    fillColor: '#3b82f6',
+                                    fillOpacity: 0.1,
+                                    weight: 2,
+                                    dashArray: '5, 5',
+                                  }}
+                                  interactive={false}
+                                />
+                              )}
+
+                              {/* Labeled Features as Markers */}
+                              {selectedSession.infrastructureData.labeledFeatures.map((feature: any, idx: number) => {
+                                if (feature.lat && feature.lon) {
+                                  // Create custom icon with the feature's color
+                                  const createColoredIcon = (type: string) => {
+                                    if (typeof window === 'undefined') return undefined;
+                                    const L = require('leaflet');
+                                    const colors = TYPE_COLORS[type] || TYPE_COLORS['Others'];
+                                    
+                                    return new L.Icon({
+                                      iconUrl: `data:image/svg+xml;base64,${btoa(`
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
+                                          <path fill="${colors.color}" d="M12 0C7.58 0 4 3.58 4 8c0 5.25 8 16 8 16s8-10.75 8-16c0-4.42-3.58-8-8-8z"/>
+                                          <circle fill="white" cx="12" cy="8" r="3"/>
+                                        </svg>
+                                      `)}`,
+                                      iconSize: [24, 36],
+                                      iconAnchor: [12, 36],
+                                      popupAnchor: [0, -36],
+                                    });
+                                  };
+
+                                  return (
+                                    <Marker
+                                      key={idx}
+                                      position={[feature.lat, feature.lon]}
+                                      icon={createColoredIcon(feature.type)}
+                                    >
+                                      <div>
+                                        <strong>{feature.customType || feature.type}</strong>
+                                        <br />
+                                        <small>
+                                          Lat: {feature.lat.toFixed(6)}<br />
+                                          Lon: {feature.lon.toFixed(6)}
+                                        </small>
+                                      </div>
+                                    </Marker>
+                                  );
+                                }
+                                return null;
+                              })}
+                            </MapContainer>
+                          </div>
+
+                          {/* Legend */}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {Object.entries(TYPE_COLORS).map(([type, colors]) => {
+                              const hasType = selectedSession.infrastructureData.labeledFeatures.some(
+                                (f: any) => f.type === type
+                              );
+                              if (!hasType) return null;
+                              
+                              return (
+                                <div key={type} className="flex items-center gap-2">
+                                  <div 
+                                    className="w-4 h-4 rounded-full border-2" 
+                                    style={{ 
+                                      backgroundColor: colors.fillColor,
+                                      borderColor: colors.color
+                                    }}
+                                  />
+                                  <span className="text-xs text-slate-700">{type}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
