@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, Rectangle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 
 // Komponen untuk memperbaiki ukuran peta setelah modal terbuka
 const MapUpdater = () => {
@@ -38,22 +37,6 @@ interface SessionMapProps {
 export default function SessionMap({ infrastructureData }: SessionMapProps) {
   const { latitude, longitude, radius, labeledFeatures } = infrastructureData;
 
-  // Fungsi untuk membuat icon custom berdasarkan tipe building
-  const createColoredIcon = (type: string) => {
-    const colors = TYPE_COLORS[type] || TYPE_COLORS['Others'];
-    return new L.Icon({
-      iconUrl: `data:image/svg+xml;base64,${btoa(`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
-          <path fill="${colors.color}" d="M12 0C7.58 0 4 3.58 4 8c0 5.25 8 16 8 16s8-10.75 8-16c0-4.42-3.58-8-8-8z"/>
-          <circle fill="white" cx="12" cy="8" r="3"/>
-        </svg>
-      `)}`,
-      iconSize: [24, 36],
-      iconAnchor: [12, 36],
-      popupAnchor: [0, -36],
-    });
-  };
-
   return (
     <MapContainer
       center={[latitude, longitude]}
@@ -70,9 +53,6 @@ export default function SessionMap({ infrastructureData }: SessionMapProps) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       />
-
-      {/* Center Marker */}
-      <Marker position={[latitude, longitude]} />
 
       {/* Search Radius Rectangle */}
       {radius && (
@@ -98,14 +78,22 @@ export default function SessionMap({ infrastructureData }: SessionMapProps) {
         />
       )}
 
-      {/* Labeled Features Markers */}
+      {/* Labeled Features - CircleMarkers dengan warna building */}
       {labeledFeatures && labeledFeatures.map((feature: any, idx: number) => {
         if (feature.lat && feature.lon) {
+          const colors = TYPE_COLORS[feature.type] || TYPE_COLORS['Others'];
           return (
-            <Marker
+            <CircleMarker
               key={idx}
-              position={[feature.lat, feature.lon]}
-              icon={createColoredIcon(feature.type)}
+              center={[feature.lat, feature.lon]}
+              radius={12}
+              pathOptions={{
+                color: colors.color,
+                fillColor: colors.fillColor,
+                fillOpacity: 0.8,
+                weight: 3,
+                opacity: 1,
+              }}
             >
               <Popup>
                 <div style={{ minWidth: '150px' }}>
@@ -118,7 +106,7 @@ export default function SessionMap({ infrastructureData }: SessionMapProps) {
                   </div>
                 </div>
               </Popup>
-            </Marker>
+            </CircleMarker>
           );
         }
         return null;
