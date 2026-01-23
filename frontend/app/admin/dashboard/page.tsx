@@ -26,6 +26,10 @@ const GeoJSON = dynamic(
   () => import('react-leaflet').then((mod) => mod.GeoJSON),
   { ssr: false }
 );
+const Popup = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Popup),
+  { ssr: false }
+);
 
 interface Session {
   id: number;
@@ -55,6 +59,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
 
   useEffect(() => {
     // Check if admin is logged in
@@ -119,6 +124,8 @@ export default function AdminDashboard() {
   const viewSessionDetail = (session: Session) => {
     setSelectedSession(session);
     setShowDetail(true);
+    // Force map remount to ensure proper rendering
+    setMapKey(prev => prev + 1);
   };
 
   if (loading) {
@@ -630,6 +637,7 @@ export default function AdminDashboard() {
                           <p className="text-sm text-slate-600 mb-3">Map View (Read-only)</p>
                           <div style={{ height: '400px' }} className="rounded-lg overflow-hidden border-2 border-slate-300">
                             <MapContainer
+                              key={mapKey}
                               center={[
                                 selectedSession.infrastructureData.latitude,
                                 selectedSession.infrastructureData.longitude
@@ -705,14 +713,17 @@ export default function AdminDashboard() {
                                       position={[feature.lat, feature.lon]}
                                       icon={createColoredIcon(feature.type)}
                                     >
-                                      <div>
-                                        <strong>{feature.customType || feature.type}</strong>
-                                        <br />
-                                        <small>
-                                          Lat: {feature.lat.toFixed(6)}<br />
-                                          Lon: {feature.lon.toFixed(6)}
-                                        </small>
-                                      </div>
+                                      <Popup>
+                                        <div style={{ minWidth: '150px' }}>
+                                          <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>
+                                            {feature.customType || feature.type}
+                                          </div>
+                                          <div style={{ fontSize: '12px', color: '#666' }}>
+                                            <strong>Latitude:</strong> {feature.lat.toFixed(6)}<br />
+                                            <strong>Longitude:</strong> {feature.lon.toFixed(6)}
+                                          </div>
+                                        </div>
+                                      </Popup>
                                     </Marker>
                                   );
                                 }
