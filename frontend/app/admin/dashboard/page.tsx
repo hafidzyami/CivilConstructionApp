@@ -5,30 +5,17 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
-// Dynamic import for map components to avoid SSR issues
-const MapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
-const Rectangle = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Rectangle),
-  { ssr: false }
-);
-const GeoJSON = dynamic(
-  () => import('react-leaflet').then((mod) => mod.GeoJSON),
-  { ssr: false }
-);
-const Popup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
-  { ssr: false }
+// Dynamic import for SessionMap component to avoid SSR issues
+const SessionMap = dynamic(
+  () => import('../components/SessionMap'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full bg-slate-100 animate-pulse rounded-lg flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Loading map...</p>
+      </div>
+    )
+  }
 );
 
 interface Session {
@@ -60,27 +47,6 @@ export default function AdminDashboard() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [mapKey, setMapKey] = useState(0);
-
-  useEffect(() => {
-    // Invalidate map size when modal opens
-    if (showDetail && selectedSession?.infrastructureData) {
-      const timer = setTimeout(() => {
-        // Trigger map resize by incrementing key slightly
-        const mapElement = document.querySelector('.leaflet-container');
-        if (mapElement && (window as any).L) {
-          const maps = (window as any).L._maps;
-          if (maps) {
-            Object.values(maps).forEach((map: any) => {
-              if (map && map.invalidateSize) {
-                map.invalidateSize();
-              }
-            });
-          }
-        }
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [showDetail, selectedSession]);
 
   useEffect(() => {
     // Check if admin is logged in
@@ -145,8 +111,6 @@ export default function AdminDashboard() {
   const viewSessionDetail = (session: Session) => {
     setSelectedSession(session);
     setShowDetail(true);
-    // Force map remount to ensure proper rendering
-    setMapKey(prev => prev + 1);
   };
 
   if (loading) {
@@ -656,8 +620,7 @@ export default function AdminDashboard() {
                       </div>
 
                       {/* Map Viewer */}
-                      {typeof window !== 'undefined' && 
-                       selectedSession.infrastructureData.latitude && 
+                      {selectedSession.infrastructureData.latitude && 
                        selectedSession.infrastructureData.longitude && (
                         <div className="bg-slate-50 p-4 rounded-xl">
                           <div className="flex items-center justify-between mb-3">
@@ -672,101 +635,11 @@ export default function AdminDashboard() {
                               Refresh Map
                             </button>
                           </div>
-                          <div style={{ height: '400px' }} className="rounded-lg overflow-hidden border-2 border-slate-300">
-                            <MapContainer
-                              key={mapKey}
-                              center={[
-                                selectedSession.infrastructureData.latitude,
-                                selectedSession.infrastructureData.longitude
-                              ]}
-                              zoom={16}
-                              style={{ height: '100%', width: '100%' }}
-                              dragging={true}
-                              scrollWheelZoom={false}
-                              doubleClickZoom={true}
-                            >
-                              <TileLayer
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                              />
-
-                              {/* Center Marker */}
-                              <Marker 
-                                position={[
-                                  selectedSession.infrastructureData.latitude,
-                                  selectedSession.infrastructureData.longitude
-                                ]} 
-                              />
-
-                              {/* Search Radius */}
-                              {selectedSession.infrastructureData.radius && (
-                                <Rectangle
-                                  bounds={[
-                                    [
-                                      selectedSession.infrastructureData.latitude - selectedSession.infrastructureData.radius / 111000,
-                                      selectedSession.infrastructureData.longitude - selectedSession.infrastructureData.radius / (111000 * Math.cos((selectedSession.infrastructureData.latitude * Math.PI) / 180)),
-                                    ],
-                                    [
-                                      selectedSession.infrastructureData.latitude + selectedSession.infrastructureData.radius / 111000,
-                                      selectedSession.infrastructureData.longitude + selectedSession.infrastructureData.radius / (111000 * Math.cos((selectedSession.infrastructureData.latitude * Math.PI) / 180)),
-                                    ],
-                                  ]}
-                                  pathOptions={{
-                                    color: '#3b82f6',
-                                    fillColor: '#3b82f6',
-                                    fillOpacity: 0.1,
-                                    weight: 2,
-                                    dashArray: '5, 5',
-                                  }}
-                                  interactive={false}
-                                />
-                              )}
-
-                              {/* Labeled Features as Markers */}
-                              {selectedSession.infrastructureData.labeledFeatures.map((feature: any, idx: number) => {
-                                if (feature.lat && feature.lon) {
-                                  // Create custom icon with the feature's color
-                                  const createColoredIcon = (type: string) => {
-                                    if (typeof window === 'undefined') return undefined;
-                                    const L = require('leaflet');
-                                    const colors = TYPE_COLORS[type] || TYPE_COLORS['Others'];
-                                    
-                                    return new L.Icon({
-                                      iconUrl: `data:image/svg+xml;base64,${btoa(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
-                                          <path fill="${colors.color}" d="M12 0C7.58 0 4 3.58 4 8c0 5.25 8 16 8 16s8-10.75 8-16c0-4.42-3.58-8-8-8z"/>
-                                          <circle fill="white" cx="12" cy="8" r="3"/>
-                                        </svg>
-                                      `)}`,
-                                      iconSize: [24, 36],
-                                      iconAnchor: [12, 36],
-                                      popupAnchor: [0, -36],
-                                    });
-                                  };
-
-                                  return (
-                                    <Marker
-                                      key={idx}
-                                      position={[feature.lat, feature.lon]}
-                                      icon={createColoredIcon(feature.type)}
-                                    >
-                                      <Popup>
-                                        <div style={{ minWidth: '150px' }}>
-                                          <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>
-                                            {feature.customType || feature.type}
-                                          </div>
-                                          <div style={{ fontSize: '12px', color: '#666' }}>
-                                            <strong>Latitude:</strong> {feature.lat.toFixed(6)}<br />
-                                            <strong>Longitude:</strong> {feature.lon.toFixed(6)}
-                                          </div>
-                                        </div>
-                                      </Popup>
-                                    </Marker>
-                                  );
-                                }
-                                return null;
-                              })}
-                            </MapContainer>
+                          <div style={{ height: '400px' }} className="rounded-lg overflow-hidden border-2 border-slate-300 relative z-0">
+                            <SessionMap
+                              key={selectedSession.id + '-' + mapKey}
+                              infrastructureData={selectedSession.infrastructureData}
+                            />
                           </div>
 
                           {/* Legend */}
