@@ -425,58 +425,142 @@ export default function AdminDashboard() {
               {/* CAD Data */}
               {selectedSession.cadData && (
                 <div>
-                  <h4 className="font-semibold text-slate-900 mb-2">CAD Analysis Data</h4>
-                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
-                    <div>
-                      <p className="text-sm text-slate-600">Site Area</p>
-                      <p className="font-semibold">
+                  <h4 className="font-semibold text-slate-900 mb-3 text-lg">CAD Analysis Data</h4>
+                  
+                  {/* Metrics Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+                      <p className="text-xs text-blue-600 font-medium mb-1">Site Area</p>
+                      <p className="text-2xl font-bold text-blue-900">
                         {selectedSession.cadData.siteArea
-                          ? `${selectedSession.cadData.siteArea.toFixed(2)} m²`
+                          ? selectedSession.cadData.siteArea.toFixed(2)
                           : '-'}
                       </p>
+                      <p className="text-xs text-blue-600 mt-1">m²</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-slate-600">Building Area</p>
-                      <p className="font-semibold">
+                    
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                      <p className="text-xs text-green-600 font-medium mb-1">Building Area</p>
+                      <p className="text-2xl font-bold text-green-900">
                         {selectedSession.cadData.buildingArea
-                          ? `${selectedSession.cadData.buildingArea.toFixed(2)} m²`
+                          ? selectedSession.cadData.buildingArea.toFixed(2)
                           : '-'}
                       </p>
+                      <p className="text-xs text-green-600 mt-1">m²</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-slate-600">Floor Area</p>
-                      <p className="font-semibold">
+                    
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
+                      <p className="text-xs text-purple-600 font-medium mb-1">Floor Area</p>
+                      <p className="text-2xl font-bold text-purple-900">
                         {selectedSession.cadData.floorArea
-                          ? `${selectedSession.cadData.floorArea.toFixed(2)} m²`
+                          ? selectedSession.cadData.floorArea.toFixed(2)
                           : '-'}
                       </p>
+                      <p className="text-xs text-purple-600 mt-1">m²</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-slate-600">BCR</p>
-                      <p className="font-semibold">
-                        {selectedSession.cadData.bcr ? `${selectedSession.cadData.bcr.toFixed(2)}%` : '-'}
+                    
+                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
+                      <p className="text-xs text-orange-600 font-medium mb-1">BCR (Building Coverage Ratio)</p>
+                      <p className="text-2xl font-bold text-orange-900">
+                        {selectedSession.cadData.bcr ? selectedSession.cadData.bcr.toFixed(2) : '-'}
                       </p>
+                      <p className="text-xs text-orange-600 mt-1">%</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-slate-600">FAR</p>
-                      <p className="font-semibold">
+                    
+                    <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-4 rounded-xl border border-pink-200">
+                      <p className="text-xs text-pink-600 font-medium mb-1">FAR (Floor Area Ratio)</p>
+                      <p className="text-2xl font-bold text-pink-900">
                         {selectedSession.cadData.far ? selectedSession.cadData.far.toFixed(2) : '-'}
                       </p>
+                      <p className="text-xs text-pink-600 mt-1">ratio</p>
                     </div>
-                    {selectedSession.cadData.dxfFileUrl && (
-                      <div>
-                        <p className="text-sm text-slate-600">DXF File</p>
-                        <a
-                          href={selectedSession.cadData.dxfFileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline font-semibold"
-                        >
-                          View DXF File
-                        </a>
-                      </div>
-                    )}
                   </div>
+
+                  {/* DXF File Viewer */}
+                  {selectedSession.cadData.dxfFileUrl && (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-semibold text-slate-700">DXF File</p>
+                        <div className="flex gap-2">
+                          <a
+                            href={selectedSession.cadData.dxfFileUrl}
+                            download
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download
+                          </a>
+                          <a
+                            href={selectedSession.cadData.dxfFileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            Open in New Tab
+                          </a>
+                        </div>
+                      </div>
+                      
+                      {/* DXF File Info */}
+                      <div className="bg-white p-4 rounded-lg border border-slate-300">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-900">CAD Drawing File</p>
+                            <p className="text-xs text-slate-500">DXF Format</p>
+                          </div>
+                        </div>
+                        
+                        {/* File Path Display */}
+                        <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                          <p className="text-xs text-slate-600 mb-1 font-medium">File URL:</p>
+                          <p className="text-xs text-slate-500 break-all font-mono">
+                            {selectedSession.cadData.dxfFileUrl}
+                          </p>
+                        </div>
+
+                        {/* Analysis Summary */}
+                        <div className="mt-3 pt-3 border-t border-slate-200">
+                          <p className="text-xs text-slate-600 font-medium mb-2">Analysis Summary:</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Building Coverage:</span>
+                              <span className="font-semibold text-slate-700">
+                                {selectedSession.cadData.bcr ? `${selectedSession.cadData.bcr.toFixed(1)}%` : '-'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Floor Ratio:</span>
+                              <span className="font-semibold text-slate-700">
+                                {selectedSession.cadData.far ? selectedSession.cadData.far.toFixed(2) : '-'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Total Site:</span>
+                              <span className="font-semibold text-slate-700">
+                                {selectedSession.cadData.siteArea ? `${selectedSession.cadData.siteArea.toFixed(0)} m²` : '-'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Total Building:</span>
+                              <span className="font-semibold text-slate-700">
+                                {selectedSession.cadData.buildingArea ? `${selectedSession.cadData.buildingArea.toFixed(0)} m²` : '-'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
