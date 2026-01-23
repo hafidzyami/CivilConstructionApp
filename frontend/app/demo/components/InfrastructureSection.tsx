@@ -56,7 +56,7 @@ const TYPE_COLORS: Record<BuildingType, { color: string; fillColor: string }> = 
   'River': { color: '#0284C7', fillColor: '#7DD3FC' },
   'Lake': { color: '#1D4ED8', fillColor: '#93C5FD' },
   'Office': { color: '#7C3AED', fillColor: '#C4B5FD' },
-  'Others': { color: '#6B7280', fillColor: '#D1D5DB' }
+  'Others': { color: '#C026D3', fillColor: '#F5D0FE' }
 };
 
 interface MapUpdaterProps {

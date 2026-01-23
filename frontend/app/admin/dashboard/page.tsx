@@ -484,23 +484,22 @@ export default function AdminDashboard() {
                             </svg>
                             Download
                           </a>
-                          <a
-                            href={selectedSession.cadData.dxfFileUrl}
+                          <Link
+                            href={`/admin/cad-viewer/${selectedSession.id}`}
                             target="_blank"
-                            rel="noopener noreferrer"
                             className="px-3 py-1.5 bg-slate-600 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 transition-colors flex items-center gap-1"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
-                            Open in New Tab
-                          </a>
+                            Open Viewer
+                          </Link>
                         </div>
                       </div>
                       
                       {/* DXF File Info */}
                       <div className="bg-white p-4 rounded-lg border border-slate-300">
-                        <div className="flex items-center gap-3 mb-3">
+                        <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                             <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -508,46 +507,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="flex-1">
                             <p className="font-semibold text-slate-900">CAD Drawing File</p>
-                            <p className="text-xs text-slate-500">DXF Format</p>
-                          </div>
-                        </div>
-                        
-                        {/* File Path Display */}
-                        <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                          <p className="text-xs text-slate-600 mb-1 font-medium">File URL:</p>
-                          <p className="text-xs text-slate-500 break-all font-mono">
-                            {selectedSession.cadData.dxfFileUrl}
-                          </p>
-                        </div>
-
-                        {/* Analysis Summary */}
-                        <div className="mt-3 pt-3 border-t border-slate-200">
-                          <p className="text-xs text-slate-600 font-medium mb-2">Analysis Summary:</p>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Building Coverage:</span>
-                              <span className="font-semibold text-slate-700">
-                                {selectedSession.cadData.bcr ? `${selectedSession.cadData.bcr.toFixed(1)}%` : '-'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Floor Ratio:</span>
-                              <span className="font-semibold text-slate-700">
-                                {selectedSession.cadData.far ? selectedSession.cadData.far.toFixed(2) : '-'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Total Site:</span>
-                              <span className="font-semibold text-slate-700">
-                                {selectedSession.cadData.siteArea ? `${selectedSession.cadData.siteArea.toFixed(0)} m²` : '-'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Total Building:</span>
-                              <span className="font-semibold text-slate-700">
-                                {selectedSession.cadData.buildingArea ? `${selectedSession.cadData.buildingArea.toFixed(0)} m²` : '-'}
-                              </span>
-                            </div>
+                            <p className="text-xs text-slate-500">DXF Format • Click &quot;Open Viewer&quot; to visualize</p>
                           </div>
                         </div>
                       </div>
