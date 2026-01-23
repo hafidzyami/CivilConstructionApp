@@ -10,5 +10,6 @@ router.post('/layers', upload.single('file'), cadController.getLayers);
 router.post('/process', upload.single('file'), cadController.processCad);
 router.post('/process-auto', upload.single('file'), cadController.processCadAuto);
 router.post('/process-llm', upload.single('file'), cadController.processCadLLM);
+router.post('/process-from-url', cadController.processFromUrl);
 
 export default router;

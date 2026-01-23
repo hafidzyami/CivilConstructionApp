@@ -40,10 +40,12 @@ export default function CADViewerPage() {
   const sessionId = params.sessionId as string;
 
   const [loading, setLoading] = useState(true);
+  const [processingDXF, setProcessingDXF] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cadData, setCadData] = useState<CADData | null>(null);
   const [polygons, setPolygons] = useState<PolygonData[]>([]);
   const [bounds, setBounds] = useState<Bounds | null>(null);
+  const [dxfError, setDxfError] = useState<string | null>(null);
 
   // Viewer state
   const svgRef = useRef<SVGSVGElement>(null);
@@ -94,29 +96,34 @@ export default function CADViewerPage() {
 
   const processDXF = async (dxfUrl: string) => {
     try {
-      // Download the DXF file
-      const response = await fetch(dxfUrl);
-      const blob = await response.blob();
-      const file = new File([blob], 'drawing.dxf', { type: 'application/dxf' });
-
-      // Send to CAD processing API
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const processRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cad/process`, {
+      setProcessingDXF(true);
+      setDxfError(null);
+      console.log('Processing DXF from URL:', dxfUrl);
+      
+      // Use backend proxy to avoid CORS issues
+      const processRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cad/process-from-url`, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileUrl: dxfUrl }),
       });
 
       const processData = await processRes.json();
+      console.log('CAD process response:', processData);
 
       if (processData.success && processData.data) {
         setPolygons(processData.data.polygons || []);
         setBounds(processData.data.bounds || null);
+        console.log('Loaded polygons:', processData.data.polygons?.length || 0);
+      } else {
+        setDxfError(processData.message || 'Failed to process DXF file');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error processing DXF:', err);
-      // Don't set error - we can still show CAD data without the visual
+      setDxfError(err.message || 'Failed to load DXF visualization');
+    } finally {
+      setProcessingDXF(false);
     }
   };
 
@@ -277,7 +284,15 @@ export default function CADViewerPage() {
 
           {/* SVG Viewer */}
           <div className="absolute inset-0 bg-[#1a1a2e] overflow-hidden">
-            {polygons.length > 0 ? (
+            {processingDXF ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center text-slate-400">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                  <p className="text-lg">Processing DXF file...</p>
+                  <p className="text-sm mt-1 text-slate-500">This may take a moment</p>
+                </div>
+              </div>
+            ) : polygons.length > 0 ? (
               <svg
                 ref={svgRef}
                 viewBox={viewBox}
@@ -311,12 +326,26 @@ export default function CADViewerPage() {
               </svg>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center text-slate-500">
+                <div className="text-center text-slate-500 max-w-md px-4">
                   <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                   </svg>
                   <p className="text-lg">No geometry data to display</p>
-                  <p className="text-sm mt-1">The DXF file might not contain processable polygons</p>
+                  {dxfError ? (
+                    <div className="mt-3 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+                      <p className="text-sm text-red-400">{dxfError}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1">The DXF file might not contain processable polygons</p>
+                  )}
+                  {cadData?.dxfFileUrl && (
+                    <button
+                      onClick={() => processDXF(cadData.dxfFileUrl)}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      Retry Processing
+                    </button>
+                  )}
                 </div>
               </div>
             )}
