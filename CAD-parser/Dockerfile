@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py .
 COPY dxf_utils.py .
 COPY fullaudit.py .
+COPY llm_extractor.py .
 
 # Create uploads directory
 RUN mkdir -p /app/uploads

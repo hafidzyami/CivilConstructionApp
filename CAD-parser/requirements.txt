@@ -5,3 +5,8 @@ ezdxf>=1.1.0
 shapely>=2.0.0
 networkx>=3.0.0
 pandas>=2.0.0
+
+# LLM Extractor dependencies (Gemini API)
+matplotlib>=3.7.0
+Pillow>=10.0.0
+google-generativeai>=0.8.0

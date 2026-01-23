@@ -80,3 +80,28 @@ export const processCadAuto = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Failed to auto-process CAD file', error: error.message });
   }
 };
+
+export const processCadLLM = async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(req.file.path), {
+      filename: req.file.originalname
+    });
+
+    const response = await axios.post(`${CAD_SERVICE_URL}/cad/process-llm`, formData, {
+      headers: { ...formData.getHeaders() },
+      timeout: 120000, // 2 minutes timeout for LLM processing
+    });
+
+    fs.unlinkSync(req.file.path);
+    res.json(response.data);
+  } catch (error: any) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    console.error('CAD LLM Process Error:', error.message);
+    res.status(500).json({ message: 'Failed to process CAD file with LLM', error: error.message });
+  }
+};

@@ -36,10 +36,21 @@ interface Selection {
 
 type AppStep = 'upload' | 'layers' | 'analyze';
 type ActiveMode = 'site' | 'building';
+type ParserMode = 'manual' | 'python' | 'llm';
 
 interface CADSectionProps {
   sessionId: number | null;
   onComplete: () => void;
+}
+
+interface AutoAnalysis {
+  site_area: number;
+  footprint_area: number;
+  total_floor_area: number;
+  floors: Record<string, number>;
+  btl: number;
+  far: number;
+  materials_count?: number;
 }
 
 export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
@@ -48,7 +59,7 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
   const [step, setStep] = useState<AppStep>('upload');
   const [loading, setLoading] = useState(false);
-  const [parserMode, setParserMode] = useState<'manual' | 'auto'>('manual');
+  const [parserMode, setParserMode] = useState<ParserMode>('manual');
 
   const [polygons, setPolygons] = useState<PolygonData[]>([]);
   const [bounds, setBounds] = useState<Bounds | null>(null);
@@ -58,6 +69,9 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
   const [floorCount, setFloorCount] = useState(1);
   const [isFootprint, setIsFootprint] = useState(true);
   const [simplify, setSimplify] = useState(false);
+  
+  // Auto analysis results from Python parser or LLM
+  const [autoAnalysis, setAutoAnalysis] = useState<AutoAnalysis | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -87,6 +101,7 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
   const processFile = async () => {
     if (!file) return;
     setLoading(true);
+    setAutoAnalysis(null);
 
     try {
       // Upload DXF file to MinIO first
@@ -107,7 +122,14 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
 
       const formData = new FormData();
       formData.append('file', file);
-      const endpoint = parserMode === 'manual' ? '/cad/process' : '/cad/process-auto';
+      
+      // Determine endpoint based on parser mode
+      let endpoint = '/cad/process';
+      if (parserMode === 'python') {
+        endpoint = '/cad/process-auto';
+      } else if (parserMode === 'llm') {
+        endpoint = '/cad/process-llm';
+      }
       
       if (parserMode === 'manual') {
         formData.append('layers', JSON.stringify(selectedLayers));
@@ -183,19 +205,37 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
         setBounds(data.bounds);
         setStep('analyze');
 
+        // Parse auto analysis results for Python or LLM parser
+        if ((parserMode === 'python' || parserMode === 'llm') && data.auto_analysis) {
+          try {
+            const analysis = typeof data.auto_analysis === 'string' 
+              ? JSON.parse(data.auto_analysis) 
+              : data.auto_analysis;
+            setAutoAnalysis(analysis);
+            console.log('Auto analysis results:', analysis);
+          } catch (e) {
+            console.error('Failed to parse auto analysis:', e, data.auto_analysis);
+          }
+        }
+
         // Save to database
         if (sessionId) {
-          const areas = finalPolys.map((p: any) => p.area_raw);
-          const totalArea = areas.reduce((a: number, b: number) => a + b, 0);
+          // Use auto analysis values if available, otherwise calculate from polygons
+          const siteArea = autoAnalysis?.site_area || data.auto_analysis?.site_area || 
+            finalPolys.reduce((sum: number, p: any) => sum + p.area_raw, 0);
+          const buildingArea = autoAnalysis?.footprint_area || data.auto_analysis?.footprint_area || 
+            (finalPolys[0]?.area_raw || 0);
+          const floorArea = autoAnalysis?.total_floor_area || data.auto_analysis?.total_floor_area || 
+            siteArea;
 
           const cadSaveRes = await fetch(`${API_URL}/demo/cad-data`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               sessionId,
-              siteArea: totalArea,
-              buildingArea: finalPolys[0]?.area_raw || 0,
-              floorArea: totalArea,
+              siteArea,
+              buildingArea,
+              floorArea,
               rawData: data,
             }),
           });
@@ -254,6 +294,18 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
   };
 
   const metrics = useMemo(() => {
+    // If we have auto analysis results (from Python or LLM parser), use those
+    if (autoAnalysis && (parserMode === 'python' || parserMode === 'llm')) {
+      return {
+        siteArea: autoAnalysis.site_area || 0,
+        footprintArea: autoAnalysis.footprint_area || 0,
+        totalFloorArea: autoAnalysis.total_floor_area || 0,
+        bcr: autoAnalysis.btl || 0,
+        far: autoAnalysis.far || 0,
+      };
+    }
+    
+    // Otherwise calculate from manual selections
     let siteArea = 0;
     let footprintArea = 0;
     let totalFloorArea = 0;
@@ -269,7 +321,7 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
     const bcr = siteArea > 0 ? (footprintArea / siteArea) * 100 : 0;
     const far = siteArea > 0 ? (totalFloorArea / siteArea) : 0;
     return { siteArea, footprintArea, totalFloorArea, bcr, far };
-  }, [selections, polygons]);
+  }, [selections, polygons, autoAnalysis, parserMode]);
 
   return (
     <div className="space-y-6">
@@ -301,7 +353,7 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
               onUpdateGeometry={processFile}
               loading={loading}
             />
-            <CADMetrics metrics={metrics} />
+            <CADMetrics metrics={metrics} parserMode={parserMode} />
           </div>
           <CADViewer
             polygons={polygons}

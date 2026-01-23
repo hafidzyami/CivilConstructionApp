@@ -286,6 +286,118 @@ async def process_cad_auto(file: UploadFile = File(...)):
                 logger.warning(f"[REQ {request_id}] Failed to cleanup temp file: {e}")
 
 
+@app.post("/cad/process-llm")
+async def process_cad_llm(file: UploadFile = File(...)):
+    """
+    Process DXF file using LLM-based extraction (Gemini 2.5 Flash)
+    
+    Args:
+        file: DXF file upload
+    
+    Returns:
+        JSON response with polygons and LLM-extracted building data
+    """
+    request_id = f"{int(time.time() * 1000)}"
+    logger.info(f"[REQ {request_id}] ========== LLM-PROCESS REQUEST START ==========")
+    temp_file_path = None
+    
+    try:
+        # Validate file extension
+        if file.filename and not (file.filename.lower().endswith('.dxf') or file.filename.lower().endswith('.dwg')):
+            logger.error(f"[REQ {request_id}] Invalid file type: {file.filename}")
+            raise HTTPException(status_code=400, detail="File must be a DXF or DWG file")
+
+        logger.info(f"[REQ {request_id}] File: {file.filename or 'unknown'}")
+        
+        # Save uploaded file temporarily
+        temp_file_path = UPLOAD_DIR / f"{request_id}_{file.filename}"
+        with temp_file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        file_size_kb = temp_file_path.stat().st_size / 1024
+        logger.info(f"[REQ {request_id}] File saved: {file_size_kb:.2f} KB")
+        
+        # Run llm_extractor.py for LLM-based analysis
+        start_time = time.time()
+        logger.info(f"[REQ {request_id}] Running LLM extractor (Gemini)...")
+        
+        try:
+            result = subprocess.run(
+                ['python', 'llm_extractor.py', str(temp_file_path), '--mode', 'llm', '--output', f'/tmp/llm_result_{request_id}.json'],
+                capture_output=True,
+                text=True,
+                timeout=120,  # 2 minute timeout for LLM
+                cwd=Path(__file__).parent
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"[REQ {request_id}] LLM extractor failed: {result.stderr}")
+                raise Exception(f"LLM extractor failed: {result.stderr}")
+            
+            # Read the JSON output file
+            llm_output_path = Path(f'/tmp/llm_result_{request_id}.json')
+            if llm_output_path.exists():
+                with open(llm_output_path, 'r') as f:
+                    llm_data = json.load(f)
+                llm_output_path.unlink()
+                
+                # Extract the LLM results
+                llm_result = llm_data.get('llm', {})
+                llm_analysis = {
+                    "site_area": llm_result.get('site_area_m2', 0),
+                    "footprint_area": llm_result.get('footprint_area_m2', 0),
+                    "total_floor_area": llm_result.get('total_floor_area_m2', 0),
+                    "floors": {},
+                    "btl": llm_result.get('bcr_percent', 0),
+                    "far": llm_result.get('far_percent', 0),
+                    "num_floors": llm_result.get('num_floors', 0),
+                    "method": "llm"
+                }
+            else:
+                llm_analysis = {"error": "LLM output not found"}
+                
+            logger.info(f"[REQ {request_id}] LLM output: {llm_analysis}")
+            
+        except subprocess.TimeoutExpired:
+            raise Exception("LLM processing timeout (>2 minutes)")
+        except Exception as e:
+            logger.error(f"[REQ {request_id}] LLM extractor error: {e}")
+            raise Exception(f"LLM extractor error: {str(e)}")
+        
+        # Also get the geometry for visualization (all layers)
+        polygons, scale, bounds, error = process_dxf_geometry(str(temp_file_path), None)
+        
+        if error:
+            logger.error(f"[REQ {request_id}] Geometry extraction failed: {error}")
+            raise HTTPException(status_code=400, detail=error)
+        
+        process_duration = time.time() - start_time
+        logger.info(f"[REQ {request_id}] LLM processing completed in {process_duration:.2f}s")
+        logger.info(f"[REQ {request_id}] Found {len(polygons)} polygons")
+        logger.info(f"[REQ {request_id}] ========== REQUEST COMPLETED ==========")
+        
+        return JSONResponse({
+            "polygons": polygons,
+            "scale": scale,
+            "bounds": bounds,
+            "auto_analysis": llm_analysis,
+            "mode": "llm"
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[REQ {request_id}] LLM processing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_file_path and temp_file_path.exists():
+            try:
+                temp_file_path.unlink()
+                logger.info(f"[REQ {request_id}] Temporary file cleaned up")
+            except Exception as e:
+                logger.warning(f"[REQ {request_id}] Failed to cleanup temp file: {e}")
+
+
 if __name__ == "__main__":
     logger.info("Starting CAD Service on port 7001...")
     uvicorn.run(app, host="0.0.0.0", port=7001)

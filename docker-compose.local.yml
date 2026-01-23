@@ -75,6 +75,7 @@ services:
       - ${CAD_PORT:-7001}:7001
     environment:
       PYTHONUNBUFFERED: 1
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     networks:
       - civilconstruction-network
     healthcheck:
