@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -52,7 +52,6 @@ export default function CADViewerPage() {
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     // Check if admin is logged in
@@ -118,9 +117,11 @@ export default function CADViewerPage() {
       const data = processData.data || processData;
       
       if (data.polygons && data.polygons.length > 0) {
-        setPolygons(data.polygons);
+        // Process polygons - generate SVG paths and detect holes
+        const processedPolygons = processPolygonsWithHoles(data.polygons);
+        setPolygons(processedPolygons);
         setBounds(data.bounds || null);
-        console.log('Loaded polygons:', data.polygons.length);
+        console.log('Loaded polygons:', processedPolygons.length);
       } else if (processData.success === false) {
         setDxfError(processData.message || 'Failed to process DXF file');
       } else {
@@ -134,6 +135,85 @@ export default function CADViewerPage() {
     }
   };
 
+  // Process polygons to generate SVG paths and detect holes
+  const processPolygonsWithHoles = (rawPolygons: any[]): PolygonData[] => {
+    // 1. Pre-calculate bboxes
+    let processed = rawPolygons.map((p: any) => {
+      const xs = p.points.map((pt: number[]) => pt[0]);
+      const ys = p.points.map((pt: number[]) => pt[1]);
+      return {
+        ...p,
+        bbox: {
+          min_x: Math.min(...xs),
+          max_x: Math.max(...xs),
+          min_y: Math.min(...ys),
+          max_y: Math.max(...ys),
+        },
+      };
+    });
+
+    // 2. Sort by area descending (parent candidates first)
+    processed.sort((a: any, b: any) => b.area_raw - a.area_raw);
+
+    // Helper: Check if point is inside poly (Ray Casting)
+    const isPointInPoly = (pt: number[], polyPts: number[][]) => {
+      const x = pt[0], y = pt[1];
+      let inside = false;
+      for (let i = 0, j = polyPts.length - 1; i < polyPts.length; j = i++) {
+        const xi = polyPts[i][0], yi = polyPts[i][1];
+        const xj = polyPts[j][0], yj = polyPts[j][1];
+        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    };
+
+    // 3. Robust hole detection
+    const finalPolys = processed.map((outer: any, i: number) => {
+      const holePaths: string[] = [];
+
+      // Check against smaller polygons
+      for (let j = i + 1; j < processed.length; j++) {
+        const inner = processed[j];
+
+        // CHECK 1: Strict bbox containment
+        if (
+          inner.bbox.min_x < outer.bbox.min_x ||
+          inner.bbox.max_x > outer.bbox.max_x ||
+          inner.bbox.min_y < outer.bbox.min_y ||
+          inner.bbox.max_y > outer.bbox.max_y
+        ) {
+          continue;
+        }
+
+        // CHECK 2: Geometric containment
+        if (isPointInPoly(inner.points[0], outer.points)) {
+          const midIdx = Math.floor(inner.points.length / 2);
+          if (isPointInPoly(inner.points[midIdx], outer.points)) {
+            const pts = inner.points;
+            const d = `M ${pts[0][0]} ${pts[0][1]} ` +
+              pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + 'Z';
+            holePaths.push(d);
+          }
+        }
+      }
+
+      // Construct main path
+      const pts = outer.points;
+      let pathString = `M ${pts[0][0]} ${pts[0][1]} ` +
+        pts.slice(1).map((p: any) => `L ${p[0]} ${p[1]} `).join('') + 'Z';
+
+      // Append holes
+      if (holePaths.length > 0) {
+        pathString += ' ' + holePaths.join(' ');
+      }
+
+      return { ...outer, path: pathString };
+    });
+
+    return finalPolys;
+  };
+
   // Zoom wheel handler
   useEffect(() => {
     const svgEl = svgRef.current;
@@ -141,15 +221,19 @@ export default function CADViewerPage() {
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      setZoom(prevZoom => Math.max(0.1, Math.min(200, prevZoom * delta)));
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? 0.85 : 1.15;
+      setZoom(prevZoom => {
+        const newZoom = prevZoom * delta;
+        return Math.max(0.1, Math.min(50, newZoom));
+      });
     };
 
     svgEl.addEventListener('wheel', onWheel, { passive: false });
     return () => {
       svgEl.removeEventListener('wheel', onWheel);
     };
-  }, []);
+  }, [polygons.length]);
 
   const viewBox = useMemo(() => {
     if (!bounds) return "0 0 100 100";
@@ -160,33 +244,41 @@ export default function CADViewerPage() {
     return `${centerX - width / 2 + panOffset.x} ${centerY - height / 2 + panOffset.y} ${width} ${height}`;
   }, [bounds, zoom, panOffset]);
 
-  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+  // Use refs for pan state to avoid re-renders during panning
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const isPanningRef = useRef(false);
+  const lastPanOffset = useRef({ x: 0, y: 0 });
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    // Allow pan with middle mouse, left mouse + shift, or just left mouse drag
+    if (e.button === 1 || e.button === 0) {
+      isPanningRef.current = true;
       setIsPanning(true);
-      setPanStart({ x: e.clientX, y: e.clientY });
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+      lastPanOffset.current = { ...panOffset };
       e.preventDefault();
     }
-  };
+  }, [panOffset]);
 
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (isPanning && svgRef.current && bounds) {
-      const dx = e.clientX - panStart.x;
-      const dy = e.clientY - panStart.y;
-      const rect = svgRef.current.getBoundingClientRect();
-      const scaleX = (bounds.max_x - bounds.min_x) / (rect.width * zoom);
-      const scaleY = (bounds.max_y - bounds.min_y) / (rect.height * zoom);
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isPanningRef.current || !svgRef.current || !bounds) return;
+    
+    const dx = e.clientX - panStartRef.current.x;
+    const dy = e.clientY - panStartRef.current.y;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = (bounds.max_x - bounds.min_x) / (rect.width * zoom);
+    const scaleY = (bounds.max_y - bounds.min_y) / (rect.height * zoom);
 
-      setPanOffset((prev) => ({
-        x: prev.x - dx * scaleX,
-        y: prev.y + dy * scaleY,
-      }));
-      setPanStart({ x: e.clientX, y: e.clientY });
-    }
-  };
+    setPanOffset({
+      x: lastPanOffset.current.x - dx * scaleX,
+      y: lastPanOffset.current.y + dy * scaleY,
+    });
+  }, [bounds, zoom]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
+    isPanningRef.current = false;
     setIsPanning(false);
-  };
+  }, []);
 
   const resetView = () => {
     setZoom(1);
@@ -270,7 +362,7 @@ export default function CADViewerPage() {
             <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-600 rounded-lg p-3 shadow-lg text-xs text-slate-300">
               <div className="text-[11px] space-y-1">
                 <div className="flex items-center gap-2"><span className="w-4 text-center">🖱️</span> Scroll to Zoom</div>
-                <div className="flex items-center gap-2"><span className="w-4 text-center">✋</span> Shift+Drag to Pan</div>
+                <div className="flex items-center gap-2"><span className="w-4 text-center">✋</span> Drag to Pan</div>
               </div>
             </div>
             <button
@@ -308,14 +400,15 @@ export default function CADViewerPage() {
                 style={{
                   transform: 'scaleY(-1)',
                   transformOrigin: 'center',
-                  cursor: isPanning ? 'grabbing' : 'default',
+                  cursor: isPanning ? 'grabbing' : 'grab',
+                  willChange: 'transform',
                 }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
               >
-                <g>
+                <g style={{ willChange: 'transform' }}>
                   {polygons.map((poly) => (
                     <path
                       key={poly.id}
@@ -326,7 +419,6 @@ export default function CADViewerPage() {
                       strokeWidth="1"
                       vectorEffect="non-scaling-stroke"
                       opacity={0.6}
-                      className="hover:opacity-100 transition-colors duration-200"
                     />
                   ))}
                 </g>
