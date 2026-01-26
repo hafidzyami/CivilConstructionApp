@@ -338,17 +338,17 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
     // Buildings are NOT pre-labeled - they appear as default unclassified features
     // until the user manually labels them
 
-    if (geometryType === 'LineString' || geometryType === 'MultiLineString') {
+   if (geometryType === 'LineString' || geometryType === 'MultiLineString') {
       return {
-        color: '#DC2626',
+        color: '#64748B',
         weight: 3,
         opacity: 1,
       };
     }
 
     return {
-      color: '#DC2626',
-      fillColor: '#FCA5A5',
+      color: '#64748B',
+      fillColor: '#CBD5E1',
       fillOpacity: 0.7,
       weight: 2,
       opacity: 1,
