@@ -97,6 +97,183 @@ class ChatbotService {
   }
 
   /**
+   * Process query with additional compliance result context
+   * Used for follow-up questions about compliance results
+   */
+  async processQueryWithContext(
+    query: string,
+    sessionId: string = 'default',
+    complianceContext: string
+  ): Promise<ChatResponse> {
+    try {
+      // Store user message
+      this.addMessage(sessionId, 'user', query);
+
+      // Generate response with compliance context
+      const response = await this.generateResponseWithComplianceContext(
+        query,
+        sessionId,
+        complianceContext
+      );
+
+      // Store assistant message
+      this.addMessage(sessionId, 'assistant', response.message);
+
+      return response;
+    } catch (error) {
+      console.error('Error processing query with context:', error);
+      return {
+        message:
+          'I apologize, but I encountered an error. Could you please rephrase your question?',
+        suggestedQuestions: this.getComplianceSuggestions(),
+      };
+    }
+  }
+
+  /**
+   * Generate response with compliance result context
+   */
+  private async generateResponseWithComplianceContext(
+    query: string,
+    sessionId: string,
+    complianceContext: string
+  ): Promise<ChatResponse> {
+    if (!this.model) {
+      return {
+        message:
+          'I can help you understand your compliance result. Please ask me specific questions about the checks, regulations, or recommendations.',
+        suggestedQuestions: this.getComplianceSuggestions(),
+      };
+    }
+
+    try {
+      // Get conversation history
+      const history = this.getHistory(sessionId).slice(-6);
+      const conversationContext = history
+        .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+        .join('\n');
+
+      // Also retrieve relevant regulations from knowledge base
+      const searchContext = await this.retrieveContext(query, sessionId);
+
+      // Build additional regulation context
+      let regulationContext = '';
+      if (searchContext.hasResults) {
+        regulationContext = `\nADDITIONAL RELEVANT REGULATIONS:\n${searchContext.articles
+          .slice(0, 5)
+          .map((a) => `- ${a.regulation}: ${a.text?.slice(0, 300)}`)
+          .join('\n')}`;
+      }
+
+      const prompt = `You are a Building Regulations Compliance Expert. You are helping a user understand their compliance check result.
+
+${complianceContext}
+${regulationContext}
+
+${conversationContext ? `CONVERSATION HISTORY:\n${conversationContext}\n\n` : ''}
+
+USER QUESTION: "${query}"
+
+INSTRUCTIONS:
+1. Answer the user's question based on their compliance result and the regulations
+2. Be specific and reference the relevant checks, regulations, or recommendations
+3. If they ask about a failed check, explain what they need to do to pass
+4. If they ask about regulations, reference the applicable articles
+5. Be professional, clear, and helpful
+6. If you don't have enough information to answer, acknowledge that and suggest what they might need
+
+STRICTLY AVOID:
+- Filler phrases like "Does that make sense?", "Feel free to ask!"
+- Making up regulations or requirements not in the context
+- Being overly verbose - keep answers focused and actionable
+
+YOUR RESPONSE:`;
+
+      const result = await this.model.generateContent(prompt);
+      const responseText = result.response.text();
+
+      // Generate follow-up questions
+      const suggestedQuestions = await this.generateComplianceFollowUps(
+        query,
+        responseText,
+        complianceContext
+      );
+
+      return {
+        message: responseText,
+        suggestedQuestions,
+        sources: searchContext.articles.slice(0, 3).map((a) => ({
+          regulation: a.regulation,
+          articleId: a.articleId,
+          text: a.text?.slice(0, 300) || '',
+          relevance: 'Related regulation',
+        })),
+      };
+    } catch (error) {
+      console.error('Error generating compliance response:', error);
+      return {
+        message:
+          'I can help you understand your compliance result. What specific aspect would you like me to explain?',
+        suggestedQuestions: this.getComplianceSuggestions(),
+      };
+    }
+  }
+
+  /**
+   * Generate follow-up questions for compliance context
+   */
+  private async generateComplianceFollowUps(
+    query: string,
+    response: string,
+    complianceContext: string
+  ): Promise<string[]> {
+    if (!this.model) {
+      return this.getComplianceSuggestions();
+    }
+
+    try {
+      const prompt = `Based on this compliance discussion:
+
+User asked: "${query}"
+Response given: "${response.slice(0, 400)}..."
+
+Context: ${complianceContext.slice(0, 500)}
+
+Generate 3 natural follow-up questions the user might want to ask. Focus on:
+- Understanding failed checks
+- How to fix compliance issues
+- Understanding specific regulations
+- Next steps for the application
+
+Return only the questions, one per line.`;
+
+      const result = await this.model.generateContent(prompt);
+      const questions = result.response
+        .text()
+        .split('\n')
+        .filter((q: string) => q.trim().length > 0)
+        .map((q: string) => q.replace(/^[\d\-\.\)\*]\s*/, '').trim())
+        .slice(0, 3);
+
+      return questions.length > 0 ? questions : this.getComplianceSuggestions();
+    } catch {
+      return this.getComplianceSuggestions();
+    }
+  }
+
+  /**
+   * Get default compliance-related suggestions
+   */
+  private getComplianceSuggestions(): string[] {
+    return [
+      'Why did my BCR check fail?',
+      'What regulations apply to my building?',
+      'How can I fix the compliance issues?',
+      'What are the next steps for approval?',
+    ];
+  }
+
+  /**
    * Generate natural, conversational response using LLM + Knowledge Base
    */
   private async generateNaturalResponse(

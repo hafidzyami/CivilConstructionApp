@@ -252,4 +252,72 @@ router.get('/sessions/:id', demoController.getSessionById);
  */
 router.delete('/sessions/:id', demoController.deleteSession);
 
+/**
+ * @swagger
+ * /api/demo/check-compliance:
+ *   post:
+ *     summary: Check compliance against regulations
+ *     tags: [Demo]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sessionId
+ *             properties:
+ *               sessionId:
+ *                 type: integer
+ *                 description: Demo session ID to check compliance for
+ *     responses:
+ *       200:
+ *         description: Compliance check completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                       enum: [accepted, rejected, review_required]
+ *                     overallScore:
+ *                       type: integer
+ *                     summary:
+ *                       type: string
+ *                     checks:
+ *                       type: array
+ *                     applicableRegulations:
+ *                       type: array
+ *                     recommendations:
+ *                       type: array
+ */
+router.post('/check-compliance', demoController.checkCompliance);
+
+/**
+ * @swagger
+ * /api/demo/compliance-result/{sessionId}:
+ *   get:
+ *     summary: Get compliance result for a session
+ *     tags: [Demo]
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Demo session ID
+ *     responses:
+ *       200:
+ *         description: Compliance result retrieved successfully
+ *       404:
+ *         description: Compliance result not found
+ */
+router.get('/compliance-result/:sessionId', demoController.getComplianceResult);
+
 export default router;

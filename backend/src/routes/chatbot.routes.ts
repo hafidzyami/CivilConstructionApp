@@ -177,4 +177,62 @@ router.post('/admin/reingest', chatbotController.reingestKnowledgeBase);
  */
 router.get('/admin/stats', chatbotController.getKnowledgeBaseStats);
 
+/**
+ * @swagger
+ * /api/chatbot/result-query:
+ *   post:
+ *     summary: Process a chatbot query with compliance result context
+ *     description: Allows users to ask follow-up questions about their compliance check result
+ *     tags: [Chatbot]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - query
+ *               - sessionId
+ *               - demoSessionId
+ *             properties:
+ *               query:
+ *                 type: string
+ *                 description: User's question about the compliance result
+ *               sessionId:
+ *                 type: string
+ *                 description: Chatbot session ID for conversation tracking
+ *               demoSessionId:
+ *                 type: integer
+ *                 description: Demo session ID to retrieve compliance result from
+ *     responses:
+ *       200:
+ *         description: Query processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 response:
+ *                   type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                     suggestedQuestions:
+ *                       type: array
+ *                     sources:
+ *                       type: array
+ *                 complianceStatus:
+ *                   type: string
+ *                   enum: [accepted, rejected, review_required]
+ *       400:
+ *         description: Invalid request
+ *       404:
+ *         description: Compliance result not found
+ *       500:
+ *         description: Server error
+ */
+router.post('/result-query', chatbotController.processResultChatQuery);
+
 export default router;

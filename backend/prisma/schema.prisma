@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,71 +7,86 @@ datasource db {
 }
 
 model DemoSession {
-  id                    Int                    @id @default(autoincrement())
-  userId                Int
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  documents             DemoDocument[]
-  cadData               DemoCadData?
-  infrastructureData    DemoInfrastructure?
-  ocrData               DemoOcr[]
+  id                 Int                   @id @default(autoincrement())
+  userId             Int
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  cadData            DemoCadData?
+  complianceResult   DemoComplianceResult?
+  documents          DemoDocument[]
+  infrastructureData DemoInfrastructure?
+  ocrData            DemoOcr[]
+}
+
+model DemoComplianceResult {
+  id                    Int         @id @default(autoincrement())
+  sessionId             Int         @unique
+  status                String
+  overallScore          Int
+  summary               String
+  checks                Json
+  applicableRegulations Json
+  recommendations       String[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  session               DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model DemoDocument {
-  id            Int          @id @default(autoincrement())
-  sessionId     Int
-  fileName      String
-  fileUrl       String
-  mimeType      String
-  fileSize      Int
-  uploadedAt    DateTime     @default(now())
-  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id         Int         @id @default(autoincrement())
+  sessionId  Int
+  fileName   String
+  fileUrl    String
+  mimeType   String
+  fileSize   Int
+  uploadedAt DateTime    @default(now())
+  session    DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
 }
 
 model DemoCadData {
-  id            Int          @id @default(autoincrement())
-  sessionId     Int          @unique
-  dxfFileUrl    String?
-  siteArea      Float?
-  buildingArea  Float?
-  floorArea     Float?
-  bcr           Float?
-  far           Float?
-  rawData       Json?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id           Int         @id @default(autoincrement())
+  sessionId    Int         @unique
+  siteArea     Float?
+  buildingArea Float?
+  floorArea    Float?
+  bcr          Float?
+  far          Float?
+  rawData      Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  dxfFileUrl   String?
+  session      DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model DemoInfrastructure {
-  id            Int          @id @default(autoincrement())
-  sessionId     Int          @unique
-  latitude      Float?
-  longitude     Float?
-  radius        Float?
-  buildings     Json?
-  roads         Json?
-  railways      Json?
-  waterways     Json?
+  id              Int         @id @default(autoincrement())
+  sessionId       Int         @unique
+  latitude        Float?
+  longitude       Float?
+  radius          Float?
+  buildings       Json?
+  roads           Json?
+  railways        Json?
+  waterways       Json?
+  rawData         Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
   labeledFeatures Json?
-  rawData       Json?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session         DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model DemoOcr {
-  id            Int          @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   sessionId     Int
   fileName      String
   fileUrl       String
   extractedText String?
   engine        String?
   rawData       Json?
-  createdAt     DateTime     @default(now())
-  session       DemoSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  session       DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
 }

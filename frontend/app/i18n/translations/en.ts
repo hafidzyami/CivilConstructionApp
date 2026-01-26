@@ -33,6 +33,8 @@ export const en = {
     osmPowered: 'OpenStreetMap Powered',
     professionalTools: 'Professional Tools',
     copyright: '© 2025 Civil Construction Platform. Built with Next.js',
+    retry: 'Try Again',
+    thinking: 'Thinking...',
   },
 
   // Home Page
@@ -319,6 +321,47 @@ export const en = {
     },
   },
 
+  // Result Section
+  result: {
+    loading: 'Checking compliance...',
+    loadingDesc: 'Analyzing your data against building regulations',
+    error: 'Error',
+    complianceScore: 'Compliance Score',
+    actual: 'Actual',
+    required: 'Required',
+    askMoreDetails: 'Ask for More Details',
+    startNew: 'Start New Analysis',
+    
+    status: {
+      accepted: 'Accepted',
+      rejected: 'Rejected',
+      reviewRequired: 'Review Required',
+    },
+    
+    tabs: {
+      checks: 'Compliance Checks',
+      regulations: 'Applicable Regulations',
+      recommendations: 'Recommendations',
+    },
+  },
+
+  // Result Chatbot
+  resultChatbot: {
+    title: 'Compliance Assistant',
+    subtitle: 'Ask questions about your compliance result',
+    pageTitle: 'Ask About Your Result',
+    pageSubtitle: 'Get detailed explanations about your compliance result',
+    
+    greetingAccepted: 'Congratulations! Your building project has been approved. I can help you understand the compliance details or answer any questions about the regulations that apply to your project.',
+    greetingRejected: 'Your building project needs some modifications to meet the regulations. I can help you understand which requirements were not met and how to address them.',
+    greetingReview: 'Your building project requires additional review. I can help explain which areas need attention and what steps you can take next.',
+    
+    placeholder: 'Ask about your compliance result...',
+    sources: 'Referenced Regulations:',
+    suggestedQuestions: 'Suggested questions:',
+    error: 'Sorry, I encountered an error. Please try again.',
+  },
+
   // Demo Page
   demo: {
     title: 'Complete Demo Workflow',
@@ -328,6 +371,7 @@ export const en = {
       ocr: 'OCR',
       cad: 'CAD',
       infrastructure: 'Infrastructure',
+      result: 'Result',
       complete: 'Complete',
     },
     

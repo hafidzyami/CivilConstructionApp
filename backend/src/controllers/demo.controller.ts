@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { uploadFile } from '../lib/minio';
 import multer from 'multer';
 import prisma from '../lib/prisma';
+import complianceService from '../services/compliance.service';
 
 // Configure multer for memory storage
 const upload = multer({
@@ -451,6 +452,72 @@ export const uploadDxf = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error uploading DXF file:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Check compliance against regulations
+export const checkCompliance = async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID is required',
+      });
+    }
+
+    // Perform compliance check
+    const result = await complianceService.checkCompliance(parseInt(sessionId));
+
+    // Save result to database
+    await complianceService.saveComplianceResult(parseInt(sessionId), result);
+
+    res.json({
+      success: true,
+      data: result,
+      message: 'Compliance check completed successfully',
+    });
+  } catch (error: any) {
+    console.error('Error checking compliance:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get compliance result
+export const getComplianceResult = async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID is required',
+      });
+    }
+
+    const result = await complianceService.getComplianceResult(parseInt(sessionId));
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Compliance result not found. Please run compliance check first.',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Error getting compliance result:', error);
     res.status(500).json({
       success: false,
       message: error.message,

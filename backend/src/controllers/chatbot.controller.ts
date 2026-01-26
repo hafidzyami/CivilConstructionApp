@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import chatbotService from '../services/chatbot.service';
 import knowledgeBaseService from '../services/knowledge-base.service.v2';
+import complianceService from '../services/compliance.service';
 import neo4jConnection from '../lib/neo4j';
 import { z } from 'zod';
 
@@ -9,6 +10,12 @@ const chatQuerySchema = z.object({
   query: z.string().min(1, 'Query cannot be empty'),
   sessionId: z.string().optional(),
   searchMode: z.enum(['llm-generated', 'similarity', 'auto']).optional(),
+});
+
+const resultChatQuerySchema = z.object({
+  query: z.string().min(1, 'Query cannot be empty'),
+  sessionId: z.string().min(1, 'Session ID is required'),
+  demoSessionId: z.number().int().positive('Demo session ID must be a positive integer'),
 });
 
 const articleIdSchema = z.object({
@@ -279,3 +286,92 @@ export const getKnowledgeBaseStats = async (req: Request, res: Response): Promis
     });
   }
 };
+
+/**
+ * POST /api/chatbot/result-query
+ * Process a chatbot query with compliance result context
+ * This endpoint allows users to ask follow-up questions about their compliance result
+ */
+export const processResultChatQuery = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const validation = resultChatQuerySchema.safeParse(req.body);
+
+    if (!validation.success) {
+      res.status(400).json({
+        error: 'Invalid request',
+        details: validation.error.errors,
+      });
+      return;
+    }
+
+    const { query, sessionId, demoSessionId } = validation.data;
+
+    // Get compliance result for context
+    const complianceResult = await complianceService.getComplianceResult(demoSessionId);
+
+    if (!complianceResult) {
+      res.status(404).json({
+        error: 'Compliance result not found',
+        message: 'Please complete the compliance check first before asking questions about the result.',
+      });
+      return;
+    }
+
+    // Build compliance context for the chatbot
+    const complianceContext = buildComplianceContext(complianceResult);
+
+    // Process query with compliance context
+    const response = await chatbotService.processQueryWithContext(
+      query,
+      sessionId,
+      complianceContext
+    );
+
+    res.status(200).json({
+      success: true,
+      response,
+      complianceStatus: complianceResult.status,
+    });
+  } catch (error: any) {
+    console.error('Error processing result chat query:', error);
+    res.status(500).json({
+      error: 'Failed to process query',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Build compliance context string for chatbot
+ */
+function buildComplianceContext(result: any): string {
+  const checksContext = result.checks
+    .map((check: any) => `- ${check.name}: ${check.status.toUpperCase()} - ${check.message}`)
+    .join('\n');
+
+  const regulationsContext = result.applicableRegulations
+    .slice(0, 5)
+    .map((reg: any) => `- ${reg.articleId}: ${reg.title || 'Untitled'} (${reg.regulation})`)
+    .join('\n');
+
+  const recommendationsContext = result.recommendations
+    .map((rec: string, idx: number) => `${idx + 1}. ${rec}`)
+    .join('\n');
+
+  return `
+COMPLIANCE CHECK RESULT:
+Status: ${result.status.toUpperCase()}
+Overall Score: ${result.overallScore}%
+
+Summary: ${result.summary}
+
+COMPLIANCE CHECKS:
+${checksContext}
+
+APPLICABLE REGULATIONS:
+${regulationsContext}
+
+RECOMMENDATIONS:
+${recommendationsContext}
+`;
+}

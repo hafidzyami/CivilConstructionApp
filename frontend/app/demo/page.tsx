@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import CADSection from './components/CADSection';
+import ResultSection from './components/ResultSection';
+import ResultChatbot from './components/ResultChatbot';
 import { useLanguage } from '../i18n';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -14,7 +16,7 @@ const InfrastructureSection = dynamic(
   { ssr: false }
 );
 
-type Step = 'ocr' | 'cad' | 'infrastructure' | 'complete';
+type Step = 'ocr' | 'cad' | 'infrastructure' | 'result' | 'chatbot' | 'complete';
 
 
 
@@ -45,6 +47,7 @@ export default function DemoPage() {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [complianceStatus, setComplianceStatus] = useState<'accepted' | 'rejected' | 'review_required'>('review_required');
 
   // OCR state
   const [ocrFiles, setOcrFiles] = useState<File[]>([]);
@@ -525,7 +528,30 @@ export default function DemoPage() {
         return <CADSection sessionId={sessionId} onComplete={() => setCurrentStep('infrastructure')} />;
 
       case 'infrastructure':
-        return <InfrastructureSection sessionId={sessionId} onComplete={() => setCurrentStep('complete')} />;
+        return <InfrastructureSection sessionId={sessionId} onComplete={() => setCurrentStep('result')} />;
+
+      case 'result':
+        return (
+          <ResultSection
+            sessionId={sessionId}
+            onAskMoreDetails={(status) => {
+              setComplianceStatus(status);
+              setCurrentStep('chatbot');
+            }}
+            onStartNew={() => {
+              window.location.reload();
+            }}
+          />
+        );
+
+      case 'chatbot':
+        return (
+          <ResultChatbot
+            sessionId={sessionId}
+            complianceStatus={complianceStatus}
+            onBack={() => setCurrentStep('result')}
+          />
+        );
 
       case 'complete':
         return (
@@ -600,9 +626,11 @@ export default function DemoPage() {
     { id: 'ocr', label: t.demo.steps.ocr, icon: '🔍' },
     { id: 'cad', label: t.demo.steps.cad, icon: '📐' },
     { id: 'infrastructure', label: t.demo.steps.infrastructure, icon: '🗺️' },
+    { id: 'result', label: t.demo?.steps?.result || 'Result', icon: '📋' },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
+  const showStepper = !['chatbot', 'complete'].includes(currentStep);
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
@@ -630,10 +658,10 @@ export default function DemoPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 mb-4">
-              {t.demo.title}
+              {currentStep === 'chatbot' ? (t.resultChatbot?.pageTitle || 'Ask About Your Result') : t.demo.title}
             </h1>
             <p className="text-slate-600 text-lg">
-              {t.demo.subtitle}
+              {currentStep === 'chatbot' ? (t.resultChatbot?.pageSubtitle || 'Get detailed explanations about your compliance result') : t.demo.subtitle}
             </p>
             {userId && (
               <p className="text-sm text-slate-500 mt-2">
@@ -642,7 +670,7 @@ export default function DemoPage() {
             )}
           </div>
 
-          {currentStep !== 'complete' && (
+          {showStepper && (
             <div className="mb-12">
               <div className="flex items-center justify-between">
                 {steps.map((step, idx) => (

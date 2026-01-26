@@ -35,6 +35,8 @@ export const ko: TranslationKeys = {
     osmPowered: 'OpenStreetMap 기반',
     professionalTools: '전문 도구',
     copyright: '© 2025 토목 건설 플랫폼. Next.js로 제작',
+    retry: '다시 시도',
+    thinking: '생각 중...',
   },
 
   // Home Page
@@ -321,6 +323,47 @@ export const ko: TranslationKeys = {
     },
   },
 
+  // Result Section
+  result: {
+    loading: '규정 준수 확인 중...',
+    loadingDesc: '건축 규정에 대해 데이터를 분석 중입니다',
+    error: '오류',
+    complianceScore: '규정 준수 점수',
+    actual: '실제값',
+    required: '필요값',
+    askMoreDetails: '자세히 알아보기',
+    startNew: '새 분석 시작',
+    
+    status: {
+      accepted: '승인됨',
+      rejected: '거부됨',
+      reviewRequired: '검토 필요',
+    },
+    
+    tabs: {
+      checks: '규정 준수 검사',
+      regulations: '적용 규정',
+      recommendations: '권고사항',
+    },
+  },
+
+  // Result Chatbot
+  resultChatbot: {
+    title: '규정 준수 도우미',
+    subtitle: '규정 준수 결과에 대해 질문하세요',
+    pageTitle: '결과에 대해 질문하기',
+    pageSubtitle: '규정 준수 결과에 대한 자세한 설명을 받으세요',
+    
+    greetingAccepted: '축하합니다! 귀하의 건축 프로젝트가 승인되었습니다. 규정 준수 세부 사항을 이해하거나 프로젝트에 적용되는 규정에 대해 질문하실 수 있습니다.',
+    greetingRejected: '귀하의 건축 프로젝트는 규정을 충족하기 위해 일부 수정이 필요합니다. 어떤 요구 사항이 충족되지 않았는지, 어떻게 해결할 수 있는지 도와드리겠습니다.',
+    greetingReview: '귀하의 건축 프로젝트는 추가 검토가 필요합니다. 어떤 부분에 주의가 필요한지, 다음 단계에서 무엇을 할 수 있는지 설명해 드리겠습니다.',
+    
+    placeholder: '규정 준수 결과에 대해 질문하세요...',
+    sources: '참조 규정:',
+    suggestedQuestions: '추천 질문:',
+    error: '죄송합니다. 오류가 발생했습니다. 다시 시도해 주세요.',
+  },
+
   // Demo Page
   demo: {
     title: '완전한 데모 워크플로우',
@@ -330,6 +373,7 @@ export const ko: TranslationKeys = {
       ocr: 'OCR',
       cad: 'CAD',
       infrastructure: '인프라',
+      result: '결과',
       complete: '완료',
     },
     
