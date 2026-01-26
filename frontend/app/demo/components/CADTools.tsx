@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLanguage } from '../../i18n';
 
 type ActiveMode = 'site' | 'building';
 
@@ -29,6 +30,7 @@ export default function CADTools({
   onUpdateGeometry,
   loading
 }: CADToolsProps) {
+  const { t } = useLanguage();
   const [showLayerPanel, setShowLayerPanel] = useState(false);
 
   return (
@@ -42,8 +44,8 @@ export default function CADTools({
               : 'border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <div className={`text-xs font-bold uppercase mb-0.5 ${activeMode === 'site' ? 'text-cyan-700' : 'text-slate-500'}`}>Mode</div>
-          <div className={`font-bold ${activeMode === 'site' ? 'text-cyan-900' : 'text-slate-700'}`}>Site Area</div>
+          <div className={`text-xs font-bold uppercase mb-0.5 ${activeMode === 'site' ? 'text-cyan-700' : 'text-slate-500'}`}>{t.demo.cad.tools.mode}</div>
+          <div className={`font-bold ${activeMode === 'site' ? 'text-cyan-900' : 'text-slate-700'}`}>{t.demo.cad.tools.siteArea}</div>
         </button>
 
         <button
@@ -54,15 +56,15 @@ export default function CADTools({
               : 'border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <div className={`text-xs font-bold uppercase mb-0.5 ${activeMode === 'building' ? 'text-orange-700' : 'text-slate-500'}`}>Mode</div>
-          <div className={`font-bold ${activeMode === 'building' ? 'text-orange-900' : 'text-slate-700'}`}>Building</div>
+          <div className={`text-xs font-bold uppercase mb-0.5 ${activeMode === 'building' ? 'text-orange-700' : 'text-slate-500'}`}>{t.demo.cad.tools.mode}</div>
+          <div className={`font-bold ${activeMode === 'building' ? 'text-orange-900' : 'text-slate-700'}`}>{t.demo.cad.tools.building}</div>
         </button>
       </div>
 
       {activeMode === 'building' && (
         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 flex items-center justify-between animate-in fade-in slide-in-from-top-1">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-500 uppercase">Floors:</span>
+            <span className="text-xs font-bold text-slate-500 uppercase">{t.demo.cad.tools.floors}:</span>
             <div className="flex items-center bg-white rounded border border-slate-300">
               <button onClick={() => setFloorCount(Math.max(1, floorCount - 1))} className="px-2 py-1 hover:bg-slate-100 text-slate-600 font-bold">-</button>
               <span className="w-8 text-center text-sm font-bold border-x border-slate-300">{floorCount}</span>
@@ -70,12 +72,12 @@ export default function CADTools({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-500 uppercase">Type:</span>
+            <span className="text-xs font-bold text-slate-500 uppercase">{t.demo.cad.tools.type}:</span>
             <button
               onClick={() => setIsFootprint(!isFootprint)}
               className={`px-3 py-1 rounded text-xs font-bold border transition-colors ${isFootprint ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-white text-slate-600 border-slate-300'}`}
             >
-              {isFootprint ? 'Footprint' : 'Upper Floor'}
+              {isFootprint ? t.demo.cad.tools.footprint : t.demo.cad.tools.upperFloor}
             </button>
           </div>
         </div>
@@ -86,7 +88,7 @@ export default function CADTools({
           onClick={() => setShowLayerPanel(!showLayerPanel)}
           className="flex w-full items-center justify-between text-left group"
         >
-          <span className="font-bold text-sm text-slate-700 group-hover:text-slate-900">Active Layers ({selectedLayers.length})</span>
+          <span className="font-bold text-sm text-slate-700 group-hover:text-slate-900">{t.demo.cad.layers.activeLayers} ({selectedLayers.length})</span>
           <svg className={`h-4 w-4 text-slate-500 transition-transform ${showLayerPanel ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -110,7 +112,7 @@ export default function CADTools({
               ))}
             </div>
             <button onClick={onUpdateGeometry} disabled={loading} className="w-full bg-slate-900 text-white font-bold py-2 rounded-lg hover:bg-slate-800">
-              {loading ? 'Processing...' : 'Update Geometry'}
+              {loading ? t.common.processing : t.demo.cad.layers.updateGeometry}
             </button>
           </div>
         )}

@@ -516,6 +516,7 @@ export const en = {
         savedSuccess: 'Infrastructure data saved successfully!',
         saveWarning: 'Warning: Infrastructure data may not have been saved properly',
         saveFailed: 'Failed to submit infrastructure data',
+        unlabeled: 'Unlabeled',
       },
     },
     

@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, GeoJSON, Rectangle, useMap } from 'rea
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import type { Feature, FeatureCollection } from 'geojson';
+import { useLanguage } from '../../i18n';
 
 // Fix Leaflet icon issues
 let redIcon: L.Icon | undefined;
@@ -78,6 +79,7 @@ interface InfrastructureSectionProps {
 }
 
 export default function InfrastructureSection({ sessionId, onComplete }: InfrastructureSectionProps) {
+  const { t } = useLanguage();
   const [location, setLocation] = useState<{ lat: number; lon: number; zoom: number }>({
     lat: -6.358137,
     lon: 106.835432,
@@ -333,15 +335,8 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
       };
     }
 
-    if (props.building) {
-      return {
-        color: '#374151',
-        fillColor: '#9CA3AF',
-        fillOpacity: 0.8,
-        weight: 2,
-        opacity: 1,
-      };
-    }
+    // Buildings are NOT pre-labeled - they appear as default unclassified features
+    // until the user manually labels them
 
     if (geometryType === 'LineString' || geometryType === 'MultiLineString') {
       return {
@@ -364,12 +359,12 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
     <div className="space-y-6">
       {/* Search Controls */}
       <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold text-slate-900 mb-4">Infrastructure Mapping</h3>
+        <h3 className="text-xl font-bold text-slate-900 mb-4">{t.demo.infrastructure.title}</h3>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-7">
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Search Location
+              {t.demo.infrastructure.searchLocation}
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -378,7 +373,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="Jakarta, Indonesia or -6.358, 106.835"
+                  placeholder={t.demo.infrastructure.searchPlaceholder}
                   className="w-full pl-11 pr-4 py-3 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-400"
                 />
                 <svg
@@ -400,14 +395,14 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                 disabled={loading}
                 className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed cursor-pointer transition-all shadow-md hover:shadow-lg"
               >
-                Search
+                {t.common.search}
               </button>
             </div>
           </div>
 
           <div className="lg:col-span-3">
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Search Radius
+              {t.demo.infrastructure.searchRadius}
             </label>
             <div className="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3 shadow-sm">
               <input
@@ -452,7 +447,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  <span>Loading</span>
+                  <span>{t.demo.infrastructure.loading}</span>
                 </>
               ) : (
                 <>
@@ -464,7 +459,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3 3m0 0l-3-3m3 3V8"
                     />
                   </svg>
-                  <span>Fetch Data</span>
+                  <span>{t.demo.infrastructure.fetchData}</span>
                 </>
               )}
             </button>
@@ -494,7 +489,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
               />
             </svg>
             <div>
-              <div className="font-semibold">Error</div>
+              <div className="font-semibold">{t.common.error}</div>
               <div>{error}</div>
             </div>
           </div>
@@ -516,27 +511,26 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded" style={{ backgroundColor: '#3B82F6' }}></div>
-              <span>Water</span>
+              <span>{t.demo.infrastructure.legend.water}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded" style={{ backgroundColor: '#EA580C' }}></div>
-              <span>Roads</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#9CA3AF' }}></div>
-              <span>Buildings</span>
+              <span>{t.demo.infrastructure.legend.roads}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded" style={{ backgroundColor: '#1F2937' }}></div>
-              <span>Railways</span>
+              <span>{t.demo.infrastructure.legend.railways}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#FCA5A5' }}></div>
+              <span>{t.demo.infrastructure.submission.unlabeled}</span>
             </div>
           </div>
         </div>
 
         {osmData?.features && osmData.features.length === 0 && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-xl text-sm">
-            No infrastructure features found in this area. Try increasing the search radius or
-            searching a different location.
+            {t.demo.infrastructure.noFeaturesFound}
           </div>
         )}
       </div>
@@ -652,7 +646,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
           {/* Legend */}
           {osmData && (
             <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md shadow-lg rounded-xl p-4 z-[999] max-w-xs">
-              <h4 className="font-bold text-slate-900 mb-3 text-sm">Building Types</h4>
+              <h4 className="font-bold text-slate-900 mb-3 text-sm">{t.demo.infrastructure.buildingTypes.title}</h4>
               <div className="space-y-2">
                 {BUILDING_TYPES.map((type) => (
                   <div key={type} className="flex items-center gap-2">
@@ -669,7 +663,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
               </div>
               {selectedFeatures.size > 0 && (
                 <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-600">
-                  {selectedFeatures.size} building{selectedFeatures.size > 1 ? 's' : ''} classified
+                  {t.demo.infrastructure.submission.classified.replace('{count}', selectedFeatures.size.toString())}
                 </div>
               )}
             </div>
@@ -688,17 +682,17 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-bold text-slate-900 mb-1">
-              {selectedFeatures.get(selectedFeatureId) ? 'Change' : 'Assign'} Building Type
+              {selectedFeatures.get(selectedFeatureId) ? t.demo.infrastructure.modal.changeType : t.demo.infrastructure.modal.assignType}
             </h3>
             <p className="text-sm text-slate-600 mb-4">
               {selectedFeatures.get(selectedFeatureId) 
-                ? 'Click a different type to change the classification' 
-                : 'Select a type to classify this feature'}
+                ? t.demo.infrastructure.modal.changeTypePrompt
+                : t.demo.infrastructure.modal.selectTypePrompt}
             </p>
             
             <div className="mb-4">
               <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Select Type
+                {t.demo.infrastructure.modal.selectType}
               </label>
               <select
                 value={tempBuildingType}
@@ -716,13 +710,13 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
             {tempBuildingType === 'Others' && (
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Custom Type Name
+                  {t.demo.infrastructure.modal.customTypeName}
                 </label>
                 <input
                   type="text"
                   value={tempCustomType}
                   onChange={(e) => setTempCustomType(e.target.value)}
-                  placeholder="Enter custom type name..."
+                  placeholder={t.demo.infrastructure.modal.customTypePlaceholder}
                   className="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-slate-900 placeholder:text-slate-400"
                 />
               </div>
@@ -738,7 +732,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                 style={{ backgroundColor: TYPE_COLORS[tempBuildingType].color }}
               />
               <span className="font-medium text-slate-900">
-                Preview: {tempBuildingType === 'Others' && tempCustomType ? tempCustomType : tempBuildingType}
+                {t.demo.infrastructure.modal.preview}: {tempBuildingType === 'Others' && tempCustomType ? tempCustomType : tempBuildingType}
               </span>
             </div>
 
@@ -747,14 +741,14 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                 onClick={() => setSelectedFeatureId(null)}
                 className="flex-1 px-4 py-3 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300 transition-colors"
               >
-                Cancel
+                {t.common.cancel}
               </button>
               <button
                 onClick={handleAssignType}
                 disabled={tempBuildingType === 'Others' && !tempCustomType.trim()}
                 className="flex-1 px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
               >
-                {selectedFeatures.get(selectedFeatureId) ? 'Update Type' : 'Assign Type'}
+                {selectedFeatures.get(selectedFeatureId) ? t.demo.infrastructure.modal.updateType : t.demo.infrastructure.modal.assignTypeBtn}
               </button>
             </div>
           </div>
@@ -772,13 +766,13 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Confirm Submission</h3>
-                <p className="text-slate-600 text-sm">Are you sure you want to submit {selectedFeatures.size} labeled feature{selectedFeatures.size > 1 ? 's' : ''}?</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">{t.demo.infrastructure.submission.confirmTitle}</h3>
+                <p className="text-slate-600 text-sm">{t.demo.infrastructure.submission.confirmMessage.replace('{count}', selectedFeatures.size.toString())}</p>
               </div>
             </div>
 
             <div className="bg-slate-50 rounded-lg p-4 mb-6 max-h-64 overflow-y-auto">
-              <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Labeled Features:</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-2">{t.demo.infrastructure.submission.labeledFeatures}:</p>
               <ul className="space-y-3">
                 {Array.from(selectedFeatures.values()).map((feature, idx) => (
                   <li key={idx} className="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
@@ -808,7 +802,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                 onClick={() => setShowSubmitConfirm(false)}
                 className="flex-1 px-4 py-3 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
               >
-                Cancel
+                {t.common.cancel}
               </button>
               <button
                 onClick={handleSubmitLabels}
@@ -821,10 +815,10 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Submitting...</span>
+                    <span>{t.demo.infrastructure.submission.submitting}</span>
                   </>
                 ) : (
-                  'Yes, Submit'
+                  t.demo.infrastructure.submission.yesSubmit
                 )}
               </button>
             </div>
@@ -843,7 +837,7 @@ export default function InfrastructureSection({ sessionId, onComplete }: Infrast
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>Submit Labeled Features ({selectedFeatures.size})</span>
+            <span>{t.demo.infrastructure.submission.submitBtn} ({selectedFeatures.size})</span>
           </button>
         </div>
       )}

@@ -518,6 +518,7 @@ export const ko: TranslationKeys = {
         savedSuccess: '인프라 데이터가 성공적으로 저장되었습니다!',
         saveWarning: '경고: 인프라 데이터가 제대로 저장되지 않았을 수 있습니다',
         saveFailed: '인프라 데이터 제출 실패',
+        unlabeled: '미분류',
       },
     },
     

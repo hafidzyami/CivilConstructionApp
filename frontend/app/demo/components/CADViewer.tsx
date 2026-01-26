@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { useLanguage } from '../../i18n';
 
 interface PolygonData {
   id: number;
@@ -43,6 +44,7 @@ export default function CADViewer({
   onTogglePoly, 
   onBoxSelect 
 }: CADViewerProps) {
+  const { t } = useLanguage();
   const svgRef = useRef<SVGSVGElement>(null);
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });

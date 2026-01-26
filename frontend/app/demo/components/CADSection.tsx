@@ -5,6 +5,7 @@ import CADUploader from './CADUploader';
 import CADTools from './CADTools';
 import CADMetrics from './CADMetrics';
 import CADViewer from './CADViewer';
+import { useLanguage } from '../../i18n';
 
 interface PolygonData {
   id: number;
@@ -54,6 +55,7 @@ interface AutoAnalysis {
 }
 
 export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
+  const { t } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [layers, setLayers] = useState<string[]>([]);
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
@@ -388,7 +390,7 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
             }}
             className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
-            Continue to Infrastructure →
+            {t.demo.navigation.continueToInfra}
           </button>
         </>
       )}

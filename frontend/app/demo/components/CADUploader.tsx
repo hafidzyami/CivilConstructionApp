@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLanguage } from '../../i18n';
 
 type AppStep = 'upload' | 'layers' | 'analyze';
 export type ParserMode = 'manual' | 'python' | 'llm';
@@ -21,11 +22,13 @@ interface CADUploaderProps {
 function StandardizationDialog({ 
   isOpen, 
   onAccept, 
-  onCancel 
+  onCancel,
+  t
 }: { 
   isOpen: boolean; 
   onAccept: () => void; 
   onCancel: () => void;
+  t: any;
 }) {
   const [checklist, setChecklist] = useState({
     units: false,
@@ -52,7 +55,7 @@ function StandardizationDialog({
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            CAD Document Standardization Requirements
+            {t.demo.cad.standardization.title}
           </h2>
         </div>
         
@@ -60,36 +63,36 @@ function StandardizationDialog({
         <div className="p-6 overflow-y-auto flex-1 text-sm">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
             <p className="text-amber-800 font-medium">
-              ⚠️ To ensure the Python Parser correctly interprets geometry and units, your DWG/DXF file must follow these standards.
+              ⚠️ {t.demo.cad.standardization.warning}
             </p>
           </div>
 
           {/* Global Settings */}
           <div className="mb-6">
-            <h3 className="font-bold text-slate-900 mb-3 text-base">📐 Global Settings</h3>
+            <h3 className="font-bold text-slate-900 mb-3 text-base">📐 {t.demo.cad.standardization.globalSettings}</h3>
             <div className="bg-slate-50 rounded-lg p-4 space-y-2">
               <div className="flex items-start gap-2">
                 <span className="text-green-600 font-bold">✓</span>
                 <div>
-                  <span className="font-medium">Drawing Units:</span> Millimeters (mm)
+                  <span className="font-medium">{t.demo.cad.standardization.drawingUnits}:</span> {t.demo.cad.standardization.millimeters}
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-green-600 font-bold">✓</span>
                 <div>
-                  <span className="font-medium">System Variable:</span> Set <code className="bg-slate-200 px-1.5 py-0.5 rounded text-xs">INSUNITS</code> to <code className="bg-slate-200 px-1.5 py-0.5 rounded text-xs">4</code> (Millimeters)
+                  <span className="font-medium">{t.demo.cad.standardization.systemVariable}:</span> Set <code className="bg-slate-200 px-1.5 py-0.5 rounded text-xs">INSUNITS</code> to <code className="bg-slate-200 px-1.5 py-0.5 rounded text-xs">4</code> ({t.demo.cad.standardization.millimeters})
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-green-600 font-bold">✓</span>
                 <div>
-                  <span className="font-medium">Geometry Type:</span> All areas must be drawn using <strong>Closed Polylines (LWPOLYLINE)</strong>
+                  <span className="font-medium">{t.demo.cad.standardization.geometryType}:</span> {t.demo.cad.standardization.closedPolylines}
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-red-600 font-bold">✗</span>
                 <div>
-                  <span className="font-medium">Prohibited Layer Names:</span> Do not use single digits (1, 2, 3...8) as layer names
+                  <span className="font-medium">{t.demo.cad.standardization.prohibitedNames}:</span> {t.demo.cad.standardization.prohibitedNamesDesc}
                 </div>
               </div>
             </div>
@@ -97,32 +100,32 @@ function StandardizationDialog({
 
           {/* Layer Naming Convention */}
           <div className="mb-6">
-            <h3 className="font-bold text-slate-900 mb-3 text-base">🏷️ Mandatory Layer Naming Convention</h3>
+            <h3 className="font-bold text-slate-900 mb-3 text-base">🏷️ {t.demo.cad.standardization.layerNaming}</h3>
             
             {/* Site Boundary */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-              <div className="font-medium text-blue-900 mb-1">A. Site Boundary (대지경계)</div>
+              <div className="font-medium text-blue-900 mb-1">A. {t.demo.cad.standardization.siteBoundary} ({t.demo.cad.standardization.siteBoundaryKr})</div>
               <div className="text-blue-800 text-xs space-y-1">
-                <p><strong>Required Keywords:</strong> <code className="bg-blue-100 px-1 rounded">SITE</code>, <code className="bg-blue-100 px-1 rounded">BOUNDARY</code>, <code className="bg-blue-100 px-1 rounded">LND</code>, <code className="bg-blue-100 px-1 rounded">대지</code>, <code className="bg-blue-100 px-1 rounded">지적</code></p>
-                <p><strong>Recommended:</strong> <code className="bg-blue-100 px-1 rounded">A-SITE-BNDY</code></p>
+                <p><strong>{t.demo.cad.standardization.requiredKeywords}:</strong> <code className="bg-blue-100 px-1 rounded">SITE</code>, <code className="bg-blue-100 px-1 rounded">BOUNDARY</code>, <code className="bg-blue-100 px-1 rounded">LND</code>, <code className="bg-blue-100 px-1 rounded">대지</code>, <code className="bg-blue-100 px-1 rounded">지적</code></p>
+                <p><strong>{t.demo.cad.standardization.recommendedLayer}:</strong> <code className="bg-blue-100 px-1 rounded">A-SITE-BNDY</code></p>
               </div>
             </div>
 
             {/* Building Footprint */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-              <div className="font-medium text-green-900 mb-1">B. Building Footprint (건축면적)</div>
+              <div className="font-medium text-green-900 mb-1">B. {t.demo.cad.standardization.buildingFootprint} ({t.demo.cad.standardization.buildingFootprintKr})</div>
               <div className="text-green-800 text-xs space-y-1">
-                <p><strong>Required Keywords:</strong> <code className="bg-green-100 px-1 rounded">FOOTPRINT</code>, <code className="bg-green-100 px-1 rounded">HH</code>, <code className="bg-green-100 px-1 rounded">건축면적</code></p>
-                <p><strong>Recommended:</strong> <code className="bg-green-100 px-1 rounded">A-AREA-FOOTPRINT</code> or <code className="bg-green-100 px-1 rounded">A-HH-FOOTPRINT</code></p>
+                <p><strong>{t.demo.cad.standardization.requiredKeywords}:</strong> <code className="bg-green-100 px-1 rounded">FOOTPRINT</code>, <code className="bg-green-100 px-1 rounded">HH</code>, <code className="bg-green-100 px-1 rounded">건축면적</code></p>
+                <p><strong>{t.demo.cad.standardization.recommendedLayer}:</strong> <code className="bg-green-100 px-1 rounded">A-AREA-FOOTPRINT</code> or <code className="bg-green-100 px-1 rounded">A-HH-FOOTPRINT</code></p>
               </div>
             </div>
 
             {/* Floor Area Layers */}
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
-              <div className="font-medium text-purple-900 mb-1">C. Floor Area Layers (층별면적)</div>
+              <div className="font-medium text-purple-900 mb-1">C. {t.demo.cad.standardization.floorAreaLayers} ({t.demo.cad.standardization.floorAreaLayersKr})</div>
               <div className="text-purple-800 text-xs space-y-1">
-                <p><strong>Naming Pattern:</strong> <code className="bg-purple-100 px-1 rounded">[Prefix]-[Number][Suffix]</code></p>
-                <p><strong>Allowed Suffixes:</strong> <code className="bg-purple-100 px-1 rounded">F</code>, <code className="bg-purple-100 px-1 rounded">FLR</code>, <code className="bg-purple-100 px-1 rounded">FLOOR</code>, <code className="bg-purple-100 px-1 rounded">층</code></p>
+                <p><strong>{t.demo.cad.standardization.namingPattern}:</strong> <code className="bg-purple-100 px-1 rounded">[Prefix]-[Number][Suffix]</code></p>
+                <p><strong>{t.demo.cad.standardization.allowedSuffixes}:</strong> <code className="bg-purple-100 px-1 rounded">F</code>, <code className="bg-purple-100 px-1 rounded">FLR</code>, <code className="bg-purple-100 px-1 rounded">FLOOR</code>, <code className="bg-purple-100 px-1 rounded">층</code></p>
               </div>
               <div className="mt-2 grid grid-cols-3 gap-1 text-xs">
                 <div className="bg-purple-100 rounded p-1.5 text-center">
@@ -142,34 +145,34 @@ function StandardizationDialog({
 
             {/* Material Specifications */}
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="font-medium text-amber-900 mb-1">D. Material Specifications (재료명세)</div>
+              <div className="font-medium text-amber-900 mb-1">D. {t.demo.cad.standardization.materialSpecs} ({t.demo.cad.standardization.materialSpecsKr})</div>
               <div className="text-amber-800 text-xs space-y-1">
-                <p><strong>Recommended Layer:</strong> <code className="bg-amber-100 px-1 rounded">A-ANNO-MATL</code></p>
-                <p><strong>Text Keywords:</strong> <code className="bg-amber-100 px-1 rounded">THK</code>, <code className="bg-amber-100 px-1 rounded">유리</code>, <code className="bg-amber-100 px-1 rounded">콘크리트</code>, <code className="bg-amber-100 px-1 rounded">마감</code>, <code className="bg-amber-100 px-1 rounded">단열재</code>, <code className="bg-amber-100 px-1 rounded">방수</code></p>
+                <p><strong>{t.demo.cad.standardization.recommendedLayer}:</strong> <code className="bg-amber-100 px-1 rounded">A-ANNO-MATL</code></p>
+                <p><strong>{t.demo.cad.standardization.textKeywords}:</strong> <code className="bg-amber-100 px-1 rounded">THK</code>, <code className="bg-amber-100 px-1 rounded">유리</code>, <code className="bg-amber-100 px-1 rounded">콘크리트</code>, <code className="bg-amber-100 px-1 rounded">마감</code>, <code className="bg-amber-100 px-1 rounded">단열재</code>, <code className="bg-amber-100 px-1 rounded">방수</code></p>
               </div>
             </div>
           </div>
 
           {/* Quick Reference Table */}
           <div className="mb-4">
-            <h3 className="font-bold text-slate-900 mb-3 text-base">📋 Quick Reference</h3>
+            <h3 className="font-bold text-slate-900 mb-3 text-base">📋 {t.demo.cad.standardization.quickReference}</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
                 <thead className="bg-slate-100">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold">Element</th>
-                    <th className="px-3 py-2 text-left font-semibold">Standard Layer</th>
-                    <th className="px-3 py-2 text-left font-semibold">Trigger Keyword</th>
+                    <th className="px-3 py-2 text-left font-semibold">{t.demo.cad.standardization.element}</th>
+                    <th className="px-3 py-2 text-left font-semibold">{t.demo.cad.standardization.standardLayer}</th>
+                    <th className="px-3 py-2 text-left font-semibold">{t.demo.cad.standardization.triggerKeyword}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   <tr className="bg-white">
-                    <td className="px-3 py-2">Site Boundary</td>
+                    <td className="px-3 py-2">{t.demo.cad.standardization.siteBoundary}</td>
                     <td className="px-3 py-2 font-mono">A-SITE-BNDY</td>
                     <td className="px-3 py-2 font-mono">SITE</td>
                   </tr>
                   <tr className="bg-slate-50">
-                    <td className="px-3 py-2">Building Footprint</td>
+                    <td className="px-3 py-2">{t.demo.cad.standardization.buildingFootprint}</td>
                     <td className="px-3 py-2 font-mono">A-AREA-FOOTPRINT</td>
                     <td className="px-3 py-2 font-mono">FOOTPRINT</td>
                   </tr>
@@ -195,7 +198,7 @@ function StandardizationDialog({
             <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
-            Please confirm you have checked the following:
+            {t.demo.cad.standardization.checklistTitle}
           </h3>
           <div className="space-y-2">
             <label className="flex items-start gap-3 cursor-pointer group">
@@ -206,7 +209,7 @@ function StandardizationDialog({
                 className="mt-1 w-4 h-4 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-pointer"
               />
               <span className="text-slate-700 group-hover:text-slate-900 transition-colors text-sm">
-                My DXF file uses <strong>millimeters (mm)</strong> as drawing units (INSUNITS = 4)
+                {t.demo.cad.standardization.checkUnits}
               </span>
             </label>
             
@@ -218,7 +221,7 @@ function StandardizationDialog({
                 className="mt-1 w-4 h-4 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-pointer"
               />
               <span className="text-slate-700 group-hover:text-slate-900 transition-colors text-sm">
-                All areas are drawn using <strong>closed polylines (LWPOLYLINE)</strong>
+                {t.demo.cad.standardization.checkPolylines}
               </span>
             </label>
             
@@ -230,7 +233,7 @@ function StandardizationDialog({
                 className="mt-1 w-4 h-4 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-pointer"
               />
               <span className="text-slate-700 group-hover:text-slate-900 transition-colors text-sm">
-                Site boundary layer includes keywords: <strong>SITE, BOUNDARY, LND, 대지, or 지적</strong>
+                {t.demo.cad.standardization.checkSite}
               </span>
             </label>
             
@@ -242,7 +245,7 @@ function StandardizationDialog({
                 className="mt-1 w-4 h-4 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-pointer"
               />
               <span className="text-slate-700 group-hover:text-slate-900 transition-colors text-sm">
-                Building footprint layer includes keywords: <strong>FOOTPRINT, HH, or 건축면적</strong>
+                {t.demo.cad.standardization.checkFootprint}
               </span>
             </label>
             
@@ -254,7 +257,7 @@ function StandardizationDialog({
                 className="mt-1 w-4 h-4 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-pointer"
               />
               <span className="text-slate-700 group-hover:text-slate-900 transition-colors text-sm">
-                Floor layers follow naming pattern: <strong>1F, 2F, B1F</strong> (or similar with FLR/FLOOR/층)
+                {t.demo.cad.standardization.checkFloors}
               </span>
             </label>
           </div>
@@ -268,10 +271,10 @@ function StandardizationDialog({
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                All requirements checked
+                {t.demo.cad.standardization.allChecked}
               </span>
             ) : (
-              <span>Please check all items to continue</span>
+              <span>{t.demo.cad.standardization.pleaseCheckAll}</span>
             )}
           </p>
           <div className="flex gap-3">
@@ -279,14 +282,14 @@ function StandardizationDialog({
               onClick={onCancel}
               className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors font-medium"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               onClick={onAccept}
               disabled={!allChecked}
               className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              I Understand & Continue
+              {t.demo.cad.standardization.understand}
             </button>
           </div>
         </div>
@@ -306,6 +309,7 @@ export default function CADUploader({
   onParserModeChange,
   onProcess
 }: CADUploaderProps) {
+  const { t } = useLanguage();
   const [dragActive, setDragActive] = useState(false);
   const [showStandardDialog, setShowStandardDialog] = useState(false);
 
@@ -350,7 +354,7 @@ export default function CADUploader({
   if (step === 'upload') {
     return (
       <div className="w-full bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-xl flex-1 flex flex-col">
-        <h2 className="text-2xl font-bold text-slate-900 mb-6">Upload Project File</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mb-6">{t.demo.cad.uploadTitle}</h2>
         <div
           className={`flex-1 relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 flex flex-col items-center justify-center ${
             dragActive
@@ -368,7 +372,7 @@ export default function CADUploader({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <p className="text-slate-600 font-medium text-lg">Scanning DXF Geometry...</p>
+              <p className="text-slate-600 font-medium text-lg">{t.demo.cad.scanningGeometry}</p>
             </div>
           ) : (
             <div>
@@ -377,8 +381,8 @@ export default function CADUploader({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              <p className="text-xl font-medium text-slate-700 mb-2">Drag & Drop DXF File</p>
-              <p className="text-slate-500 mb-6">Supported formats: .dxf</p>
+              <p className="text-xl font-medium text-slate-700 mb-2">{t.demo.cad.dragDrop}</p>
+              <p className="text-slate-500 mb-6">{t.demo.cad.supportedFormats}</p>
               <input
                 type="file"
                 accept=".dxf"
@@ -390,7 +394,7 @@ export default function CADUploader({
                 htmlFor="file-upload-cad"
                 className="inline-block px-8 py-3 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 cursor-pointer"
               >
-                Browse Files
+                {t.demo.cad.browseFiles}
               </label>
             </div>
           )}
@@ -405,13 +409,14 @@ export default function CADUploader({
         isOpen={showStandardDialog}
         onAccept={handleAcceptStandards}
         onCancel={handleCancelStandards}
+        t={t}
       />
       
       <div className="w-full bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-8 shadow-xl flex-1 flex flex-col min-h-0">
-        <h2 className="text-2xl font-bold text-slate-900 mb-6 shrink-0">Select Layers to Import</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mb-6 shrink-0">{t.demo.cad.layers.title}</h2>
         
         <div className="mb-6 shrink-0">
-          <label className="block text-sm font-bold text-slate-700 mb-3">Parser Mode</label>
+          <label className="block text-sm font-bold text-slate-700 mb-3">{t.demo.cad.parserMode.title}</label>
           <div className="grid grid-cols-3 gap-3">
             {/* Manual Parser */}
             <button
@@ -429,8 +434,8 @@ export default function CADUploader({
                   {parserMode === 'manual' && <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>}
                 </div>
                 <div>
-                  <div className="font-bold text-slate-900 text-sm">Manual Parser</div>
-                  <div className="text-xs text-slate-600 mt-1">Select polygons manually for site and building areas</div>
+                  <div className="font-bold text-slate-900 text-sm">{t.demo.cad.parserMode.manual}</div>
+                  <div className="text-xs text-slate-600 mt-1">{t.demo.cad.parserMode.manualDesc}</div>
                 </div>
               </div>
             </button>
@@ -452,10 +457,10 @@ export default function CADUploader({
                 </div>
                 <div>
                   <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    Python Parser
+                    {t.demo.cad.parserMode.python}
                     <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">SCRIPT</span>
                   </div>
-                  <div className="text-xs text-slate-600 mt-1">Auto-detect using predefined layer keywords</div>
+                  <div className="text-xs text-slate-600 mt-1">{t.demo.cad.parserMode.pythonDesc}</div>
                 </div>
               </div>
             </button>
@@ -477,10 +482,10 @@ export default function CADUploader({
                 </div>
                 <div>
                   <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    LLM Parser
+                    {t.demo.cad.parserMode.llm}
                     <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">AI</span>
                   </div>
-                  <div className="text-xs text-slate-600 mt-1">Multimodal AI analysis using Large Language Models</div>
+                  <div className="text-xs text-slate-600 mt-1">{t.demo.cad.parserMode.llmDesc}</div>
                 </div>
               </div>
             </button>
@@ -550,14 +555,10 @@ export default function CADUploader({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              {parserMode === 'llm' ? 'Analyzing with AI...' : 'Processing...'}
+              {t.common.processing}
             </span>
           ) : (
-            parserMode === 'llm' 
-              ? '🤖 Analyze with Multimodal LLM' 
-              : parserMode === 'python' 
-              ? '🐍 Auto-Analyze with Python Script' 
-              : 'Load Geometry'
+            t.demo.cad.layers.processFile
           )}
         </button>
       </div>
