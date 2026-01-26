@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import CADSection from './components/CADSection';
+import { useLanguage } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 // Dynamic import InfrastructureSection to avoid SSR issues with Leaflet
 const InfrastructureSection = dynamic(
@@ -36,6 +38,7 @@ interface OCRResult {
 
 
 export default function DemoPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<Step>('ocr');
   const [userId, setUserId] = useState<number | null>(null);
@@ -233,7 +236,7 @@ export default function DemoPage() {
             <div className="space-y-6">
               {/* File Upload */}
               <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">Upload Documents</h2>
+                <h2 className="text-2xl font-bold text-slate-900 mb-4">{t.demo.ocr.title}</h2>
 
                 <div
                   className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
@@ -248,7 +251,7 @@ export default function DemoPage() {
                 >
                   {ocrFiles.length > 0 ? (
                     <div className="space-y-4">
-                      <p className="font-semibold text-slate-700">{ocrFiles.length} file(s) selected:</p>
+                      <p className="font-semibold text-slate-700">{t.demo.ocr.filesSelected.replace('{count}', String(ocrFiles.length))}</p>
                       <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                         {ocrFiles.map((file, idx) => (
                           <div key={idx} className="text-sm text-slate-600 p-2 bg-white rounded">
@@ -265,7 +268,7 @@ export default function DemoPage() {
                         }}
                         className="text-red-600 hover:text-red-700 text-sm font-medium"
                       >
-                        Clear All
+                        {t.demo.ocr.clearAll}
                       </button>
                     </div>
                   ) : (
@@ -273,8 +276,8 @@ export default function DemoPage() {
                       <svg className="w-16 h-16 mx-auto text-slate-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
-                      <p className="text-lg font-medium text-slate-700 mb-2">Drag and drop files here</p>
-                      <p className="text-sm text-slate-500 mb-4">or click to browse</p>
+                      <p className="text-lg font-medium text-slate-700 mb-2">{t.demo.ocr.dragDrop}</p>
+                      <p className="text-sm text-slate-500 mb-4">{t.demo.ocr.orClick}</p>
                       <input
                         type="file"
                         multiple
@@ -287,9 +290,9 @@ export default function DemoPage() {
                         htmlFor="ocr-file-upload"
                         className="inline-block px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors cursor-pointer"
                       >
-                        Select Files
+                        {t.demo.ocr.selectFiles}
                       </label>
-                      <p className="text-xs text-slate-400 mt-4">Supported: PDF, DOC, DOCX, JPG, PNG</p>
+                      <p className="text-xs text-slate-400 mt-4">{t.demo.ocr.supportedFormats}</p>
                     </div>
                   )}
                 </div>
@@ -297,14 +300,14 @@ export default function DemoPage() {
 
               {/* OCR Options */}
               <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">OCR Options</h2>
+                <h2 className="text-2xl font-bold text-slate-900 mb-4">{t.demo.ocr.options}</h2>
 
                 {/* Preprocessing Toggle */}
                 <div className="mb-6">
                   <label className="flex items-center justify-between cursor-pointer">
                     <div>
-                      <span className="text-lg font-medium text-slate-900">Preprocessing</span>
-                      <p className="text-sm text-slate-500">Apply rotation and skew correction</p>
+                      <span className="text-lg font-medium text-slate-900">{t.demo.ocr.preprocessing}</span>
+                      <p className="text-sm text-slate-500">{t.demo.ocr.preprocessingDesc}</p>
                     </div>
                     <div className="relative">
                       <input
@@ -321,12 +324,12 @@ export default function DemoPage() {
 
                 {/* OCR Engine */}
                 <div>
-                  <label className="block text-lg font-medium text-slate-900 mb-3">OCR Engine</label>
+                  <label className="block text-lg font-medium text-slate-900 mb-3">{t.demo.ocr.engineTitle}</label>
                   <div className="space-y-3">
                     {[
-                      { value: 'surya', label: 'Surya OCR', desc: 'Full layout + tables + text (all languages)' },
-                      { value: 'paddle', label: 'PaddleOCR', desc: 'Text recognition (Korean + Latin only)' },
-                      { value: 'hybrid', label: 'Hybrid Mode', badge: 'RECOMMENDED', desc: 'Surya layout + PaddleOCR text' },
+                      { value: 'surya', label: t.demo.ocr.surya, desc: t.demo.ocr.suryaDesc },
+                      { value: 'paddle', label: t.demo.ocr.paddle, desc: t.demo.ocr.paddleDesc },
+                      { value: 'hybrid', label: t.demo.ocr.hybrid, badge: t.demo.ocr.recommended, desc: t.demo.ocr.hybridDesc },
                     ].map((engine) => (
                       <label key={engine.value} className="flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-purple-50 has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50">
                         <input
@@ -358,7 +361,7 @@ export default function DemoPage() {
                   disabled={ocrProcessing || ocrFiles.length === 0}
                   className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                 >
-                  {ocrProcessing ? 'Processing...' : 'Process Documents'}
+                  {ocrProcessing ? t.common.processing : t.demo.ocr.processDocuments}
                 </button>
               </div>
             </div>
@@ -371,7 +374,7 @@ export default function DemoPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <p className="text-xl text-slate-700 font-medium">Processing {ocrFiles.length} document(s)...</p>
+                  <p className="text-xl text-slate-700 font-medium">{t.demo.ocr.processingDocuments.replace('{count}', String(ocrFiles.length))}</p>
                 </div>
               )}
 
@@ -383,8 +386,8 @@ export default function DemoPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <div>
-                        <h3 className="text-lg font-semibold text-green-900">OCR Completed Successfully</h3>
-                        <p className="text-sm text-green-700 mt-1">Processed {ocrResults.length} document(s)</p>
+                        <h3 className="text-lg font-semibold text-green-900">{t.demo.ocr.completed}</h3>
+                        <p className="text-sm text-green-700 mt-1">{t.demo.ocr.processedCount.replace('{count}', String(ocrResults.length))}</p>
                       </div>
                     </div>
                   </div>
@@ -392,7 +395,7 @@ export default function DemoPage() {
                   {ocrResults.map((result, idx) => (
                     <div key={idx} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg space-y-4">
                       <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-                        <h2 className="text-xl font-bold text-slate-900">Document {idx + 1}: {ocrFiles[idx]?.name}</h2>
+                        <h2 className="text-xl font-bold text-slate-900">{t.demo.ocr.document} {idx + 1}: {ocrFiles[idx]?.name}</h2>
                         <span className="text-xs text-slate-500">{(ocrFiles[idx].size / 1024).toFixed(2)} KB</span>
                       </div>
                       
@@ -401,7 +404,7 @@ export default function DemoPage() {
                           {/* Image Preview */}
                           {ocrPreviews[idx] && (
                             <div>
-                              <h3 className="text-sm font-semibold text-slate-700 mb-2">Original Image</h3>
+                              <h3 className="text-sm font-semibold text-slate-700 mb-2">{t.demo.ocr.originalImage}</h3>
                               <img
                                 src={ocrPreviews[idx]}
                                 alt={`Preview ${idx + 1}`}
@@ -413,7 +416,7 @@ export default function DemoPage() {
                           {/* Preprocessed Image */}
                           {result.preprocessedImage && (
                             <div>
-                              <h3 className="text-sm font-semibold text-slate-700 mb-2">Preprocessed Image</h3>
+                              <h3 className="text-sm font-semibold text-slate-700 mb-2">{t.demo.ocr.preprocessedImage}</h3>
                               <img
                                 src={result.preprocessedImage}
                                 alt={`Preprocessed ${idx + 1}`}
@@ -421,7 +424,7 @@ export default function DemoPage() {
                               />
                               {result.preprocessingMetadata?.rotation_applied !== undefined && (
                                 <p className="text-xs text-slate-500 mt-2 text-center">
-                                  Rotation applied: {result.preprocessingMetadata.rotation_applied.toFixed(2)}°
+                                  {t.demo.ocr.rotationApplied.replace('{degrees}', result.preprocessingMetadata.rotation_applied.toFixed(2))}
                                 </p>
                               )}
                             </div>
@@ -430,22 +433,22 @@ export default function DemoPage() {
                           {/* Extracted Text */}
                           <div>
                             <div className="flex items-center justify-between mb-2">
-                              <h3 className="text-sm font-semibold text-slate-700">Extracted Text</h3>
+                              <h3 className="text-sm font-semibold text-slate-700">{t.demo.ocr.extractedText}</h3>
                               <button
                                 onClick={() => downloadOCRText(idx)}
                                 className="px-3 py-1 bg-purple-600 text-white rounded-md text-xs font-medium hover:bg-purple-700 transition-colors"
                               >
-                                Download TXT
+                                {t.demo.ocr.downloadTxt}
                               </button>
                             </div>
                             <div className="bg-slate-50 rounded-lg p-4 max-h-64 overflow-y-auto border border-slate-200">
                               <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono">
-                                {result.textContent || 'No text detected'}
+                                {result.textContent || t.demo.ocr.noTextDetected}
                               </pre>
                             </div>
                             {result.results?.text_lines && (
                               <p className="text-xs text-slate-500 mt-2">
-                                Found {result.results.text_lines.length} text lines
+                                {t.demo.ocr.foundLines.replace('{count}', String(result.results.text_lines.length))}
                               </p>
                             )}
                           </div>
@@ -454,7 +457,7 @@ export default function DemoPage() {
                           {result.results && (
                             <div>
                               <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-sm font-semibold text-slate-700">JSON Results</h3>
+                                <h3 className="text-sm font-semibold text-slate-700">{t.demo.ocr.jsonResults}</h3>
                                 <button
                                   onClick={() => {
                                     const blob = new Blob([JSON.stringify(result.results, null, 2)], { type: 'application/json' });
@@ -469,7 +472,7 @@ export default function DemoPage() {
                                   }}
                                   className="px-3 py-1 bg-purple-600 text-white rounded-md text-xs font-medium hover:bg-purple-700 transition-colors"
                                 >
-                                  Download JSON
+                                  {t.demo.ocr.downloadJson}
                                 </button>
                               </div>
                               <div className="bg-slate-50 rounded-lg p-4 max-h-64 overflow-y-auto border border-slate-200">
@@ -487,7 +490,7 @@ export default function DemoPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <div>
-                              <p className="text-sm font-semibold text-red-900">OCR Failed</p>
+                              <p className="text-sm font-semibold text-red-900">{t.demo.ocr.ocrFailed}</p>
                               <p className="text-sm text-red-700 mt-1">{result.error}</p>
                             </div>
                           </div>
@@ -501,7 +504,7 @@ export default function DemoPage() {
                     onClick={() => setCurrentStep('cad')}
                     className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
                   >
-                    Continue to CAD Analysis →
+                    {t.demo.navigation.continueToCAD}
                   </button>
                 </>
               )}
@@ -511,7 +514,7 @@ export default function DemoPage() {
                   <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="text-xl text-slate-500">Upload documents to see results</p>
+                  <p className="text-xl text-slate-500">{t.demo.ocr.uploadToSee}</p>
                 </div>
               )}
             </div>
@@ -532,20 +535,20 @@ export default function DemoPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-3xl font-bold text-slate-900">Demo Completed!</h3>
+            <h3 className="text-3xl font-bold text-slate-900">{t.demo.complete.title}</h3>
             <p className="text-slate-600 text-lg max-w-2xl mx-auto">
-              All workflow steps completed successfully. Your data has been saved with User ID: <strong>{userId}</strong>
+              {t.demo.complete.message} <strong>{userId}</strong>
             </p>
             
             <div className="bg-slate-50 p-8 rounded-2xl text-left max-w-2xl mx-auto space-y-4">
-              <h4 className="font-bold text-slate-900 text-xl mb-4">Summary</h4>
+              <h4 className="font-bold text-slate-900 text-xl mb-4">{t.demo.complete.summary}</h4>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🔍</span>
                   <div>
-                    <p className="font-semibold text-slate-900">OCR Processing</p>
+                    <p className="font-semibold text-slate-900">{t.demo.complete.ocrProcessing}</p>
                     <p className="text-sm text-slate-600">
-                      {ocrResults.filter(r => r.success).length} of {ocrResults.length} document(s) processed successfully
+                      {t.demo.complete.ocrResult.replace('{success}', String(ocrResults.filter(r => r.success).length)).replace('{total}', String(ocrResults.length))}
                     </p>
                   </div>
                 </div>
@@ -553,9 +556,9 @@ export default function DemoPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">📐</span>
                   <div>
-                    <p className="font-semibold text-slate-900">CAD Analysis</p>
+                    <p className="font-semibold text-slate-900">{t.demo.complete.cadAnalysis}</p>
                     <p className="text-sm text-slate-600">
-                      CAD geometry processed and analyzed successfully
+                      {t.demo.complete.cadResult}
                     </p>
                   </div>
                 </div>
@@ -563,9 +566,9 @@ export default function DemoPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🗺️</span>
                   <div>
-                    <p className="font-semibold text-slate-900">Infrastructure Mapping</p>
+                    <p className="font-semibold text-slate-900">{t.demo.complete.infraMapping}</p>
                     <p className="text-sm text-slate-600">
-                      Infrastructure features labeled and analyzed
+                      {t.demo.complete.infraResult}
                     </p>
                   </div>
                 </div>
@@ -577,7 +580,7 @@ export default function DemoPage() {
                 href="/"
                 className="px-8 py-4 bg-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-300 transition-all text-lg"
               >
-                Back to Home
+                {t.common.backToHome}
               </Link>
               <button
                 onClick={() => {
@@ -585,7 +588,7 @@ export default function DemoPage() {
                 }}
                 className="px-8 py-4 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all text-lg"
               >
-                Start New Demo
+                {t.demo.complete.startNew}
               </button>
             </div>
           </div>
@@ -594,9 +597,9 @@ export default function DemoPage() {
   };
 
   const steps = [
-    { id: 'ocr', label: 'OCR', icon: '🔍' },
-    { id: 'cad', label: 'CAD', icon: '📐' },
-    { id: 'infrastructure', label: 'Infrastructure', icon: '🗺️' },
+    { id: 'ocr', label: t.demo.steps.ocr, icon: '🔍' },
+    { id: 'cad', label: t.demo.steps.cad, icon: '📐' },
+    { id: 'infrastructure', label: t.demo.steps.infrastructure, icon: '🗺️' },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
@@ -615,22 +618,26 @@ export default function DemoPage() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back to Home
+          {t.common.backToHome}
         </Link>
+      </div>
+
+      <div className="absolute top-8 right-8">
+        <LanguageSwitcher />
       </div>
 
       <div className="container mx-auto px-8 py-16">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 mb-4">
-              Complete Demo Workflow
+              {t.demo.title}
             </h1>
             <p className="text-slate-600 text-lg">
-              Experience the full system: Document OCR → CAD Analysis → Infrastructure Mapping
+              {t.demo.subtitle}
             </p>
             {userId && (
               <p className="text-sm text-slate-500 mt-2">
-                User ID: <strong>{userId}</strong> | Session ID: <strong>{sessionId}</strong>
+                {t.demo.session.userId}: <strong>{userId}</strong> | {t.demo.session.sessionId}: <strong>{sessionId}</strong>
               </p>
             )}
           </div>

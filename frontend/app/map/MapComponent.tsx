@@ -6,6 +6,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import type { Feature, FeatureCollection } from 'geojson';
 import Link from 'next/link';
+import { useLanguage } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 // Fix Leaflet icon issues
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -79,6 +81,7 @@ const TYPE_COLORS: Record<BuildingType, { color: string; fillColor: string }> = 
 };
 
 export default function MapComponent() {
+  const { t } = useLanguage();
   const [location, setLocation] = useState<LocationState>(DEFAULT_LOCATION);
   const [radius, setRadius] = useState<number>(300);
   const [searchInput, setSearchInput] = useState<string>('');
@@ -346,12 +349,13 @@ export default function MapComponent() {
                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                   />
                 </svg>
-                <span className="font-medium">Back</span>
+                <span className="font-medium">{t.common.backToHome}</span>
               </Link>
               <div className="h-6 w-px bg-slate-300"></div>
               <h1 className="text-2xl font-bold bg-linear-to-r from-slate-900 to-blue-900 bg-clip-text text-transparent">
-                Infrastructure Explorer
+                {t.map.title}
               </h1>
+              <LanguageSwitcher />
             </div>
             {osmData && osmData.features && (
               <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">

@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useLanguage, interpolate } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 interface OCRResult {
   success: boolean;
@@ -35,6 +37,7 @@ interface OCRResult {
 }
 
 export default function OCRPage() {
+  const { t } = useLanguage();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [usePreprocessing, setUsePreprocessing] = useState(true);
@@ -74,7 +77,6 @@ export default function OCRPage() {
     setSelectedFile(file);
     setResult(null);
 
-    // Create image preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result as string);
@@ -100,12 +102,9 @@ export default function OCRPage() {
     formData.append('engine', ocrEngine);
 
     try {
-      // Determine API URL: env var > runtime detection > fallback
       const getApiUrl = () => {
-        // 1. Use environment variable if provided
         if (process.env.NEXT_PUBLIC_API_URL) {
           const envUrl = process.env.NEXT_PUBLIC_API_URL;
-          // If page is HTTPS but env URL is HTTP, use relative path (nginx proxy)
           if (typeof window !== 'undefined' &&
               window.location.protocol === 'https:' &&
               envUrl.startsWith('http://')) {
@@ -114,12 +113,10 @@ export default function OCRPage() {
           return envUrl;
         }
 
-        // 2. Runtime detection fallback
         if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-          return '/api'; // Production: relative URL
+          return '/api';
         }
 
-        // 3. Development fallback
         return 'http://localhost:6969/api';
       };
 
@@ -187,15 +184,16 @@ export default function OCRPage() {
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                Back to Home
+                {t.common.backToHome}
               </Link>
               <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-600">
-                Document OCR
+                {t.ocr.title}
               </h1>
               <p className="text-xl text-slate-600 mt-2">
-                Extract text from images using advanced OCR technology
+                {t.ocr.subtitle}
               </p>
             </div>
+            <LanguageSwitcher />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
@@ -203,7 +201,7 @@ export default function OCRPage() {
             <div className="space-y-6">
               {/* File Upload */}
               <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">Upload Image</h2>
+                <h2 className="text-2xl font-bold text-slate-900 mb-4">{t.ocr.uploadTitle}</h2>
 
                 <div
                   className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
@@ -235,7 +233,7 @@ export default function OCRPage() {
                         }}
                         className="text-red-600 hover:text-red-700 text-sm font-medium cursor-pointer"
                       >
-                        Remove Image
+                        {t.ocr.removeImage}
                       </button>
                     </div>
                   ) : (
@@ -254,9 +252,9 @@ export default function OCRPage() {
                         />
                       </svg>
                       <p className="text-lg font-medium text-slate-700 mb-2">
-                        Drag and drop your image here
+                        {t.ocr.dragDrop}
                       </p>
-                      <p className="text-sm text-slate-500 mb-4">or click to browse</p>
+                      <p className="text-sm text-slate-500 mb-4">{t.ocr.orClick}</p>
                       <input
                         type="file"
                         accept="image/*"
@@ -268,10 +266,10 @@ export default function OCRPage() {
                         htmlFor="file-upload"
                         className="inline-block px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors cursor-pointer"
                       >
-                        Select Image
+                        {t.ocr.selectImage}
                       </label>
                       <p className="text-xs text-slate-400 mt-4">
-                        Supported formats: JPG, PNG, BMP, TIFF
+                        {t.ocr.supportedFormats}
                       </p>
                     </div>
                   )}
@@ -280,15 +278,15 @@ export default function OCRPage() {
 
               {/* OCR Options */}
               <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">OCR Options</h2>
+                <h2 className="text-2xl font-bold text-slate-900 mb-4">{t.ocr.options.title}</h2>
 
                 {/* Preprocessing Toggle */}
                 <div className="mb-6">
                   <label className="flex items-center justify-between cursor-pointer">
                     <div>
-                      <span className="text-lg font-medium text-slate-900">Preprocessing</span>
+                      <span className="text-lg font-medium text-slate-900">{t.ocr.options.preprocessing}</span>
                       <p className="text-sm text-slate-500">
-                        Apply rotation and skew correction
+                        {t.ocr.options.preprocessingDesc}
                       </p>
                     </div>
                     <div className="relative">
@@ -307,7 +305,7 @@ export default function OCRPage() {
                 {/* OCR Engine Selection */}
                 <div>
                   <label className="block text-lg font-medium text-slate-900 mb-3">
-                    OCR Engine
+                    {t.ocr.options.engineTitle}
                   </label>
                   <div className="space-y-3">
                     <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-purple-50 has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50">
@@ -320,9 +318,9 @@ export default function OCRPage() {
                         className="mt-1 text-purple-600 focus:ring-purple-500"
                       />
                       <div className="ml-3">
-                        <span className="font-medium text-slate-900">Surya OCR</span>
+                        <span className="font-medium text-slate-900">{t.ocr.options.surya}</span>
                         <p className="text-sm text-slate-500">
-                          Full layout + tables + text (all languages)
+                          {t.ocr.options.suryaDesc}
                         </p>
                       </div>
                     </label>
@@ -337,9 +335,9 @@ export default function OCRPage() {
                         className="mt-1 text-purple-600 focus:ring-purple-500"
                       />
                       <div className="ml-3">
-                        <span className="font-medium text-slate-900">PaddleOCR</span>
+                        <span className="font-medium text-slate-900">{t.ocr.options.paddle}</span>
                         <p className="text-sm text-slate-500">
-                          Text recognition (Korean + Latin only)
+                          {t.ocr.options.paddleDesc}
                         </p>
                       </div>
                     </label>
@@ -355,13 +353,13 @@ export default function OCRPage() {
                       />
                       <div className="ml-3">
                         <span className="font-medium text-slate-900">
-                          Hybrid Mode
+                          {t.ocr.options.hybrid}
                           <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                            RECOMMENDED
+                            {t.ocr.options.recommended}
                           </span>
                         </span>
                         <p className="text-sm text-slate-500">
-                          Surya layout + PaddleOCR text
+                          {t.ocr.options.hybridDesc}
                         </p>
                       </div>
                     </label>
@@ -396,10 +394,10 @@ export default function OCRPage() {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      Processing...
+                      {t.common.processing}
                     </span>
                   ) : (
-                    'Process Image'
+                    t.ocr.process
                   )}
                 </button>
               </div>
@@ -428,10 +426,10 @@ export default function OCRPage() {
                         </svg>
                         <div>
                           <h3 className="text-lg font-semibold text-green-900">
-                            OCR Completed Successfully
+                            {t.ocr.results.success}
                           </h3>
                           <p className="text-sm text-green-700 mt-1">
-                            Found {result.results?.text_lines.length || 0} text lines
+                            {interpolate(t.ocr.results.foundLines, { count: result.results?.text_lines.length || 0 })}
                           </p>
                         </div>
                       </div>
@@ -453,7 +451,7 @@ export default function OCRPage() {
                           />
                         </svg>
                         <div>
-                          <h3 className="text-lg font-semibold text-red-900">OCR Failed</h3>
+                          <h3 className="text-lg font-semibold text-red-900">{t.ocr.results.failed}</h3>
                           <p className="text-sm text-red-700 mt-1">{result.error}</p>
                         </div>
                       </div>
@@ -466,7 +464,7 @@ export default function OCRPage() {
                       {result.preprocessedImage && (
                         <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
                           <h2 className="text-2xl font-bold text-slate-900 mb-4">
-                            Preprocessed Image
+                            {t.ocr.results.preprocessedImage}
                           </h2>
                           <img
                             src={result.preprocessedImage}
@@ -475,7 +473,7 @@ export default function OCRPage() {
                           />
                           {result.preprocessingMetadata?.rotation_applied !== undefined && (
                             <p className="text-sm text-slate-600 mt-2">
-                              Rotation applied: {result.preprocessingMetadata.rotation_applied.toFixed(2)}°
+                              {interpolate(t.ocr.results.rotationApplied, { degrees: result.preprocessingMetadata.rotation_applied.toFixed(2) })}
                             </p>
                           )}
                         </div>
@@ -484,17 +482,17 @@ export default function OCRPage() {
                       {/* Extracted Text */}
                       <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
                         <div className="flex items-center justify-between mb-4">
-                          <h2 className="text-2xl font-bold text-slate-900">Extracted Text</h2>
+                          <h2 className="text-2xl font-bold text-slate-900">{t.ocr.results.extractedText}</h2>
                           <button
                             onClick={downloadText}
                             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors cursor-pointer"
                           >
-                            Download TXT
+                            {t.ocr.results.downloadTxt}
                           </button>
                         </div>
                         <div className="bg-slate-50 rounded-lg p-4 max-h-96 overflow-y-auto">
                           <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono">
-                            {result.textContent || 'No text detected'}
+                            {result.textContent || t.ocr.results.noTextDetected}
                           </pre>
                         </div>
                       </div>
@@ -502,12 +500,12 @@ export default function OCRPage() {
                       {/* JSON Results */}
                       <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
                         <div className="flex items-center justify-between mb-4">
-                          <h2 className="text-2xl font-bold text-slate-900">JSON Results</h2>
+                          <h2 className="text-2xl font-bold text-slate-900">{t.ocr.results.jsonResults}</h2>
                           <button
                             onClick={downloadJSON}
                             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors cursor-pointer"
                           >
-                            Download JSON
+                            {t.ocr.results.downloadJson}
                           </button>
                         </div>
                         <div className="bg-slate-50 rounded-lg p-4 max-h-96 overflow-y-auto">
@@ -537,7 +535,7 @@ export default function OCRPage() {
                     />
                   </svg>
                   <p className="text-xl text-slate-500">
-                    Upload an image and click "Process Image" to see results
+                    {t.ocr.results.placeholder}
                   </p>
                 </div>
               )}
@@ -564,9 +562,9 @@ export default function OCRPage() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  <p className="text-xl text-slate-700 font-medium">Processing your image...</p>
+                  <p className="text-xl text-slate-700 font-medium">{t.ocr.results.processingMessage}</p>
                   <p className="text-sm text-slate-500 mt-2">
-                    This may take a few moments depending on image size
+                    {t.ocr.results.processingNote}
                   </p>
                 </div>
               )}

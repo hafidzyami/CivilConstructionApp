@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { AppStep } from '../types';
+import { useLanguage } from '../../i18n';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 interface CADHeaderProps {
   step: AppStep;
@@ -7,6 +11,8 @@ interface CADHeaderProps {
 }
 
 export default function CADHeader({ step, onReset }: CADHeaderProps) {
+  const { t } = useLanguage();
+  
   return (
     <div className="flex items-center justify-between mb-6 shrink-0">
       <div>
@@ -17,25 +23,28 @@ export default function CADHeader({ step, onReset }: CADHeaderProps) {
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back to Home
+          {t.common.backToHome}
         </Link>
         <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-red-600">
-          AutoCAD Analyzer
+          {t.cad.title}
         </h1>
         {step !== 'analyze' && (
           <p className="text-xl text-slate-600 mt-2">
-            Automated geometry extraction and BCR/FAR calculation
+            {t.cad.subtitle}
           </p>
         )}
       </div>
-      {step === 'analyze' && (
-        <button
-          onClick={onReset}
-          className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors shadow-sm font-medium"
-        >
-          Reset Analysis
-        </button>
-      )}
+      <div className="flex items-center gap-4">
+        <LanguageSwitcher />
+        {step === 'analyze' && (
+          <button
+            onClick={onReset}
+            className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors shadow-sm font-medium"
+          >
+            {t.cad.resetAnalysis}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

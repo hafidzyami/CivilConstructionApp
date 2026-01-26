@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useLanguage } from '../../i18n';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 // Dynamic import for SessionMap component to avoid SSR issues
 const SessionMap = dynamic(
@@ -12,7 +14,7 @@ const SessionMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="h-full w-full bg-slate-100 animate-pulse rounded-lg flex items-center justify-center">
-        <p className="text-slate-500 text-sm">Loading map...</p>
+        <p className="text-slate-500 text-sm">Loading...</p>
       </div>
     )
   }
@@ -41,6 +43,7 @@ const TYPE_COLORS: Record<string, { color: string; fillColor: string }> = {
 };
 
 export default function AdminDashboard() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +78,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteSession = async (sessionId: number) => {
-    if (!confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
+    if (!confirm(t.admin.dashboard.deleteConfirm)) {
       return;
     }
 
@@ -94,11 +97,11 @@ export default function AdminDashboard() {
           setSelectedSession(null);
         }
       } else {
-        alert('Failed to delete session: ' + data.message);
+        alert(t.admin.dashboard.deleteFailed + ': ' + data.message);
       }
     } catch (error) {
       console.error('Error deleting session:', error);
-      alert('Failed to delete session');
+      alert(t.admin.dashboard.deleteFailed);
     }
   };
 
@@ -118,7 +121,7 @@ export default function AdminDashboard() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-slate-900 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading dashboard...</p>
+          <p className="text-slate-600">{t.admin.dashboard.loadingDashboard}</p>
         </div>
       </div>
     );
@@ -141,16 +144,19 @@ export default function AdminDashboard() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Home
+              {t.common.home}
             </Link>
-            <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold text-slate-900">{t.admin.dashboard.title}</h1>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
+            >
+              {t.admin.dashboard.logout}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -160,7 +166,7 @@ export default function AdminDashboard() {
           <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Total Sessions</p>
+                <p className="text-sm text-slate-600 mb-1">{t.admin.dashboard.totalSessions}</p>
                 <p className="text-3xl font-bold text-slate-900">{sessions.length}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -175,7 +181,7 @@ export default function AdminDashboard() {
           <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Unique Users</p>
+                <p className="text-sm text-slate-600 mb-1">{t.admin.dashboard.uniqueUsers}</p>
                 <p className="text-3xl font-bold text-slate-900">
                   {new Set(sessions.map((s) => s.userId)).size}
                 </p>
@@ -191,7 +197,7 @@ export default function AdminDashboard() {
           <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Total Documents</p>
+                <p className="text-sm text-slate-600 mb-1">{t.admin.dashboard.totalDocuments}</p>
                 <p className="text-3xl font-bold text-slate-900">
                   {sessions.reduce((acc, s) => acc + s.documents.length, 0)}
                 </p>
@@ -207,7 +213,7 @@ export default function AdminDashboard() {
           <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">OCR Records</p>
+                <p className="text-sm text-slate-600 mb-1">{t.admin.dashboard.ocrRecords}</p>
                 <p className="text-3xl font-bold text-slate-900">
                   {sessions.reduce((acc, s) => acc + s.ocrData.length, 0)}
                 </p>
@@ -225,7 +231,7 @@ export default function AdminDashboard() {
         {/* Sessions Table */}
         <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-lg overflow-hidden">
           <div className="p-6 border-b border-slate-200">
-            <h2 className="text-2xl font-bold text-slate-900">Demo Sessions History</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{t.admin.dashboard.sessionsHistory}</h2>
           </div>
 
           <div className="overflow-x-auto">
@@ -233,28 +239,28 @@ export default function AdminDashboard() {
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Session ID
+                    {t.admin.dashboard.sessionId}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    User ID
+                    {t.admin.dashboard.userId}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Documents
+                    {t.admin.dashboard.documents}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    CAD Data
+                    {t.admin.dashboard.cadData}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Infrastructure
+                    {t.admin.dashboard.infrastructure}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    OCR Records
+                    {t.admin.dashboard.ocrRecords}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Created At
+                    {t.admin.dashboard.createdAt}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Actions
+                    {t.admin.dashboard.actions}
                   </th>
                 </tr>
               </thead>
@@ -265,35 +271,35 @@ export default function AdminDashboard() {
                       #{session.id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      User {session.userId}
+                      {t.admin.dashboard.userId} {session.userId}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {session.documents.length} files
+                      {session.documents.length} {t.admin.dashboard.files}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                       {session.cadData ? (
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                          ✓ Saved
+                          ✓ {t.admin.dashboard.saved}
                         </span>
                       ) : (
                         <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          - None
+                          - {t.admin.dashboard.none}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                       {session.infrastructureData ? (
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                          ✓ Saved
+                          ✓ {t.admin.dashboard.saved}
                         </span>
                       ) : (
                         <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          - None
+                          - {t.admin.dashboard.none}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {session.ocrData.length} records
+                      {session.ocrData.length} {t.admin.dashboard.records}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                       {new Date(session.createdAt).toLocaleDateString()}
@@ -304,13 +310,13 @@ export default function AdminDashboard() {
                           onClick={() => viewSessionDetail(session)}
                           className="text-blue-600 hover:text-blue-800 font-semibold"
                         >
-                          View Details
+                          {t.admin.dashboard.viewDetails}
                         </button>
                         <button
                           onClick={() => handleDeleteSession(session.id)}
                           className="text-red-600 hover:text-red-800 font-semibold"
                         >
-                          Delete
+                          {t.admin.dashboard.delete}
                         </button>
                       </div>
                     </td>
@@ -334,7 +340,7 @@ export default function AdminDashboard() {
                     d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                   />
                 </svg>
-                <p className="text-slate-600 text-lg">No demo sessions yet</p>
+                <p className="text-slate-600 text-lg">{t.admin.dashboard.noSessionsYet}</p>
               </div>
             )}
           </div>
@@ -347,7 +353,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between">
               <h3 className="text-2xl font-bold text-slate-900">
-                Session #{selectedSession.id} Details
+                {t.admin.dashboard.sessionDetails} #{selectedSession.id}
               </h3>
               <button
                 onClick={() => setShowDetail(false)}
@@ -362,24 +368,24 @@ export default function AdminDashboard() {
             <div className="p-6 space-y-6">
               {/* Basic Info */}
               <div>
-                <h4 className="font-semibold text-slate-900 mb-2">Basic Information</h4>
+                <h4 className="font-semibold text-slate-900 mb-2">{t.admin.dashboard.basicInfo}</h4>
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
                   <div>
-                    <p className="text-sm text-slate-600">User ID</p>
+                    <p className="text-sm text-slate-600">{t.admin.dashboard.userId}</p>
                     <p className="font-semibold">{selectedSession.userId}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600">Session ID</p>
+                    <p className="text-sm text-slate-600">{t.admin.dashboard.sessionId}</p>
                     <p className="font-semibold">{selectedSession.id}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600">Created At</p>
+                    <p className="text-sm text-slate-600">{t.admin.dashboard.createdAt}</p>
                     <p className="font-semibold">
                       {new Date(selectedSession.createdAt).toLocaleString()}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600">Last Updated</p>
+                    <p className="text-sm text-slate-600">{t.admin.dashboard.lastUpdated}</p>
                     <p className="font-semibold">
                       {new Date(selectedSession.updatedAt).toLocaleString()}
                     </p>
@@ -390,7 +396,7 @@ export default function AdminDashboard() {
               {/* Documents */}
               <div>
                 <h4 className="font-semibold text-slate-900 mb-2">
-                  Documents ({selectedSession.documents.length})
+                  {t.admin.dashboard.documents} ({selectedSession.documents.length})
                 </h4>
                 <div className="space-y-2">
                   {selectedSession.documents.map((doc) => (
@@ -407,7 +413,7 @@ export default function AdminDashboard() {
                         rel="noopener noreferrer"
                         className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors"
                       >
-                        View
+                        {t.admin.dashboard.view}
                       </a>
                     </div>
                   ))}
@@ -417,12 +423,12 @@ export default function AdminDashboard() {
               {/* CAD Data */}
               {selectedSession.cadData && (
                 <div>
-                  <h4 className="font-semibold text-slate-900 mb-3 text-lg">CAD Analysis Data</h4>
+                  <h4 className="font-semibold text-slate-900 mb-3 text-lg">{t.admin.dashboard.cadAnalysisData}</h4>
                   
                   {/* Metrics Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                      <p className="text-xs text-blue-600 font-medium mb-1">Site Area</p>
+                      <p className="text-xs text-blue-600 font-medium mb-1">{t.admin.dashboard.siteArea}</p>
                       <p className="text-2xl font-bold text-blue-900">
                         {selectedSession.cadData.siteArea
                           ? selectedSession.cadData.siteArea.toFixed(2)
@@ -432,7 +438,7 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
-                      <p className="text-xs text-green-600 font-medium mb-1">Building Area</p>
+                      <p className="text-xs text-green-600 font-medium mb-1">{t.admin.dashboard.buildingArea}</p>
                       <p className="text-2xl font-bold text-green-900">
                         {selectedSession.cadData.buildingArea
                           ? selectedSession.cadData.buildingArea.toFixed(2)
@@ -442,7 +448,7 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
-                      <p className="text-xs text-purple-600 font-medium mb-1">Floor Area</p>
+                      <p className="text-xs text-purple-600 font-medium mb-1">{t.admin.dashboard.floorArea}</p>
                       <p className="text-2xl font-bold text-purple-900">
                         {selectedSession.cadData.floorArea
                           ? selectedSession.cadData.floorArea.toFixed(2)
@@ -452,7 +458,7 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
-                      <p className="text-xs text-orange-600 font-medium mb-1">BCR (Building Coverage Ratio)</p>
+                      <p className="text-xs text-orange-600 font-medium mb-1">{t.admin.dashboard.bcrFull}</p>
                       <p className="text-2xl font-bold text-orange-900">
                         {selectedSession.cadData.bcr ? selectedSession.cadData.bcr.toFixed(2) : '-'}
                       </p>
@@ -460,11 +466,11 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-4 rounded-xl border border-pink-200">
-                      <p className="text-xs text-pink-600 font-medium mb-1">FAR (Floor Area Ratio)</p>
+                      <p className="text-xs text-pink-600 font-medium mb-1">{t.admin.dashboard.farFull}</p>
                       <p className="text-2xl font-bold text-pink-900">
                         {selectedSession.cadData.far ? selectedSession.cadData.far.toFixed(2) : '-'}
                       </p>
-                      <p className="text-xs text-pink-600 mt-1">ratio</p>
+                      <p className="text-xs text-pink-600 mt-1">{t.admin.dashboard.ratio}</p>
                     </div>
                   </div>
 
@@ -472,7 +478,7 @@ export default function AdminDashboard() {
                   {selectedSession.cadData.dxfFileUrl && (
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-semibold text-slate-700">DXF File</p>
+                        <p className="text-sm font-semibold text-slate-700">{t.admin.dashboard.dxfFile}</p>
                         <div className="flex gap-2">
                           <a
                             href={selectedSession.cadData.dxfFileUrl}
@@ -482,7 +488,7 @@ export default function AdminDashboard() {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
-                            Download
+                            {t.admin.dashboard.download}
                           </a>
                           <Link
                             href={`/admin/cad-viewer/${selectedSession.id}`}
@@ -492,7 +498,7 @@ export default function AdminDashboard() {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
-                            Open Viewer
+                            {t.admin.dashboard.openViewer}
                           </Link>
                         </div>
                       </div>
@@ -506,8 +512,8 @@ export default function AdminDashboard() {
                             </svg>
                           </div>
                           <div className="flex-1">
-                            <p className="font-semibold text-slate-900">CAD Drawing File</p>
-                            <p className="text-xs text-slate-500">DXF Format • Click &quot;Open Viewer&quot; to visualize</p>
+                            <p className="font-semibold text-slate-900">{t.admin.dashboard.cadDrawingFile}</p>
+                            <p className="text-xs text-slate-500">{t.admin.dashboard.dxfFormat}</p>
                           </div>
                         </div>
                       </div>
@@ -519,22 +525,22 @@ export default function AdminDashboard() {
               {/* Infrastructure Data */}
               {selectedSession.infrastructureData && (
                 <div>
-                  <h4 className="font-semibold text-slate-900 mb-2">Infrastructure Data</h4>
+                  <h4 className="font-semibold text-slate-900 mb-2">{t.admin.dashboard.infrastructureData}</h4>
                   <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl mb-3">
                     <div>
-                      <p className="text-sm text-slate-600">Latitude</p>
+                      <p className="text-sm text-slate-600">{t.admin.dashboard.latitude}</p>
                       <p className="font-semibold">
                         {selectedSession.infrastructureData.latitude || '-'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-600">Longitude</p>
+                      <p className="text-sm text-slate-600">{t.admin.dashboard.longitude}</p>
                       <p className="font-semibold">
                         {selectedSession.infrastructureData.longitude || '-'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-600">Radius</p>
+                      <p className="text-sm text-slate-600">{t.admin.dashboard.radius}</p>
                       <p className="font-semibold">
                         {selectedSession.infrastructureData.radius
                           ? `${selectedSession.infrastructureData.radius} m`
@@ -548,7 +554,7 @@ export default function AdminDashboard() {
                    selectedSession.infrastructureData.labeledFeatures.length > 0 && (
                     <>
                       <div className="bg-slate-50 p-4 rounded-xl mb-4">
-                        <p className="text-sm text-slate-600 mb-3 font-semibold">Labeled Features ({selectedSession.infrastructureData.labeledFeatures.length})</p>
+                        <p className="text-sm text-slate-600 mb-3 font-semibold">{t.admin.dashboard.labeledFeatures} ({selectedSession.infrastructureData.labeledFeatures.length})</p>
                         <div className="space-y-2">
                           {selectedSession.infrastructureData.labeledFeatures.map((feature: any, idx: number) => {
                             const getTypeColor = (type: string) => {
@@ -584,7 +590,7 @@ export default function AdminDashboard() {
                        selectedSession.infrastructureData.longitude && (
                         <div className="bg-slate-50 p-4 rounded-xl">
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm text-slate-600 font-semibold">Map View (Read-only)</p>
+                            <p className="text-sm text-slate-600 font-semibold">{t.admin.dashboard.mapView}</p>
                             <button
                               onClick={() => setMapKey(prev => prev + 1)}
                               className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1"
@@ -592,7 +598,7 @@ export default function AdminDashboard() {
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                               </svg>
-                              Refresh Map
+                              {t.admin.dashboard.refreshMap}
                             </button>
                           </div>
                           <div style={{ height: '400px' }} className="rounded-lg overflow-hidden border-2 border-slate-300 relative z-0">
@@ -635,7 +641,7 @@ export default function AdminDashboard() {
               {selectedSession.ocrData.length > 0 && (
                 <div>
                   <h4 className="font-semibold text-slate-900 mb-2">
-                    OCR Records ({selectedSession.ocrData.length})
+                    {t.admin.dashboard.ocrRecords} ({selectedSession.ocrData.length})
                   </h4>
                   <div className="space-y-2">
                     {selectedSession.ocrData.map((ocr) => (
@@ -656,7 +662,7 @@ export default function AdminDashboard() {
                             rel="noopener noreferrer"
                             className="text-sm text-blue-600 hover:underline mt-1 inline-block"
                           >
-                            View File
+                            {t.admin.dashboard.viewFile}
                           </a>
                         )}
                       </div>

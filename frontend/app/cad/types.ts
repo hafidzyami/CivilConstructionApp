@@ -34,5 +34,16 @@ export interface MetricsData {
   far: number;
 }
 
+export interface AutoAnalysis {
+  site_area: number;
+  footprint_area: number;
+  total_floor_area: number;
+  floors: Record<string, number>;
+  btl: number;
+  far: number;
+  materials_count?: number;
+}
+
 export type AppStep = 'upload' | 'layers' | 'analyze';
 export type ActiveMode = 'site' | 'building';
+export type ParserMode = 'manual' | 'python' | 'llm';

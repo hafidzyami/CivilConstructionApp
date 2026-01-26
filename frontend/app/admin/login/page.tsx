@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useLanguage } from '../../i18n';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 export default function AdminLogin() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +26,7 @@ export default function AdminLogin() {
       localStorage.setItem('adminEmail', email);
       router.push('/admin/dashboard');
     } else {
-      setError('Invalid email or password');
+      setError(t.admin.login.invalidCredentials);
       setLoading(false);
     }
   };
@@ -42,8 +45,12 @@ export default function AdminLogin() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back to Home
+          {t.common.backToHome}
         </Link>
+      </div>
+
+      <div className="absolute top-8 right-8">
+        <LanguageSwitcher />
       </div>
 
       <div className="w-full max-w-md">
@@ -54,14 +61,14 @@ export default function AdminLogin() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Admin Login</h1>
-            <p className="text-slate-600">Access the administration dashboard</p>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">{t.admin.login.title}</h1>
+            <p className="text-slate-600">{t.admin.login.subtitle}</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
-                Email Address
+                {t.admin.login.email}
               </label>
               <input
                 type="email"
@@ -69,14 +76,14 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none"
-                placeholder="admin@example.com"
+                placeholder={t.admin.login.emailPlaceholder}
                 required
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">
-                Password
+                {t.admin.login.password}
               </label>
               <input
                 type="password"
@@ -84,7 +91,7 @@ export default function AdminLogin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none"
-                placeholder="••••••••"
+                placeholder={t.admin.login.passwordPlaceholder}
                 required
               />
             </div>
@@ -100,7 +107,7 @@ export default function AdminLogin() {
               disabled={loading}
               className="w-full px-6 py-3 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? t.admin.login.loggingIn : t.admin.login.loginButton}
             </button>
           </form>
         </div>

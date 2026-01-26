@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useLanguage } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 type SearchMode = 'auto' | 'llm-generated' | 'similarity';
 
@@ -18,6 +20,7 @@ interface Message {
 }
 
 export default function ChatbotPage() {
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +38,6 @@ export default function ChatbotPage() {
   }, [messages]);
 
   useEffect(() => {
-    // Send initial greeting
     handleSendMessage('hello', true);
   }, []);
 
@@ -89,7 +91,7 @@ export default function ChatbotPage() {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: t.chatbot.messages.error,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -126,11 +128,11 @@ export default function ChatbotPage() {
   const getSearchModeDisplay = (mode: SearchMode) => {
     switch (mode) {
       case 'auto':
-        return { label: 'Auto', desc: 'Smart search (tries similarity first, then LLM)' };
+        return { label: t.chatbot.searchMode.auto, desc: t.chatbot.searchMode.autoDesc };
       case 'similarity':
-        return { label: 'Similarity', desc: 'Vector-based semantic search' };
+        return { label: t.chatbot.searchMode.similarity, desc: t.chatbot.searchMode.similarityDesc };
       case 'llm-generated':
-        return { label: 'LLM Query', desc: 'AI-generated database queries' };
+        return { label: t.chatbot.searchMode.llmGenerated, desc: t.chatbot.searchMode.llmGeneratedDesc };
     }
   };
 
@@ -138,10 +140,10 @@ export default function ChatbotPage() {
     if (!method) return null;
 
     const badges: Record<string, { color: string; label: string }> = {
-      'similarity': { color: 'bg-green-500', label: '🔍 Similarity' },
-      'llm-generated': { color: 'bg-purple-500', label: '🤖 LLM Query' },
-      'fixed-query': { color: 'bg-blue-500', label: '📊 Direct Match' },
-      'fulltext': { color: 'bg-yellow-500', label: '🔎 Fulltext' },
+      'similarity': { color: 'bg-green-500', label: t.chatbot.searchMethods.similarity },
+      'llm-generated': { color: 'bg-purple-500', label: t.chatbot.searchMethods.llmGenerated },
+      'fixed-query': { color: 'bg-blue-500', label: t.chatbot.searchMethods.directMatch },
+      'fulltext': { color: 'bg-yellow-500', label: t.chatbot.searchMethods.fulltext },
     };
 
     const badge = badges[method] || { color: 'bg-gray-500', label: method };
@@ -158,13 +160,16 @@ export default function ChatbotPage() {
       <div className="container mx-auto px-4 py-8 h-screen flex flex-col">
         {/* Header */}
         <div className="mb-6">
-          <div className="text-center mb-4">
-            <h1 className="text-4xl font-bold text-white mb-2">
-              Building Regulations Assistant
-            </h1>
-            <p className="text-gray-300">
-              Ask questions about building regulations and construction standards
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-center flex-1">
+              <h1 className="text-4xl font-bold text-white mb-2">
+                {t.chatbot.title}
+              </h1>
+              <p className="text-gray-300">
+                {t.chatbot.subtitle}
+              </p>
+            </div>
+            <LanguageSwitcher />
           </div>
 
           {/* Search Mode Toggle */}
@@ -172,7 +177,7 @@ export default function ChatbotPage() {
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex-1 min-w-[200px]">
                 <label className="block text-white text-sm font-semibold mb-2">
-                  Search Mode
+                  {t.chatbot.searchMode.title}
                 </label>
                 <div className="flex gap-2">
                   {(['auto', 'similarity', 'llm-generated'] as SearchMode[]).map((mode) => {
@@ -196,7 +201,7 @@ export default function ChatbotPage() {
               </div>
               <div className="flex-1 min-w-[200px]">
                 <p className="text-sm text-gray-300">
-                  <span className="font-semibold text-white">Current:</span>{' '}
+                  <span className="font-semibold text-white">{t.chatbot.searchMode.current}:</span>{' '}
                   {getSearchModeDisplay(searchMode).desc}
                 </p>
               </div>
@@ -223,7 +228,6 @@ export default function ChatbotPage() {
                   {/* Message Content */}
                   <div className="whitespace-pre-wrap break-words">
                     {message.content.split('\n').map((line, i) => {
-                      // Basic markdown-like rendering
                       if (line.startsWith('###')) {
                         return (
                           <h3 key={i} className="text-lg font-bold mt-2 mb-1">
@@ -268,7 +272,7 @@ export default function ChatbotPage() {
                   {/* Sources */}
                   {message.sources && message.sources.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-300">
-                      <p className="text-sm font-semibold mb-2">Sources:</p>
+                      <p className="text-sm font-semibold mb-2">{t.chatbot.messages.sources}:</p>
                       <div className="space-y-2">
                         {message.sources.slice(0, 3).map((source, idx) => (
                           <div key={idx} className="text-xs bg-gray-100 p-2 rounded">
@@ -283,7 +287,7 @@ export default function ChatbotPage() {
                   {/* Suggested Questions */}
                   {message.suggestedQuestions && message.suggestedQuestions.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-300">
-                      <p className="text-sm font-semibold mb-2">Suggested questions:</p>
+                      <p className="text-sm font-semibold mb-2">{t.chatbot.messages.suggestedQuestions}:</p>
                       <div className="flex flex-wrap gap-2">
                         {message.suggestedQuestions.map((question, idx) => (
                           <button
@@ -345,7 +349,7 @@ export default function ChatbotPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask about regulations, standards, or specific articles..."
+                placeholder={t.chatbot.input.placeholder}
                 className="flex-1 px-4 py-3 rounded-lg bg-white/90 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isLoading}
               />
@@ -354,17 +358,17 @@ export default function ChatbotPage() {
                 disabled={isLoading || !input.trim()}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-colors"
               >
-                Send
+                {t.chatbot.input.send}
               </button>
               <button
                 onClick={handleClearChat}
                 className="px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
               >
-                Clear
+                {t.chatbot.input.clear}
               </button>
             </div>
             <p className="text-xs text-gray-300 mt-2">
-              Press Enter to send, Shift+Enter for new line
+              {t.chatbot.input.hint}
             </p>
           </div>
         </div>
@@ -372,7 +376,7 @@ export default function ChatbotPage() {
         {/* Footer */}
         <div className="mt-4 text-center text-gray-400 text-sm">
           <a href="/" className="hover:text-white transition-colors">
-            ← Back to Home
+            ← {t.common.backToHome}
           </a>
         </div>
       </div>
