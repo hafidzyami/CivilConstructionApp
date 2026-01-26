@@ -112,12 +112,19 @@ export default function CADViewerPage() {
       const processData = await processRes.json();
       console.log('CAD process response:', processData);
 
-      if (processData.success && processData.data) {
-        setPolygons(processData.data.polygons || []);
-        setBounds(processData.data.bounds || null);
-        console.log('Loaded polygons:', processData.data.polygons?.length || 0);
-      } else {
+      // Handle both response formats:
+      // 1. Direct format: {polygons, bounds, scale}
+      // 2. Wrapped format: {success, data: {polygons, bounds, scale}}
+      const data = processData.data || processData;
+      
+      if (data.polygons && data.polygons.length > 0) {
+        setPolygons(data.polygons);
+        setBounds(data.bounds || null);
+        console.log('Loaded polygons:', data.polygons.length);
+      } else if (processData.success === false) {
         setDxfError(processData.message || 'Failed to process DXF file');
+      } else {
+        setDxfError('No polygons found in DXF file');
       }
     } catch (err: any) {
       console.error('Error processing DXF:', err);
