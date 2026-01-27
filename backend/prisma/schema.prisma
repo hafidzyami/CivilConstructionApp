@@ -12,6 +12,7 @@ model DemoSession {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   cadData            DemoCadData?
+  chatHistory        DemoChatHistory[]
   complianceResult   DemoComplianceResult?
   documents          DemoDocument[]
   infrastructureData DemoInfrastructure?
@@ -33,14 +34,15 @@ model DemoComplianceResult {
 }
 
 model DemoDocument {
-  id         Int         @id @default(autoincrement())
-  sessionId  Int
-  fileName   String
-  fileUrl    String
-  mimeType   String
-  fileSize   Int
-  uploadedAt DateTime    @default(now())
-  session    DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id           Int         @id @default(autoincrement())
+  sessionId    Int
+  fileName     String
+  fileUrl      String
+  mimeType     String
+  fileSize     Int
+  documentType String?
+  uploadedAt   DateTime    @default(now())
+  session      DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
 }
@@ -84,9 +86,24 @@ model DemoOcr {
   fileUrl       String
   extractedText String?
   engine        String?
+  documentType  String?
   rawData       Json?
   createdAt     DateTime    @default(now())
   session       DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+}
+
+model DemoChatHistory {
+  id            Int         @id @default(autoincrement())
+  sessionId     Int
+  chatSessionId String
+  role          String
+  content       String
+  sources       Json?
+  createdAt     DateTime    @default(now())
+  session       DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([chatSessionId])
 }

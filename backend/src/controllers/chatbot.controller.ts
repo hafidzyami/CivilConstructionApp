@@ -3,6 +3,7 @@ import chatbotService from '../services/chatbot.service';
 import knowledgeBaseService from '../services/knowledge-base.service.v2';
 import complianceService from '../services/compliance.service';
 import neo4jConnection from '../lib/neo4j';
+import prisma from '../lib/prisma';
 import { z } from 'zod';
 
 // Validation schemas
@@ -317,6 +318,16 @@ export const processResultChatQuery = async (req: Request, res: Response): Promi
       return;
     }
 
+    // Save user message to database
+    await prisma.demoChatHistory.create({
+      data: {
+        sessionId: demoSessionId,
+        chatSessionId: sessionId,
+        role: 'user',
+        content: query,
+      },
+    });
+
     // Build compliance context for the chatbot
     const complianceContext = buildComplianceContext(complianceResult);
 
@@ -326,6 +337,17 @@ export const processResultChatQuery = async (req: Request, res: Response): Promi
       sessionId,
       complianceContext
     );
+
+    // Save assistant response to database
+    await prisma.demoChatHistory.create({
+      data: {
+        sessionId: demoSessionId,
+        chatSessionId: sessionId,
+        role: 'assistant',
+        content: response.message,
+        sources: response.sources || null,
+      },
+    });
 
     res.status(200).json({
       success: true,

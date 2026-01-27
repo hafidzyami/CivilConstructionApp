@@ -29,7 +29,48 @@ interface Session {
   cadData: any;
   infrastructureData: any;
   ocrData: any[];
+  complianceResult: any;
+  chatHistory: any[];
 }
+
+// Document type configuration for display
+const DOCUMENT_TYPES: Record<string, { label: string; badge: string; badgeColor: string }> = {
+  landScope: { 
+    label: 'Land Scope Documents', 
+    badge: 'Required', 
+    badgeColor: 'bg-red-100 text-red-700' 
+  },
+  saleTransfer: { 
+    label: 'Sale/Transfer Confirmation', 
+    badge: 'Required (Either 2 or 3)', 
+    badgeColor: 'bg-orange-100 text-orange-700' 
+  },
+  ownershipRights: { 
+    label: 'Ownership/Rights Proof', 
+    badge: 'Required (Either 2 or 3)', 
+    badgeColor: 'bg-orange-100 text-orange-700' 
+  },
+  coOwnerConsent: { 
+    label: 'Co-owner Consent, Share Verification & Building Overview', 
+    badge: 'Optional (max 3)', 
+    badgeColor: 'bg-slate-100 text-slate-600' 
+  },
+  preDecision: { 
+    label: 'Pre-Decision Document', 
+    badge: 'Optional', 
+    badgeColor: 'bg-slate-100 text-slate-600' 
+  },
+  otherPermit: { 
+    label: 'Other Permit Forms', 
+    badge: 'Optional (max 5)', 
+    badgeColor: 'bg-slate-100 text-slate-600' 
+  },
+  combinedAgreement: { 
+    label: 'Combined Agreement', 
+    badge: 'Optional', 
+    badgeColor: 'bg-slate-100 text-slate-600' 
+  },
+};
 
 // Color mapping for building types (read-only)
 const TYPE_COLORS: Record<string, { color: string; fillColor: string }> = {
@@ -393,30 +434,156 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Documents */}
+              {/* Compliance Result */}
+              {selectedSession.complianceResult && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">{t.admin?.dashboard?.complianceResult || 'Compliance Result'}</h4>
+                  <div className="bg-slate-50 p-4 rounded-xl">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        selectedSession.complianceResult.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                        selectedSession.complianceResult.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {selectedSession.complianceResult.status === 'accepted' ? (t.result?.status?.accepted || 'Accepted') :
+                         selectedSession.complianceResult.status === 'rejected' ? (t.result?.status?.rejected || 'Rejected') :
+                         (t.result?.status?.reviewRequired || 'Review Required')}
+                      </span>
+                      <span className="text-lg font-bold text-slate-900">
+                        {selectedSession.complianceResult.overallScore}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-3">{selectedSession.complianceResult.summary}</p>
+                    
+                    {/* Checks Summary */}
+                    {selectedSession.complianceResult.checks && Array.isArray(selectedSession.complianceResult.checks) && (
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <p className="text-xs font-semibold text-slate-500 mb-2">{t.admin?.dashboard?.checksOverview || 'Checks Overview'}</p>
+                        <div className="flex gap-2 flex-wrap">
+                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+                            ✓ {selectedSession.complianceResult.checks.filter((c: any) => c.status === 'pass').length} passed
+                          </span>
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
+                            ✗ {selectedSession.complianceResult.checks.filter((c: any) => c.status === 'fail').length} failed
+                          </span>
+                          <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
+                            ⚠ {selectedSession.complianceResult.checks.filter((c: any) => c.status === 'warning').length} warnings
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Chat History */}
+              {selectedSession.chatHistory && selectedSession.chatHistory.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">
+                    {t.admin?.dashboard?.chatHistory || 'Chat History'} ({selectedSession.chatHistory.length} {t.admin?.dashboard?.messages || 'messages'})
+                  </h4>
+                  <div className="bg-slate-50 p-4 rounded-xl max-h-80 overflow-y-auto space-y-3">
+                    {selectedSession.chatHistory.map((msg: any) => (
+                      <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] rounded-xl px-3 py-2 ${
+                          msg.role === 'user' 
+                            ? 'bg-purple-600 text-white' 
+                            : 'bg-white border border-slate-200'
+                        }`}>
+                          <p className={`text-sm ${msg.role === 'user' ? 'text-white' : 'text-slate-700'}`}>
+                            {msg.content}
+                          </p>
+                          <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-purple-200' : 'text-slate-400'}`}>
+                            {new Date(msg.createdAt).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Documents by Type */}
               <div>
                 <h4 className="font-semibold text-slate-900 mb-2">
                   {t.admin.dashboard.documents} ({selectedSession.documents.length})
                 </h4>
-                <div className="space-y-2">
-                  {selectedSession.documents.map((doc) => (
-                    <div key={doc.id} className="bg-slate-50 p-3 rounded-xl flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-slate-900">{doc.fileName}</p>
-                        <p className="text-sm text-slate-600">
-                          {(doc.fileSize / 1024).toFixed(2)} KB • {doc.mimeType}
-                        </p>
+                <div className="space-y-4">
+                  {/* Group documents by type */}
+                  {Object.entries(DOCUMENT_TYPES).map(([typeId, typeConfig]) => {
+                    const docsOfType = selectedSession.documents.filter((doc: any) => doc.documentType === typeId);
+                    const ocrOfType = selectedSession.ocrData.filter((ocr: any) => ocr.documentType === typeId);
+                    
+                    if (docsOfType.length === 0 && ocrOfType.length === 0) return null;
+                    
+                    return (
+                      <div key={typeId} className="bg-slate-50 p-3 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="font-medium text-slate-900">{typeConfig.label}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${typeConfig.badgeColor}`}>
+                            {typeConfig.badge}
+                          </span>
+                        </div>
+                        <div className="space-y-2 ml-2">
+                          {docsOfType.map((doc: any) => (
+                            <div key={doc.id} className="bg-white p-2 rounded-lg flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-slate-700">{doc.fileName}</p>
+                                <p className="text-xs text-slate-500">
+                                  {(doc.fileSize / 1024).toFixed(2)} KB • {doc.mimeType}
+                                </p>
+                              </div>
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-1 bg-blue-500 text-white rounded text-xs font-semibold hover:bg-blue-600 transition-colors"
+                              >
+                                {t.admin.dashboard.view}
+                              </a>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <a
-                        href={doc.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors"
-                      >
-                        {t.admin.dashboard.view}
-                      </a>
-                    </div>
-                  ))}
+                    );
+                  })}
+                  
+                  {/* Show documents without type (legacy) */}
+                  {(() => {
+                    const untypedDocs = selectedSession.documents.filter((doc: any) => !doc.documentType);
+                    if (untypedDocs.length === 0) return null;
+                    
+                    return (
+                      <div className="bg-slate-50 p-3 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="font-medium text-slate-900">{t.admin?.dashboard?.otherDocuments || 'Other Documents'}</p>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                            Legacy
+                          </span>
+                        </div>
+                        <div className="space-y-2 ml-2">
+                          {untypedDocs.map((doc: any) => (
+                            <div key={doc.id} className="bg-white p-2 rounded-lg flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-slate-700">{doc.fileName}</p>
+                                <p className="text-xs text-slate-500">
+                                  {(doc.fileSize / 1024).toFixed(2)} KB • {doc.mimeType}
+                                </p>
+                              </div>
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-1 bg-blue-500 text-white rounded text-xs font-semibold hover:bg-blue-600 transition-colors"
+                              >
+                                {t.admin.dashboard.view}
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -643,30 +810,91 @@ export default function AdminDashboard() {
                   <h4 className="font-semibold text-slate-900 mb-2">
                     {t.admin.dashboard.ocrRecords} ({selectedSession.ocrData.length})
                   </h4>
-                  <div className="space-y-2">
-                    {selectedSession.ocrData.map((ocr) => (
-                      <div key={ocr.id} className="bg-slate-50 p-3 rounded-xl">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-medium text-slate-900">{ocr.fileName}</p>
-                          <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
-                            {ocr.engine}
-                          </span>
+                  <div className="space-y-4">
+                    {/* Group OCR data by document type */}
+                    {Object.entries(DOCUMENT_TYPES).map(([typeId, typeConfig]) => {
+                      const ocrOfType = selectedSession.ocrData.filter((ocr: any) => ocr.documentType === typeId);
+                      
+                      if (ocrOfType.length === 0) return null;
+                      
+                      return (
+                        <div key={typeId} className="bg-slate-50 p-3 rounded-xl">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="font-medium text-slate-900">{typeConfig.label}</p>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${typeConfig.badgeColor}`}>
+                              {typeConfig.badge}
+                            </span>
+                          </div>
+                          <div className="space-y-2 ml-2">
+                            {ocrOfType.map((ocr: any) => (
+                              <div key={ocr.id} className="bg-white p-2 rounded-lg">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-sm font-medium text-slate-700">{ocr.fileName}</p>
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
+                                    {ocr.engine}
+                                  </span>
+                                </div>
+                                {ocr.extractedText && (
+                                  <p className="text-xs text-slate-600 line-clamp-2">{ocr.extractedText}</p>
+                                )}
+                                {ocr.fileUrl && (
+                                  <a
+                                    href={ocr.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                                  >
+                                    {t.admin.dashboard.viewFile}
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        {ocr.extractedText && (
-                          <p className="text-sm text-slate-600 line-clamp-2">{ocr.extractedText}</p>
-                        )}
-                        {ocr.fileUrl && (
-                          <a
-                            href={ocr.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline mt-1 inline-block"
-                          >
-                            {t.admin.dashboard.viewFile}
-                          </a>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
+                    
+                    {/* Show OCR without type (legacy) */}
+                    {(() => {
+                      const untypedOcr = selectedSession.ocrData.filter((ocr: any) => !ocr.documentType);
+                      if (untypedOcr.length === 0) return null;
+                      
+                      return (
+                        <div className="bg-slate-50 p-3 rounded-xl">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="font-medium text-slate-900">{t.admin?.dashboard?.otherDocuments || 'Other Documents'}</p>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                              Legacy
+                            </span>
+                          </div>
+                          <div className="space-y-2 ml-2">
+                            {untypedOcr.map((ocr: any) => (
+                              <div key={ocr.id} className="bg-white p-2 rounded-lg">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-sm font-medium text-slate-700">{ocr.fileName}</p>
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
+                                    {ocr.engine}
+                                  </span>
+                                </div>
+                                {ocr.extractedText && (
+                                  <p className="text-xs text-slate-600 line-clamp-2">{ocr.extractedText}</p>
+                                )}
+                                {ocr.fileUrl && (
+                                  <a
+                                    href={ocr.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                                  >
+                                    {t.admin.dashboard.viewFile}
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

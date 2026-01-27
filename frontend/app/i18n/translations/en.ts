@@ -143,6 +143,11 @@ export const en = {
       refreshMap: 'Refresh Map',
       viewFile: 'View File',
       loadingMap: 'Loading map...',
+      complianceResult: 'Compliance Result',
+      checksOverview: 'Checks Overview',
+      chatHistory: 'Chat History',
+      messages: 'messages',
+      otherDocuments: 'Other Documents',
     },
   },
 

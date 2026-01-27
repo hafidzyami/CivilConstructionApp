@@ -67,7 +67,7 @@ export const getOrCreateSession = async (req: Request, res: Response) => {
 // Upload documents
 export const uploadDocuments = async (req: Request, res: Response) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, documentType } = req.body;
     const files = req.files as Express.Multer.File[];
 
     if (!sessionId) {
@@ -103,6 +103,7 @@ export const uploadDocuments = async (req: Request, res: Response) => {
           fileUrl,
           mimeType: file.mimetype,
           fileSize: file.size,
+          documentType: documentType || null,
         },
       });
 
@@ -234,7 +235,7 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
 // Save OCR data
 export const saveOcrData = async (req: Request, res: Response) => {
   try {
-    const { sessionId, fileName, fileUrl, extractedText, engine, rawData } = req.body;
+    const { sessionId, fileName, fileUrl, extractedText, engine, rawData, documentType } = req.body;
     const file = req.file as Express.Multer.File;
 
     if (!sessionId) {
@@ -265,6 +266,7 @@ export const saveOcrData = async (req: Request, res: Response) => {
         fileUrl: finalFileUrl,
         extractedText: extractedText || null,
         engine: engine || null,
+        documentType: documentType || null,
         rawData: rawData || null,
       },
     });
@@ -292,6 +294,10 @@ export const getAllSessions = async (req: Request, res: Response) => {
         cadData: true,
         infrastructureData: true,
         ocrData: true,
+        complianceResult: true,
+        chatHistory: {
+          orderBy: { createdAt: 'asc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });

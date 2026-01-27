@@ -145,6 +145,11 @@ export const ko: TranslationKeys = {
       refreshMap: '지도 새로고침',
       viewFile: '파일 보기',
       loadingMap: '지도 로딩 중...',
+      complianceResult: '규정 준수 결과',
+      checksOverview: '검사 개요',
+      chatHistory: '채팅 기록',
+      messages: '메시지',
+      otherDocuments: '기타 문서',
     },
   },
 

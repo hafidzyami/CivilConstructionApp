@@ -234,6 +234,7 @@ export default function DemoPage() {
       // Upload all files to MinIO
       const uploadFormData = new FormData();
       uploadFormData.append('sessionId', sessionId!.toString());
+      uploadFormData.append('documentType', docTypeId);
       state.files.forEach(file => {
         uploadFormData.append('documents', file);
       });
