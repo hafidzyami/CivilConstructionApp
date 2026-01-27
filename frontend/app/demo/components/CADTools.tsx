@@ -15,6 +15,7 @@ interface CADToolsProps {
   onLayerChange: (l: string[]) => void;
   onUpdateGeometry: () => void;
   loading: boolean;
+  readOnly?: boolean;
 }
 
 export default function CADTools({
@@ -28,10 +29,40 @@ export default function CADTools({
   selectedLayers,
   onLayerChange,
   onUpdateGeometry,
-  loading
+  loading,
+  readOnly = false
 }: CADToolsProps) {
   const { t } = useLanguage();
   const [showLayerPanel, setShowLayerPanel] = useState(false);
+
+  // If readOnly, show a simplified view-only panel
+  if (readOnly) {
+    return (
+      <div className="lg:col-span-5 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-5 shadow-lg flex flex-col justify-center">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800">{t.demo?.cad?.tools?.viewOnlyTitle || 'View Only Mode'}</h3>
+            <p className="text-xs text-slate-500">{t.demo?.cad?.tools?.viewOnlyDesc || 'Data has been auto-extracted. Zoom and pan to explore.'}</p>
+          </div>
+        </div>
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            {t.demo?.cad?.tools?.autoAnalyzed || 'Automatically analyzed'}
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            {t.demo?.cad?.tools?.viewOnlyHint || 'Use scroll to zoom, Shift+drag to pan'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lg:col-span-5 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-5 shadow-lg flex flex-col justify-center">
