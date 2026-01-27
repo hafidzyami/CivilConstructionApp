@@ -52,6 +52,7 @@ interface AutoAnalysis {
   btl: number;
   far: number;
   materials_count?: number;
+  building_height?: number; // Building height in meters (extracted from EL values)
 }
 
 export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
@@ -74,6 +75,9 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
   
   // Auto analysis results from Python parser or LLM
   const [autoAnalysis, setAutoAnalysis] = useState<AutoAnalysis | null>(null);
+  
+  // Building height state (manual input or auto-extracted)
+  const [buildingHeight, setBuildingHeight] = useState<number | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -215,6 +219,11 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
               : data.auto_analysis;
             setAutoAnalysis(analysis);
             console.log('Auto analysis results:', analysis);
+            
+            // Set building height if extracted automatically
+            if (analysis.building_height && analysis.building_height > 0) {
+              setBuildingHeight(analysis.building_height);
+            }
           } catch (e) {
             console.error('Failed to parse auto analysis:', e, data.auto_analysis);
           }
@@ -354,15 +363,73 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
               onLayerChange={setSelectedLayers}
               onUpdateGeometry={processFile}
               loading={loading}
+              readOnly={parserMode === 'python' || parserMode === 'llm'}
             />
             <CADMetrics metrics={metrics} parserMode={parserMode} />
           </div>
+          
+          {/* Building Height Input - Manual mode or Auto-extracted display */}
+          <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl p-4 shadow-lg">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">{t.demo?.cad?.buildingHeight?.title || 'Building Height'}</h3>
+                  <p className="text-xs text-slate-500">
+                    {parserMode === 'manual' 
+                      ? (t.demo?.cad?.buildingHeight?.manualHint || 'Enter the total building height (from EL values in your DXF)')
+                      : (t.demo?.cad?.buildingHeight?.autoHint || 'Automatically extracted from EL values in DXF')}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {parserMode === 'manual' ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={buildingHeight ?? ''}
+                      onChange={(e) => setBuildingHeight(e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder={t.demo?.cad?.buildingHeight?.placeholder || 'e.g., 12.5'}
+                      className="w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                    <span className="text-sm text-slate-600 font-medium">m</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-2xl font-bold ${buildingHeight ? 'text-blue-600' : 'text-slate-400'}`}>
+                      {buildingHeight ? buildingHeight.toFixed(1) : '—'}
+                    </span>
+                    <span className="text-sm text-slate-600 font-medium">m</span>
+                    {buildingHeight && (
+                      <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+                        {t.demo?.cad?.buildingHeight?.autoExtracted || 'Auto-extracted'}
+                      </span>
+                    )}
+                    {!buildingHeight && (
+                      <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+                        {t.demo?.cad?.buildingHeight?.notFound || 'Not found in DXF'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
           <CADViewer
             polygons={polygons}
             bounds={bounds}
             selections={selections}
             onTogglePoly={togglePoly}
             onBoxSelect={handleBoxSelect}
+            readOnly={parserMode === 'python' || parserMode === 'llm'}
           />
           
           <button
@@ -380,6 +447,7 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
                       floorArea: metrics.totalFloorArea,
                       bcr: metrics.bcr,
                       far: metrics.far,
+                      buildingHeight: buildingHeight,
                     }),
                   });
                 } catch (err) {

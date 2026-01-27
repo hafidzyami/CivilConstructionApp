@@ -12,11 +12,17 @@ class FinalComplianceAuditor:
         self.units = self.doc.header.get('$INSUNITS', 4)
         self.scale = 1_000_000 if self.units in [0, 4] else 1.0
         
+        # Unit scale for height (mm to m conversion)
+        self.height_scale = 0.001 if self.units in [0, 4] else 1.0
+        
         # Flexible Keywords
         self.SITE_KWS = ['지적', 'SITE', '대지', 'LND', 'BOUNDARY']
         self.FOOTPRINT_KWS = ['HH', 'FOOTPRINT', '건축면적']
         # Expanded Floor detection (Catching '1', '2', '층', 'FLR', 'FLOOR')
         self.FLOOR_PATTERN = self.FLOOR_PATTERN = re.compile(r'(B?\d+)(F|층|FLR|FLOOR|ND|ST|RD|TH)', re.IGNORECASE)
+        
+        # Elevation pattern to detect EL values (e.g., "EL+12500", "EL 12.5", "EL+12,500", "EL=12500")
+        self.EL_PATTERN = re.compile(r'EL\s*[+=]?\s*([\d,]+(?:\.\d+)?)', re.IGNORECASE)
 
     def _get_area(self, e):
         try:
@@ -25,10 +31,26 @@ class FinalComplianceAuditor:
                 return abs(ezdxf.math.area([Vec2(v[:2]) for v in e.get_points()])) / self.scale
             return 0.0
         except: return 0.0
+    
+    def _extract_elevation(self, text):
+        """Extract elevation value from text containing EL notation"""
+        match = self.EL_PATTERN.search(text)
+        if match:
+            value_str = match.group(1).replace(',', '')  # Remove commas
+            try:
+                value = float(value_str)
+                # If value > 100, assume it's in mm and convert to m
+                if value > 100:
+                    return value * 0.001
+                return value
+            except ValueError:
+                return None
+        return None
 
     def run_audit(self):
         geometry_data = []
         material_data = [] 
+        elevation_values = []  # Store all found EL values
         mat_kws = ["마감", "유리", "콘크리트", "THK", "단열재", "방수"]
 
         for e in self.msp:
@@ -53,10 +75,12 @@ class FinalComplianceAuditor:
                     'pos': pos # Fixed the AttributeError here
                 })
             
-            # 2. Material Extraction
+            # 2. Material & Elevation Extraction from TEXT entities
             if e.dxftype() in ['TEXT', 'MTEXT']:
                 txt = e.plain_text()
                 txt = re.sub(r'\\[A-Za-z][^;]*;', '', txt).strip()
+                
+                # Check for material keywords
                 if any(k in txt for k in mat_kws):
                     # Get insertion point safely
                     try:
@@ -69,6 +93,11 @@ class FinalComplianceAuditor:
                         'layer': e.dxf.layer.upper(),
                         'pos': ins_pos
                     })
+                
+                # Check for elevation values (EL notation)
+                el_value = self._extract_elevation(txt)
+                if el_value is not None:
+                    elevation_values.append(el_value)
 
         df = pd.DataFrame(geometry_data)
         if df.empty:
@@ -109,6 +138,21 @@ class FinalComplianceAuditor:
         # If we found 0 floors (common in messy files), fallback to footprint
         if total_floor_area == 0:
             total_floor_area = footprint_area
+            
+        # --- LOGIC: BUILDING HEIGHT ---
+        # Calculate building height from max EL value (highest point)
+        building_height = None
+        if elevation_values:
+            # The building height is typically the maximum elevation found
+            # Filter out ground level (EL around 0) if there are higher values
+            max_elevation = max(elevation_values)
+            min_elevation = min(elevation_values)
+            
+            # If we have multiple elevations, the height is max - min (or just max if min is near 0)
+            if min_elevation < 1:  # Ground level is near 0
+                building_height = max_elevation
+            else:
+                building_height = max_elevation - min_elevation if max_elevation > min_elevation else max_elevation
 
         return {
             "site": site_area,
@@ -117,7 +161,9 @@ class FinalComplianceAuditor:
             "floors": floor_totals,
             "materials": material_data,
             "btl": (footprint_area / site_area * 100) if site_area > 0 else 0,
-            "far": (total_floor_area / site_area * 100) if site_area > 0 else 0
+            "far": (total_floor_area / site_area * 100) if site_area > 0 else 0,
+            "building_height": building_height,
+            "elevation_values": elevation_values  # Include all found values for reference
         }
 
 if __name__ == "__main__":
@@ -138,5 +184,7 @@ if __name__ == "__main__":
         "floors": res['floors'],
         "btl": res['btl'],
         "far": res['far'],
-        "materials_count": len(res['materials'])
+        "materials_count": len(res['materials']),
+        "building_height": res.get('building_height'),
+        "elevation_values": res.get('elevation_values', [])
     }))

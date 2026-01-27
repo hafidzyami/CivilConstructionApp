@@ -60,6 +60,7 @@ class ExtractionResult:
     num_floors: int = 0
     bcr: float = 0.0  # Building Coverage Ratio (%)
     far: float = 0.0  # Floor Area Ratio (%)
+    building_height: float = 0.0  # Building height in meters (from EL values)
     layers: list = None
     materials: list = None
     raw_response: str = ""
@@ -74,6 +75,7 @@ class ExtractionResult:
             "num_floors": self.num_floors,
             "bcr_percent": self.bcr,
             "far_percent": self.far,
+            "building_height_m": self.building_height,
             "layers": self.layers or [],
             "materials": self.materials or [],
             "method": self.method
@@ -332,6 +334,7 @@ I need you to extract the following information from this architectural drawing:
 4. **Number of Floors (층수)**: How many floors/stories the building has
 5. **Building Coverage Ratio (건폐율, BCR)**: (Building Footprint / Site Area) × 100%
 6. **Floor Area Ratio (용적률, FAR)**: (Total Floor Area / Site Area) × 100%
+7. **Building Height (건물높이)**: The total building height in meters. Look for EL (elevation) values like "EL+12500", "EL 12.5m", "EL=8500" in text entities. The building height is typically the maximum EL value. If values are >100, they're likely in mm (divide by 1000 for meters).
 
 **DXF Text Content:**
 ```
@@ -344,6 +347,7 @@ I need you to extract the following information from this architectural drawing:
 - Look for layers named like: SITE, 대지, HH, FOOTPRINT, 1F, 2F, etc.
 - The largest polygon is often the site boundary
 - HH or FOOTPRINT layers typically contain building footprint
+- For building height, search for EL values in text entities - these indicate elevation levels
 
 **IMPORTANT:** Return your answer ONLY as valid JSON in this exact format:
 ```json
@@ -355,9 +359,10 @@ I need you to extract the following information from this architectural drawing:
   "num_floors": <integer>,
   "bcr_percent": <number>,
   "far_percent": <number>,
+  "building_height_m": <number or null if not found>,
   "detected_layers": ["layer1", "layer2"],
   "confidence": "high/medium/low",
-  "notes": "any relevant observations"
+  "notes": "any relevant observations including EL values found"
 }}
 ```
 """
@@ -453,6 +458,7 @@ I need you to extract the following information from this architectural drawing:
             num_floors=data.get('num_floors', 0),
             bcr=data.get('bcr_percent', 0),
             far=data.get('far_percent', 0),
+            building_height=data.get('building_height_m', 0) or 0,
             layers=data.get('detected_layers', []),
             raw_response=response,
             method="llm"

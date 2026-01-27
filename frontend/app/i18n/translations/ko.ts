@@ -481,6 +481,19 @@ export const ko: TranslationKeys = {
         type: '유형',
         footprint: '건축면적',
         upperFloor: '상층부',
+        viewOnlyTitle: '읽기 전용 모드',
+        viewOnlyDesc: '데이터가 자동으로 추출되었습니다. 확대/축소 및 이동하여 탐색하세요.',
+        autoAnalyzed: '자동 분석됨',
+        viewOnlyHint: '스크롤로 확대/축소, Shift+드래그로 이동',
+      },
+      
+      buildingHeight: {
+        title: '건물 높이',
+        manualHint: '총 건물 높이를 입력하세요 (DXF의 EL 값 참조)',
+        autoHint: 'DXF의 EL 값에서 자동 추출됨',
+        placeholder: '예: 12.5',
+        autoExtracted: '자동 추출됨',
+        notFound: 'DXF에서 찾을 수 없음',
       },
       
       metrics: {

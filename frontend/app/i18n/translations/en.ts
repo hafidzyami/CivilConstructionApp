@@ -479,6 +479,19 @@ export const en = {
         type: 'Type',
         footprint: 'Footprint',
         upperFloor: 'Upper Floor',
+        viewOnlyTitle: 'View Only Mode',
+        viewOnlyDesc: 'Data has been auto-extracted. Zoom and pan to explore.',
+        autoAnalyzed: 'Automatically analyzed',
+        viewOnlyHint: 'Use scroll to zoom, Shift+drag to pan',
+      },
+      
+      buildingHeight: {
+        title: 'Building Height',
+        manualHint: 'Enter the total building height (from EL values in your DXF)',
+        autoHint: 'Automatically extracted from EL values in DXF',
+        placeholder: 'e.g., 12.5',
+        autoExtracted: 'Auto-extracted',
+        notFound: 'Not found in DXF',
       },
       
       metrics: {

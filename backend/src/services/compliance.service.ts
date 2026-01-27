@@ -11,6 +11,7 @@ export interface ComplianceCheckInput {
   floorArea?: number;
   bcr?: number;
   far?: number;
+  buildingHeight?: number;  // Building height in meters
   // Infrastructure Data
   latitude?: number;
   longitude?: number;
@@ -163,6 +164,7 @@ class ComplianceService {
       input.floorArea = sessionData.cadData.floorArea || undefined;
       input.bcr = sessionData.cadData.bcr || undefined;
       input.far = sessionData.cadData.far || undefined;
+      input.buildingHeight = sessionData.cadData.buildingHeight || undefined;
     }
 
     // Extract infrastructure data
@@ -308,6 +310,81 @@ class ComplianceService {
       }
     }
 
+    // Check Building Height compliance
+    if (input.buildingHeight !== undefined && input.buildingHeight > 0) {
+      // General height limit - varies by zone, using common residential limit
+      const generalHeightLimit = 20; // 20m is common for general residential areas
+      
+      // Check against general height limit
+      checks.push({
+        name: 'Building Height Limit',
+        status: input.buildingHeight <= generalHeightLimit ? 'pass' : 'warning',
+        actualValue: `${input.buildingHeight.toFixed(2)} m`,
+        requiredValue: `≤ ${generalHeightLimit} m (general residential)`,
+        regulation: 'Building Act Article 60',
+        message:
+          input.buildingHeight <= generalHeightLimit
+            ? `Building height of ${input.buildingHeight.toFixed(2)}m is within the general limit of ${generalHeightLimit}m`
+            : `Building height of ${input.buildingHeight.toFixed(2)}m exceeds the general residential limit of ${generalHeightLimit}m - verify local zoning requirements`,
+      });
+
+      // High-rise building check (13m+ requires structural safety confirmation)
+      if (input.buildingHeight >= 13) {
+        checks.push({
+          name: 'Structural Safety Confirmation',
+          status: 'warning',
+          actualValue: `${input.buildingHeight.toFixed(2)} m`,
+          requiredValue: '≥ 13 m requires confirmation',
+          regulation: 'Building Act Article 48, Enforcement Decree Article 32',
+          message: `Building height of ${input.buildingHeight.toFixed(2)}m exceeds 13m - structural safety confirmation by a licensed engineer is required`,
+        });
+      }
+
+      // Emergency elevator requirement (31m+)
+      if (input.buildingHeight > 31) {
+        checks.push({
+          name: 'Emergency Elevator Requirement',
+          status: 'fail',
+          actualValue: `${input.buildingHeight.toFixed(2)} m`,
+          requiredValue: '> 31 m requires emergency elevator',
+          regulation: 'Building Act Article 64, Enforcement Decree Article 90',
+          message: `Building height of ${input.buildingHeight.toFixed(2)}m exceeds 31m - emergency elevator installation is required`,
+        });
+      }
+
+      // Skyscraper check (200m+)
+      if (input.buildingHeight >= 200) {
+        checks.push({
+          name: 'Skyscraper Regulations',
+          status: 'warning',
+          actualValue: `${input.buildingHeight.toFixed(2)} m`,
+          requiredValue: '≥ 200 m = skyscraper',
+          regulation: 'Building Act Enforcement Decree Article 2',
+          message: `Building height of ${input.buildingHeight.toFixed(2)}m classifies this as a skyscraper - special regulations apply`,
+        });
+      }
+
+      // Sunshine/setback requirements check (9m threshold)
+      if (input.buildingHeight > 9) {
+        checks.push({
+          name: 'Setback from Adjacent Site',
+          status: 'warning',
+          actualValue: `${input.buildingHeight.toFixed(2)} m`,
+          requiredValue: '> 9 m requires setback ≥ 1/2 of height',
+          regulation: 'Building Act Article 61, Enforcement Decree Article 86',
+          message: `For parts exceeding 9m in height, the building must maintain a setback of at least 1/2 of the building height from adjacent site boundaries (for sunshine protection)`,
+        });
+      }
+    } else {
+      // No building height provided
+      checks.push({
+        name: 'Building Height Data',
+        status: 'warning',
+        regulation: 'Building Act Article 60',
+        message: 'Building height not provided - height restrictions cannot be verified. Please ensure the building complies with local height limits.',
+      });
+    }
+
     return checks;
   }
 
@@ -348,6 +425,7 @@ Building Data:
 - Total Floor Area: ${input.floorArea ? `${input.floorArea.toFixed(2)} m²` : 'Not provided'}
 - Building Coverage Ratio: ${input.bcr ? `${input.bcr.toFixed(2)}%` : 'Not calculated'}
 - Floor Area Ratio: ${input.far ? `${input.far.toFixed(2)}%` : 'Not calculated'}
+- Building Height: ${input.buildingHeight ? `${input.buildingHeight.toFixed(2)} m` : 'Not provided'}
 - Number of Floors: ${input.numberOfFloors || 'Not provided'}
 - Building Type: ${input.buildingType || 'Not specified'}
 - Zone Type: ${input.zoneType || 'Not specified'}

@@ -351,6 +351,7 @@ async def process_cad_llm(file: UploadFile = File(...)):
                     "btl": llm_result.get('bcr_percent', 0),
                     "far": llm_result.get('far_percent', 0),
                     "num_floors": llm_result.get('num_floors', 0),
+                    "building_height": llm_result.get('building_height_m', None),
                     "method": "llm"
                 }
             else:

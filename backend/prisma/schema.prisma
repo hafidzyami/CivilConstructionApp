@@ -48,18 +48,19 @@ model DemoDocument {
 }
 
 model DemoCadData {
-  id           Int         @id @default(autoincrement())
-  sessionId    Int         @unique
-  siteArea     Float?
-  buildingArea Float?
-  floorArea    Float?
-  bcr          Float?
-  far          Float?
-  rawData      Json?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  dxfFileUrl   String?
-  session      DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id             Int         @id @default(autoincrement())
+  sessionId      Int         @unique
+  siteArea       Float?
+  buildingArea   Float?
+  floorArea      Float?
+  bcr            Float?
+  far            Float?
+  buildingHeight Float?      // Building height in meters (from EL values)
+  rawData        Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  dxfFileUrl     String?
+  session        DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model DemoInfrastructure {
