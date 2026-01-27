@@ -417,6 +417,7 @@ export const en = {
       downloadJson: 'Download JSON',
       ocrFailed: 'OCR Failed',
       uploadToSee: 'Upload documents to see results',
+      retryUpload: 'Clear & Retry',
       required: 'Required',
       requiredEither: 'Required (Either)',
       optional: 'Optional',

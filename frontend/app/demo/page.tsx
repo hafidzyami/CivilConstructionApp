@@ -85,7 +85,7 @@ export default function DemoPage() {
     });
     return initial as Record<DocumentTypeId, DocumentTypeState>;
   });
-  const [activeDocType, setActiveDocType] = useState<DocumentTypeId | null>(null);
+  const [expandedDocTypes, setExpandedDocTypes] = useState<Set<DocumentTypeId>>(new Set());
   const [dragActive, setDragActive] = useState(false);
   const [ocrEngine, setOcrEngine] = useState<'surya' | 'paddle' | 'hybrid'>('hybrid');
   const [usePreprocessing, setUsePreprocessing] = useState(true);
@@ -248,22 +248,28 @@ export default function DemoPage() {
       if (uploadData.success) {
         const uploadedDocs = uploadData.data;
         
-        // Save OCR results to database for each document
+        // Save OCR results to database for each document (only successful ones)
         for (let i = 0; i < results.length; i++) {
           const result = results[i];
-          const ocrFormData = new FormData();
-          ocrFormData.append('sessionId', sessionId!.toString());
-          ocrFormData.append('extractedText', result.textContent || '');
-          ocrFormData.append('engine', ocrEngine);
-          ocrFormData.append('fileName', state.files[i].name);
-          ocrFormData.append('fileUrl', uploadedDocs[i]?.fileUrl || '');
-          ocrFormData.append('documentType', docTypeId);
+          if (result.success) {
+            const ocrFormData = new FormData();
+            ocrFormData.append('sessionId', sessionId!.toString());
+            ocrFormData.append('extractedText', result.textContent || '');
+            ocrFormData.append('engine', ocrEngine);
+            ocrFormData.append('fileName', state.files[i].name);
+            ocrFormData.append('fileUrl', uploadedDocs[i]?.fileUrl || '');
+            ocrFormData.append('documentType', docTypeId);
 
-          await fetch(`${API_URL}/demo/ocr-data`, {
-            method: 'POST',
-            body: ocrFormData,
-          });
+            await fetch(`${API_URL}/demo/ocr-data`, {
+              method: 'POST',
+              body: ocrFormData,
+            });
+          }
         }
+
+        // Check if all results are successful
+        const allSuccessful = results.every(r => r.success);
+        const hasAnySuccess = results.some(r => r.success);
 
         setDocumentStates(prev => ({
           ...prev,
@@ -271,9 +277,14 @@ export default function DemoPage() {
             ...prev[docTypeId],
             results,
             processing: false,
-            processed: true,
+            processed: allSuccessful, // Only mark as processed if ALL succeeded
           }
         }));
+
+        if (!allSuccessful) {
+          const failedCount = results.filter(r => !r.success).length;
+          setError(`${failedCount} file(s) failed OCR processing. You can retry or upload different files.`);
+        }
       }
     } catch (err: any) {
       setError('Failed to process OCR: ' + err.message);
@@ -409,13 +420,23 @@ export default function DemoPage() {
             <div className="space-y-4">
               {documentTypes.map((docType) => {
                 const state = documentStates[docType.id];
-                const isExpanded = activeDocType === docType.id;
+                const isExpanded = expandedDocTypes.has(docType.id);
                 
                 return (
                   <div key={docType.id} className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-lg overflow-hidden">
                     {/* Document Type Header */}
                     <button
-                      onClick={() => setActiveDocType(isExpanded ? null : docType.id)}
+                      onClick={() => {
+                        setExpandedDocTypes(prev => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(docType.id)) {
+                            newSet.delete(docType.id);
+                          } else {
+                            newSet.add(docType.id);
+                          }
+                          return newSet;
+                        });
+                      }}
                       className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
@@ -540,49 +561,116 @@ export default function DemoPage() {
                               </div>
                             )}
 
-                            {state.processed && state.results.length > 0 && (
+                            {state.results.length > 0 && (
                               <div className="space-y-4 max-h-80 overflow-y-auto">
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                                  <div className="flex items-center">
-                                    <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="text-sm font-semibold text-green-900">{t.demo.ocr.completed}</span>
+                                {/* Status Banner */}
+                                {state.processed ? (
+                                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                    <div className="flex items-center">
+                                      <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      <span className="text-sm font-semibold text-green-900">{t.demo.ocr.completed}</span>
+                                    </div>
                                   </div>
-                                </div>
+                                ) : (
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center">
+                                        <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="text-sm font-semibold text-red-900">{t.demo?.ocr?.ocrFailed || 'OCR Failed'}</span>
+                                      </div>
+                                      <button
+                                        onClick={() => clearDocumentType(docType.id)}
+                                        className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700"
+                                      >
+                                        {t.demo?.ocr?.retryUpload || 'Clear & Retry'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
 
                                 {state.results.map((result, idx) => (
-                                  <div key={idx} className="bg-slate-50 rounded-lg p-4 space-y-3">
+                                  <div key={idx} className={`rounded-lg p-4 space-y-3 ${result.success ? 'bg-slate-50' : 'bg-red-50/50'}`}>
                                     <div className="flex items-center justify-between">
-                                      <span className="font-medium text-slate-900 text-sm">{state.files[idx]?.name}</span>
-                                      <div className="flex gap-2">
-                                        <button
-                                          onClick={() => downloadOCRText(docType.id, idx)}
-                                          className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700"
-                                        >
-                                          TXT
-                                        </button>
-                                        {result.results && (
-                                          <button
-                                            onClick={() => downloadOCRJson(docType.id, idx)}
-                                            className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
-                                          >
-                                            JSON
-                                          </button>
+                                      <div className="flex items-center gap-2">
+                                        {result.success ? (
+                                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        ) : (
+                                          <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
                                         )}
+                                        <span className="font-medium text-slate-900 text-sm">{state.files[idx]?.name}</span>
                                       </div>
+                                      {result.success && (
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => downloadOCRText(docType.id, idx)}
+                                            className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700"
+                                          >
+                                            TXT
+                                          </button>
+                                          {result.results && (
+                                            <button
+                                              onClick={() => downloadOCRJson(docType.id, idx)}
+                                              className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
+                                            >
+                                              JSON
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                     
                                     {result.success ? (
-                                      <div className="bg-white rounded p-3 max-h-32 overflow-y-auto border border-slate-200">
-                                        <pre className="text-xs text-slate-700 whitespace-pre-wrap font-mono">
-                                          {result.textContent?.substring(0, 500) || t.demo.ocr.noTextDetected}
-                                          {result.textContent && result.textContent.length > 500 && '...'}
-                                        </pre>
+                                      <div className="space-y-3">
+                                        {/* Image Previews */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {/* Original Image Preview */}
+                                          {state.previews[idx] && (
+                                            <div>
+                                              <p className="text-xs font-medium text-slate-600 mb-1">{t.demo?.ocr?.originalImage || 'Original'}</p>
+                                              <img
+                                                src={state.previews[idx]}
+                                                alt={`Original ${idx + 1}`}
+                                                className="w-full h-24 object-contain rounded border border-slate-200 bg-white"
+                                              />
+                                            </div>
+                                          )}
+                                          {/* Preprocessed Image */}
+                                          {result.preprocessedImage && (
+                                            <div>
+                                              <p className="text-xs font-medium text-slate-600 mb-1">{t.demo?.ocr?.preprocessedImage || 'Preprocessed'}</p>
+                                              <img
+                                                src={result.preprocessedImage}
+                                                alt={`Preprocessed ${idx + 1}`}
+                                                className="w-full h-24 object-contain rounded border border-slate-200 bg-white"
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                        {result.preprocessingMetadata?.rotation_applied !== undefined && result.preprocessingMetadata.rotation_applied !== 0 && (
+                                          <p className="text-xs text-slate-500">
+                                            {(t.demo?.ocr?.rotationApplied || 'Rotation applied: {degrees}°').replace('{degrees}', result.preprocessingMetadata.rotation_applied.toFixed(2))}
+                                          </p>
+                                        )}
+                                        {/* Extracted Text */}
+                                        <div className="bg-white rounded p-3 max-h-32 overflow-y-auto border border-slate-200">
+                                          <pre className="text-xs text-slate-700 whitespace-pre-wrap font-mono">
+                                            {result.textContent?.substring(0, 500) || t.demo.ocr.noTextDetected}
+                                            {result.textContent && result.textContent.length > 500 && '...'}
+                                          </pre>
+                                        </div>
                                       </div>
                                     ) : (
-                                      <div className="bg-red-50 p-3 rounded border border-red-200">
-                                        <p className="text-xs text-red-700">{result.error}</p>
+                                      <div className="bg-red-100 p-3 rounded border border-red-200">
+                                        <p className="text-xs text-red-700 font-medium">{t.demo?.ocr?.ocrFailed || 'OCR Failed'}</p>
+                                        <p className="text-xs text-red-600 mt-1">{result.error}</p>
                                       </div>
                                     )}
                                   </div>

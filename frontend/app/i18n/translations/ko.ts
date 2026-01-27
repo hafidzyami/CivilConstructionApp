@@ -419,6 +419,7 @@ export const ko: TranslationKeys = {
       downloadJson: 'JSON 다운로드',
       ocrFailed: 'OCR 실패',
       uploadToSee: '결과를 보려면 문서를 업로드하세요',
+      retryUpload: '지우고 다시 시도',
       required: '필수',
       requiredEither: '필수 (둘 중 하나)',
       optional: '선택사항',
