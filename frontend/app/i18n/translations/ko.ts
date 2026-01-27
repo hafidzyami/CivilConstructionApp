@@ -385,6 +385,7 @@ export const ko: TranslationKeys = {
     
     ocr: {
       title: '문서 업로드',
+      uploadInstructions: '각 카테고리별로 문서를 업로드하세요. 각 문서 유형별로 OCR을 개별적으로 처리합니다.',
       dragDrop: '여기에 파일을 드래그 앤 드롭하세요',
       orClick: '또는 클릭하여 찾아보기',
       selectFiles: '파일 선택',
@@ -402,9 +403,9 @@ export const ko: TranslationKeys = {
       hybrid: '하이브리드 모드',
       hybridDesc: 'Surya 레이아웃 + PaddleOCR 텍스트',
       recommended: '권장',
-      processDocuments: '문서 처리',
+      processDocuments: 'OCR 처리',
       processingDocuments: '{count}개 문서 처리 중...',
-      completed: 'OCR이 성공적으로 완료되었습니다',
+      completed: 'OCR 완료',
       processedCount: '{count}개 문서 처리됨',
       document: '문서',
       originalImage: '원본 이미지',
@@ -418,6 +419,23 @@ export const ko: TranslationKeys = {
       downloadJson: 'JSON 다운로드',
       ocrFailed: 'OCR 실패',
       uploadToSee: '결과를 보려면 문서를 업로드하세요',
+      required: '필수',
+      requiredEither: '필수 (둘 중 하나)',
+      optional: '선택사항',
+      maxFiles: '최대 {count}개 파일',
+      singleFile: '1개 파일',
+      requirementsNotMet: '요구사항이 충족되지 않았습니다',
+      isRequired: '필수입니다',
+      eitherRequired: '매매/양도 확인서 또는 소유권/권리 증명서 중 하나가 필요합니다',
+      docTypes: {
+        landScope: '토지 범위 문서',
+        saleTransfer: '매매/양도 확인서',
+        ownershipRights: '소유권/권리 증명서',
+        coOwnerConsent: '공동 소유자 동의서, 지분 확인서 & 건물 개요',
+        preDecision: '사전 결정 문서',
+        otherPermit: '기타 허가 양식',
+        combinedAgreement: '결합 계약서',
+      },
     },
     
     cad: {

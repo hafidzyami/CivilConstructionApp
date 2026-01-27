@@ -383,6 +383,7 @@ export const en = {
     
     ocr: {
       title: 'Upload Documents',
+      uploadInstructions: 'Upload documents for each category. Process OCR for each document type individually.',
       dragDrop: 'Drag and drop files here',
       orClick: 'or click to browse',
       selectFiles: 'Select Files',
@@ -400,9 +401,9 @@ export const en = {
       hybrid: 'Hybrid Mode',
       hybridDesc: 'Surya layout + PaddleOCR text',
       recommended: 'RECOMMENDED',
-      processDocuments: 'Process Documents',
+      processDocuments: 'Process OCR',
       processingDocuments: 'Processing {count} document(s)...',
-      completed: 'OCR Completed Successfully',
+      completed: 'OCR Completed',
       processedCount: 'Processed {count} document(s)',
       document: 'Document',
       originalImage: 'Original Image',
@@ -416,6 +417,23 @@ export const en = {
       downloadJson: 'Download JSON',
       ocrFailed: 'OCR Failed',
       uploadToSee: 'Upload documents to see results',
+      required: 'Required',
+      requiredEither: 'Required (Either)',
+      optional: 'Optional',
+      maxFiles: 'Max {count} files',
+      singleFile: '1 file',
+      requirementsNotMet: 'Requirements not met',
+      isRequired: 'is required',
+      eitherRequired: 'Either Sale/Transfer Confirmation or Ownership/Rights Proof is required',
+      docTypes: {
+        landScope: 'Land Scope Documents',
+        saleTransfer: 'Sale/Transfer Confirmation',
+        ownershipRights: 'Ownership/Rights Proof',
+        coOwnerConsent: 'Co-owner Consent, Share Verification & Building Overview',
+        preDecision: 'Pre-Decision Document',
+        otherPermit: 'Other Permit Forms',
+        combinedAgreement: 'Combined Agreement',
+      },
     },
     
     cad: {
