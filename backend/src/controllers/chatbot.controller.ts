@@ -345,7 +345,7 @@ export const processResultChatQuery = async (req: Request, res: Response): Promi
         chatSessionId: sessionId,
         role: 'assistant',
         content: response.message,
-        sources: response.sources || null,
+        sources: response.sources || undefined,
       },
     });
 
