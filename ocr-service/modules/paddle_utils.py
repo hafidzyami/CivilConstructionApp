@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from .device_utils import get_device
-
+import gc
 
 def perform_paddle_ocr(image, use_cuda=True):
     """
