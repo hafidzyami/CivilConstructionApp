@@ -83,16 +83,13 @@ def perform_paddle_ocr(image, use_cuda=True):
 
 def perform_hybrid_ocr(image, use_cuda=True):
     """
-    Hybrid OCR: Surya for layout/table/bbox analysis, PaddleOCR for text recognition
-
-    Args:
-        image: Input image (numpy array, BGR or grayscale)
-        use_cuda: Whether to use CUDA if available
-
-    Returns:
-        Dictionary with Surya layout/tables + PaddleOCR text
+    Hybrid OCR: Sequential execution to save memory
+    1. Run Surya (Layout/Tables/Detection)
+    2. DELETE Surya models & GC
+    3. Run PaddleOCR (Text Recognition)
     """
     try:
+        # Import lazily
         from surya.foundation import FoundationPredictor
         from surya.layout import LayoutPredictor
         from surya.table_rec import TableRecPredictor
@@ -100,48 +97,63 @@ def perform_hybrid_ocr(image, use_cuda=True):
         from paddleocr import PaddleOCR
         from PIL import Image
 
+        # Force CPU if needed (recommended for your Docker setup)
+        # device = 'cpu' 
         device = get_device(prefer_cuda=use_cuda)
-
         print(f"  > Using {device.upper()} for Hybrid OCR")
 
-        # Convert to PIL for Surya
+        # --- STEP 1: PREPARE IMAGE ---
         if len(image.shape) == 2:
             pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_GRAY2RGB))
         else:
             pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-
         images = [pil_image]
 
-        # Step 1: Surya for layout and table detection
-        print("  > [SURYA] Initializing models...")
+        # --- STEP 2: RUN SURYA (Layout & Tables) ---
+        print("  > [SURYA] Initializing Foundation Model...")
         foundation_predictor = FoundationPredictor(device=device)
 
         print("  > [SURYA] Analyzing layout...")
         layout_predictor = LayoutPredictor(foundation_predictor)
         layout_results = layout_predictor(images)
+        
+        # Cleanup Layout Predictor immediately
+        del layout_predictor
+        gc.collect()
 
-        print("  > [SURYA] Detecting tables...")
+        print("  > [SURYA] Recognizing tables...")
         table_predictor = TableRecPredictor(device=device)
         table_results = table_predictor(images)
+        
+        # Cleanup Table Predictor
+        del table_predictor
+        gc.collect()
 
-        print("  > [SURYA] Detecting text bounding boxes...")
+        print("  > [SURYA] Detecting text boxes...")
         detection_predictor = DetectionPredictor(device=device)
         detection_results = detection_predictor(images)
 
-        # Step 2: PaddleOCR for text recognition
-        # GPU is auto-detected if paddlepaddle-gpu is installed
-        print("  > [PADDLE] Initializing OCR (Korean + Latin)...")
+        # Cleanup Detection & Foundation
+        del detection_predictor
+        del foundation_predictor
+        
+        # CRITICAL: Force Python to release the RAM back to the OS
+        print("  > [MEMORY] Cleaning up Surya models...")
+        gc.collect()
+
+        # --- STEP 3: RUN PADDLE (Text Recognition) ---
+        print("  > [PADDLE] Initializing OCR...")
         paddle_ocr = PaddleOCR(
-            use_angle_cls=False,        # Disabled: orientation handled by DocImgOrientationClassification in preprocessing
+            use_angle_cls=False,
             lang='korean',
-            # Adjust thresholds to detect whole lines, not individual characters
-            det_db_thresh=0.3,          # Binary threshold for text detection
-            det_db_box_thresh=0.6,      # Box threshold (higher = fewer false positives)
-            det_db_unclip_ratio=1.8,    # Expand text boxes (higher = larger boxes)
-            rec_batch_num=6
+            show_log=False,        # Reduce log spam
+            det_db_thresh=0.3,
+            det_db_box_thresh=0.6,
+            det_db_unclip_ratio=1.8,
+            rec_batch_num=1,       # <--- REDUCED from 6 to 1 to save RAM
+            use_mp=True            # Use multi-processing for CPU speed
         )
 
-        # Convert grayscale to BGR if needed
         if len(image.shape) == 2:
             image_bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         else:
@@ -149,34 +161,12 @@ def perform_hybrid_ocr(image, use_cuda=True):
 
         print("  > [PADDLE] Recognizing text...")
         paddle_result = paddle_ocr.ocr(image_bgr)
+        
+        # Clean up Paddle
+        del paddle_ocr
+        gc.collect()
 
-        if paddle_result and paddle_result[0]:
-            # Debug: Check paddle_result structure
-            print(f"  > [PADDLE] Result type: {type(paddle_result)}")
-            print(f"  > [PADDLE] Result length: {len(paddle_result) if hasattr(paddle_result, '__len__') else 'N/A'}")
-            if paddle_result and len(paddle_result) > 0:
-                print(f"  > [PADDLE] First element type: {type(paddle_result[0])}")
-
-                # Extract OCRResult object - PaddleOCR 3.0.3 returns OCRResult objects
-                ocr_result = paddle_result[0]
-
-                # Access the actual OCR data from OCRResult dictionary
-                # PaddleOCR 3.0.3 uses: rec_polys, rec_texts, rec_scores
-                if 'rec_polys' in ocr_result and 'rec_texts' in ocr_result and 'rec_scores' in ocr_result:
-                    boxes = ocr_result['rec_polys']
-                    texts = ocr_result['rec_texts']
-                    scores = ocr_result['rec_scores']
-
-                    print(f"  > [PADDLE] Detected {len(texts)} text regions")
-
-                    # Debug: Print first 3 detections
-                    for i in range(min(3, len(texts))):
-                        print(f"    Line {i+1}: '{texts[i]}' (conf: {scores[i]:.2f})")
-                else:
-                    print(f"  > [PADDLE] WARNING: Expected keys not found in OCRResult")
-                    print(f"  > [PADDLE] Available keys: {list(ocr_result.keys())}")
-
-        # Step 3: Merge Surya layout + PaddleOCR text
+        # --- STEP 4: MERGE ---
         print("  > Merging hybrid results...")
         merged_result = merge_hybrid_results(
             layout_results[0],

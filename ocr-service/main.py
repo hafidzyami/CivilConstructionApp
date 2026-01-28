@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Optional
 import shutil
-
+os.environ["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "1"
 # Configure logging for production
 logging.basicConfig(
     level=logging.INFO,

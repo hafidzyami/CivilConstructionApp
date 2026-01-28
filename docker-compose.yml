@@ -46,6 +46,9 @@ services:
       - ${OCR_PORT:-7000}:7000
     environment:
       PYTHONUNBUFFERED: 1
+      - PYTORCH_NO_CUDA_MEMORY_CACHING=1
+      - OMP_NUM_THREADS=4
+      - MKL_NUM_THREADS=4
     networks:
       - civilconstruction-network
     healthcheck:
