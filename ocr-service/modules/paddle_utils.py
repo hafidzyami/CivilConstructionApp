@@ -96,7 +96,7 @@ def perform_hybrid_ocr(image, use_cuda=True):
         from surya.detection import DetectionPredictor
         from paddleocr import PaddleOCR
         from PIL import Image
-
+        import gc
         # Force CPU if needed (recommended for your Docker setup)
         # device = 'cpu' 
         device = get_device(prefer_cuda=use_cuda)
