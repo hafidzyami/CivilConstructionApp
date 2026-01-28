@@ -147,7 +147,7 @@ def perform_hybrid_ocr(image, use_cuda=True):
             det_db_box_thresh=0.6,
             det_db_unclip_ratio=1.8,
             rec_batch_num=1,        # Keep this at 1 for memory safety
-            use_mp=True
+            #use_mp=True
         )
 
         # Convert grayscale to BGR if needed
