@@ -83,53 +83,49 @@ def perform_paddle_ocr(image, use_cuda=True):
 
 def perform_hybrid_ocr(image, use_cuda=True):
     """
-    Hybrid OCR: Sequential execution to save memory
-    1. Run Surya (Layout/Tables/Detection)
-    2. DELETE Surya models & GC
-    3. Run PaddleOCR (Text Recognition)
+    Hybrid OCR: Surya for layout/table/bbox analysis, PaddleOCR for text recognition
     """
     try:
-        # Import lazily
         from surya.foundation import FoundationPredictor
         from surya.layout import LayoutPredictor
         from surya.table_rec import TableRecPredictor
         from surya.detection import DetectionPredictor
         from paddleocr import PaddleOCR
         from PIL import Image
-        import gc
-        # Force CPU if needed (recommended for your Docker setup)
-        # device = 'cpu' 
+
         device = get_device(prefer_cuda=use_cuda)
+
         print(f"  > Using {device.upper()} for Hybrid OCR")
 
-        # --- STEP 1: PREPARE IMAGE ---
+        # Convert to PIL for Surya
         if len(image.shape) == 2:
             pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_GRAY2RGB))
         else:
             pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
         images = [pil_image]
 
-        # --- STEP 2: RUN SURYA (Layout & Tables) ---
-        print("  > [SURYA] Initializing Foundation Model...")
+        # Step 1: Surya for layout and table detection
+        print("  > [SURYA] Initializing models...")
         foundation_predictor = FoundationPredictor(device=device)
 
         print("  > [SURYA] Analyzing layout...")
         layout_predictor = LayoutPredictor(foundation_predictor)
         layout_results = layout_predictor(images)
         
-        # Cleanup Layout Predictor immediately
+        # Cleanup Layout
         del layout_predictor
         gc.collect()
 
-        print("  > [SURYA] Recognizing tables...")
+        print("  > [SURYA] Detecting tables...")
         table_predictor = TableRecPredictor(device=device)
         table_results = table_predictor(images)
         
-        # Cleanup Table Predictor
+        # Cleanup Table
         del table_predictor
         gc.collect()
 
-        print("  > [SURYA] Detecting text boxes...")
+        print("  > [SURYA] Detecting text bounding boxes...")
         detection_predictor = DetectionPredictor(device=device)
         detection_results = detection_predictor(images)
 
@@ -137,23 +133,24 @@ def perform_hybrid_ocr(image, use_cuda=True):
         del detection_predictor
         del foundation_predictor
         
-        # CRITICAL: Force Python to release the RAM back to the OS
+        # Force memory release before loading Paddle
         print("  > [MEMORY] Cleaning up Surya models...")
         gc.collect()
 
-        # --- STEP 3: RUN PADDLE (Text Recognition) ---
-        print("  > [PADDLE] Initializing OCR...")
+        # Step 2: PaddleOCR for text recognition
+        print("  > [PADDLE] Initializing OCR (Korean + Latin)...")
         paddle_ocr = PaddleOCR(
             use_angle_cls=False,
             lang='korean',
-            show_log=False,        # Reduce log spam
+            # show_log=False,       <--- REMOVED THIS LINE (It causes the error)
             det_db_thresh=0.3,
             det_db_box_thresh=0.6,
             det_db_unclip_ratio=1.8,
-            rec_batch_num=1,       # <--- REDUCED from 6 to 1 to save RAM
-            use_mp=True            # Use multi-processing for CPU speed
+            rec_batch_num=1,        # Keep this at 1 for memory safety
+            use_mp=True
         )
 
+        # Convert grayscale to BGR if needed
         if len(image.shape) == 2:
             image_bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         else:
@@ -161,12 +158,14 @@ def perform_hybrid_ocr(image, use_cuda=True):
 
         print("  > [PADDLE] Recognizing text...")
         paddle_result = paddle_ocr.ocr(image_bgr)
-        
-        # Clean up Paddle
+
+        # Cleanup Paddle
         del paddle_ocr
         gc.collect()
 
-        # --- STEP 4: MERGE ---
+        # ... (rest of the merging logic) ...
+        
+        # Step 3: Merge Surya layout + PaddleOCR text
         print("  > Merging hybrid results...")
         merged_result = merge_hybrid_results(
             layout_results[0],
