@@ -24,17 +24,28 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB max file size
+    fileSize: 50 * 1024 * 1024 // 50MB max file size (increased for PDF/DOCX)
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|bmp|tiff|tif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    // Image extensions
+    const imageTypes = /jpeg|jpg|png|bmp|tiff|tif/;
+    // Document extensions
+    const documentExtensions = /pdf|doc|docx/;
+    // Document MIME types
+    const documentMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    
+    const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+    const isImage = imageTypes.test(ext) && imageTypes.test(file.mimetype);
+    const isDocument = documentExtensions.test(ext) || documentMimeTypes.includes(file.mimetype);
 
-    if (mimetype && extname) {
+    if (isImage || isDocument) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed (JPG, PNG, BMP, TIFF)'));
+      cb(new Error('Only image files (JPG, PNG, BMP, TIFF) and documents (PDF, DOC, DOCX) are allowed'));
     }
   }
 });
@@ -43,7 +54,7 @@ const upload = multer({
  * @swagger
  * /api/ocr/process:
  *   post:
- *     summary: Process OCR on uploaded image
+ *     summary: Process OCR on uploaded file (image, PDF, or DOCX)
  *     tags: [OCR]
  *     requestBody:
  *       required: true
@@ -55,7 +66,7 @@ const upload = multer({
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Image file to process
+ *                 description: File to process (JPG, PNG, BMP, TIFF, PDF, DOC, DOCX)
  *               preprocessing:
  *                 type: string
  *                 enum: [true, false]

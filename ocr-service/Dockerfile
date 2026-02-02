@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Stage 2: Production runtime
 FROM python:3.11-slim
 
-# Install runtime dependencies
+# Install runtime dependencies including poppler for PDF support
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder

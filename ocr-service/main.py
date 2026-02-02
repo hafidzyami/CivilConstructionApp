@@ -1,6 +1,7 @@
 """
 FastAPI OCR Service
 Microservice for handling OCR processing with Surya, PaddleOCR, and Hybrid modes
+Supports images (JPG, PNG, BMP, TIFF), PDF, and DOCX files
 """
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import JSONResponse
@@ -11,9 +12,24 @@ import sys
 import os
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import shutil
+import io
 os.environ["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "1"
+
+# PDF and DOCX support
+try:
+    from pdf2image import convert_from_path, convert_from_bytes
+    PDF_SUPPORT = True
+except ImportError:
+    PDF_SUPPORT = False
+    
+try:
+    from docx import Document as DocxDocument
+    from PIL import Image
+    DOCX_SUPPORT = True
+except ImportError:
+    DOCX_SUPPORT = False
 # Configure logging for production
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +67,80 @@ app.add_middleware(
 # Create upload directory
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Supported file types
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'}
+DOCUMENT_EXTENSIONS = {'.pdf', '.doc', '.docx'}
+
+
+def convert_pdf_to_images(pdf_path: Path) -> List[np.ndarray]:
+    """Convert PDF pages to list of OpenCV images"""
+    if not PDF_SUPPORT:
+        raise HTTPException(status_code=500, detail="PDF support not available. Please install pdf2image and poppler.")
+    
+    try:
+        # Convert PDF to PIL images
+        pil_images = convert_from_path(str(pdf_path), dpi=300)
+        
+        # Convert PIL images to OpenCV format (BGR)
+        cv_images = []
+        for pil_img in pil_images:
+            # Convert PIL RGB to OpenCV BGR
+            cv_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+            cv_images.append(cv_img)
+        
+        return cv_images
+    except Exception as e:
+        logger.error(f"Failed to convert PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to convert PDF: {str(e)}")
+
+
+def extract_text_from_docx(docx_path: Path) -> str:
+    """Extract text directly from DOCX file"""
+    if not DOCX_SUPPORT:
+        raise HTTPException(status_code=500, detail="DOCX support not available. Please install python-docx.")
+    
+    try:
+        doc = DocxDocument(str(docx_path))
+        full_text = []
+        
+        for para in doc.paragraphs:
+            if para.text.strip():
+                full_text.append(para.text)
+        
+        # Also extract text from tables
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = []
+                for cell in row.cells:
+                    if cell.text.strip():
+                        row_text.append(cell.text.strip())
+                if row_text:
+                    full_text.append(' | '.join(row_text))
+        
+        return '\n'.join(full_text)
+    except Exception as e:
+        logger.error(f"Failed to extract text from DOCX: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to extract text from DOCX: {str(e)}")
+
+
+def get_file_type(filename: str, content_type: str) -> str:
+    """Determine file type from filename and content type"""
+    ext = Path(filename).suffix.lower() if filename else ''
+    
+    if ext in IMAGE_EXTENSIONS:
+        return 'image'
+    elif ext == '.pdf' or content_type == 'application/pdf':
+        return 'pdf'
+    elif ext in {'.doc', '.docx'} or content_type in {
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }:
+        return 'docx'
+    elif content_type and content_type.startswith('image/'):
+        return 'image'
+    
+    return 'unknown'
 
 
 def extract_text_from_results(ocr_results):
@@ -155,10 +245,10 @@ async def process_ocr(
     engine: str = Form(default="hybrid")
 ):
     """
-    Process OCR on uploaded image
+    Process OCR on uploaded file
 
     Args:
-        file: Image file (JPEG, PNG, etc.)
+        file: Image file (JPEG, PNG, etc.), PDF, or DOCX
         preprocessing: Apply preprocessing (default: True)
         engine: OCR engine to use - 'surya', 'paddle', or 'hybrid' (default: 'hybrid')
 
@@ -172,17 +262,19 @@ async def process_ocr(
     temp_file_path = None
 
     try:
-        # Validate file type
-        if not file.content_type or not file.content_type.startswith('image/'):
-            logger.error(f"[REQ {request_id}] Invalid file type: {file.content_type}")
-            raise HTTPException(status_code=400, detail="File must be an image")
+        # Determine file type
+        file_type = get_file_type(file.filename, file.content_type)
+        logger.info(f"[REQ {request_id}] File: {file.filename}, Type: {file_type}, Content-Type: {file.content_type}")
+        
+        if file_type == 'unknown':
+            logger.error(f"[REQ {request_id}] Unsupported file type: {file.content_type}")
+            raise HTTPException(status_code=400, detail="Unsupported file type. Please upload an image (JPG, PNG, BMP, TIFF), PDF, or DOCX file.")
 
         # Validate engine
         if engine not in ['surya', 'paddle', 'hybrid']:
             logger.error(f"[REQ {request_id}] Invalid engine: {engine}")
             raise HTTPException(status_code=400, detail="Engine must be 'surya', 'paddle', or 'hybrid'")
 
-        logger.info(f"[REQ {request_id}] File: {file.filename}")
         logger.info(f"[REQ {request_id}] Engine: {engine}")
         logger.info(f"[REQ {request_id}] Preprocessing: {preprocessing}")
 
@@ -195,15 +287,6 @@ async def process_ocr(
         file_size_kb = temp_file_path.stat().st_size / 1024
         logger.info(f"[REQ {request_id}] File saved: {file_size_kb:.2f} KB (took {time.time() - save_start:.2f}s)")
 
-        # Load image
-        load_start = time.time()
-        image = cv2.imread(str(temp_file_path))
-        if image is None:
-            logger.error(f"[REQ {request_id}] Failed to load image")
-            raise HTTPException(status_code=400, detail="Failed to load image")
-
-        logger.info(f"[REQ {request_id}] Image loaded: {image.shape} (took {time.time() - load_start:.2f}s)")
-
         result = {
             'text': '',
             'preprocessedImage': None,
@@ -211,58 +294,128 @@ async def process_ocr(
             'results': None
         }
 
-        # Preprocessing
-        image_for_ocr = image
-        if preprocessing:
-            logger.info(f"[REQ {request_id}] Starting preprocessing...")
-            preprocess_start = time.time()
+        # Handle DOCX files - extract text directly
+        if file_type == 'docx':
+            logger.info(f"[REQ {request_id}] Processing DOCX file - extracting text directly")
+            text_content = extract_text_from_docx(temp_file_path)
+            
+            result['text'] = text_content
+            result['results'] = {
+                'layout': {'regions': []},
+                'tables': [],
+                'text_lines': [{
+                    'text': line,
+                    'bbox': [0, i * 20, 100, (i + 1) * 20],
+                    'confidence': 1.0,
+                    'region_type': 'Text'
+                } for i, line in enumerate(text_content.split('\n')) if line.strip()]
+            }
+            
+            total_duration = time.time() - start_time
+            logger.info(f"[REQ {request_id}] DOCX text extraction completed: {len(text_content)} characters")
+            logger.info(f"[REQ {request_id}] ========== REQUEST COMPLETED in {total_duration:.2f}s ==========")
+            
+            return JSONResponse(content=result)
 
-            preprocessed, metadata = preprocess_image(image, save_steps_dir=None)
-            image_for_ocr = preprocessed
+        # Handle PDF and Image files
+        images_to_process = []
+        
+        if file_type == 'pdf':
+            logger.info(f"[REQ {request_id}] Converting PDF to images...")
+            convert_start = time.time()
+            images_to_process = convert_pdf_to_images(temp_file_path)
+            logger.info(f"[REQ {request_id}] PDF converted to {len(images_to_process)} page(s) (took {time.time() - convert_start:.2f}s)")
+        else:
+            # Load image
+            load_start = time.time()
+            image = cv2.imread(str(temp_file_path))
+            if image is None:
+                logger.error(f"[REQ {request_id}] Failed to load image")
+                raise HTTPException(status_code=400, detail="Failed to load image")
+            images_to_process = [image]
+            logger.info(f"[REQ {request_id}] Image loaded: {image.shape} (took {time.time() - load_start:.2f}s)")
 
-            preprocess_duration = time.time() - preprocess_start
-            logger.info(f"[REQ {request_id}] Preprocessing completed in {preprocess_duration:.2f}s")
-            logger.info(f"[REQ {request_id}] Preprocessing metadata: {metadata}")
+        # Process all images (pages)
+        all_text_lines = []
+        all_text_content = []
+        preprocessed_image_b64 = None
+        preprocessing_metadata = None
+        
+        for page_idx, image in enumerate(images_to_process):
+            logger.info(f"[REQ {request_id}] Processing page {page_idx + 1}/{len(images_to_process)}")
+            
+            # Preprocessing
+            image_for_ocr = image
+            if preprocessing:
+                logger.info(f"[REQ {request_id}] Starting preprocessing for page {page_idx + 1}...")
+                preprocess_start = time.time()
 
-            # Convert to base64
-            b64_start = time.time()
-            result['preprocessedImage'] = image_to_base64(preprocessed)
-            result['preprocessingMetadata'] = metadata
-            logger.info(f"[REQ {request_id}] Base64 encoding took {time.time() - b64_start:.2f}s")
+                preprocessed, metadata = preprocess_image(image, save_steps_dir=None)
+                image_for_ocr = preprocessed
 
-        # OCR Processing
-        logger.info(f"[REQ {request_id}] Starting OCR with engine: {engine}")
-        ocr_start = time.time()
+                preprocess_duration = time.time() - preprocess_start
+                logger.info(f"[REQ {request_id}] Preprocessing completed in {preprocess_duration:.2f}s")
+                
+                # Only store preprocessed image for first page (or single image)
+                if page_idx == 0:
+                    b64_start = time.time()
+                    preprocessed_image_b64 = image_to_base64(preprocessed)
+                    preprocessing_metadata = metadata
+                    logger.info(f"[REQ {request_id}] Base64 encoding took {time.time() - b64_start:.2f}s")
 
-        ocr_results = None
-        if engine == 'surya':
-            ocr_results = perform_surya_ocr(image_for_ocr, use_cuda=True)
-        elif engine == 'paddle':
-            ocr_results = perform_paddle_ocr(image_for_ocr, use_cuda=True)
-        else:  # hybrid
-            ocr_results = perform_hybrid_ocr(image_for_ocr, use_cuda=True)
+            # OCR Processing
+            logger.info(f"[REQ {request_id}] Starting OCR with engine: {engine} for page {page_idx + 1}")
+            ocr_start = time.time()
 
-        ocr_duration = time.time() - ocr_start
-        logger.info(f"[REQ {request_id}] OCR completed in {ocr_duration:.2f}s")
+            ocr_results = None
+            if engine == 'surya':
+                ocr_results = perform_surya_ocr(image_for_ocr, use_cuda=True)
+            elif engine == 'paddle':
+                ocr_results = perform_paddle_ocr(image_for_ocr, use_cuda=True)
+            else:  # hybrid
+                ocr_results = perform_hybrid_ocr(image_for_ocr, use_cuda=True)
 
-        if not ocr_results:
+            ocr_duration = time.time() - ocr_start
+            logger.info(f"[REQ {request_id}] OCR completed for page {page_idx + 1} in {ocr_duration:.2f}s")
+
+            if ocr_results and 'text_lines' in ocr_results:
+                # Add page offset to bbox for multi-page documents
+                page_offset = page_idx * 1000  # Arbitrary offset to separate pages
+                for line in ocr_results['text_lines']:
+                    if 'bbox' in line and len(line['bbox']) >= 2:
+                        line['bbox'][1] += page_offset  # Offset y position
+                        if len(line['bbox']) >= 4:
+                            line['bbox'][3] += page_offset
+                    line['page'] = page_idx + 1
+                    all_text_lines.extend([line])
+                
+                # Extract text from this page
+                page_text = extract_text_from_results(ocr_results)
+                if page_text:
+                    all_text_content.append(f"--- Page {page_idx + 1} ---\n{page_text}" if len(images_to_process) > 1 else page_text)
+
+        # Combine results
+        if not all_text_lines and not all_text_content:
             logger.warning(f"[REQ {request_id}] OCR processing returned no results")
             raise HTTPException(status_code=500, detail="OCR processing returned no results")
 
-        # Extract text
-        extract_start = time.time()
-        text_content = extract_text_from_results(ocr_results)
-        logger.info(f"[REQ {request_id}] Text extraction took {time.time() - extract_start:.2f}s")
-        logger.info(f"[REQ {request_id}] Extracted {len(text_content)} characters")
-
-        result['text'] = text_content
-
-        # Clean results for JSON
-        json_start = time.time()
-        result['results'] = clean_results_for_json(ocr_results)
-        logger.info(f"[REQ {request_id}] JSON conversion took {time.time() - json_start:.2f}s")
+        result['text'] = '\n\n'.join(all_text_content)
+        result['preprocessedImage'] = preprocessed_image_b64
+        result['preprocessingMetadata'] = preprocessing_metadata
+        result['results'] = {
+            'layout': {'regions': []},
+            'tables': [],
+            'text_lines': [{
+                'text': line.get('text', ''),
+                'bbox': line.get('bbox', []),
+                'confidence': float(line.get('confidence', 1.0)),
+                'region_type': line.get('region_type', 'Unknown'),
+                'page': line.get('page', 1)
+            } for line in all_text_lines]
+        }
 
         total_duration = time.time() - start_time
+        logger.info(f"[REQ {request_id}] Extracted {len(result['text'])} characters from {len(images_to_process)} page(s)")
         logger.info(f"[REQ {request_id}] ========== REQUEST COMPLETED in {total_duration:.2f}s ==========")
 
         return JSONResponse(content=result)
