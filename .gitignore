@@ -18,3 +18,4 @@ neo4j/
 CAD-parser/draft/*.py
 CAD-parser/.venv
 CAD-parser/__pycache__/*
+# CubiCasa5k/model_best_val_loss_var.pkl
