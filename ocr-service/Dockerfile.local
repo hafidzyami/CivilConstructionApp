@@ -1,0 +1,110 @@
+# Multi-stage build for OCR Service with CUDA/GPU support
+# Requires: NVIDIA Docker runtime (nvidia-docker2)
+# Build: docker build -t ocr-service:gpu .
+# Run: docker run --gpus all -p 7000:7000 ocr-service:gpu
+
+# Stage 1: Python builder with ML dependencies
+# Using CUDA 12.9 for RTX 5070 (Blackwell) compatibility
+FROM nvidia/cuda:12.9.0-runtime-ubuntu22.04 as builder
+
+# Install Python and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    build-essential \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Create virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --upgrade pip setuptools wheel
+
+# Install PyTorch with CUDA 12.8 support (closest to 12.9)
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
+# Install PaddlePaddle GPU version for CUDA 12.9
+RUN pip install paddlepaddle-gpu==3.2.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu129/
+
+# Copy requirements and install remaining Python dependencies
+# Note: surya-ocr 0.17.0 requires transformers>=4.56.1
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Stage 2: Production runtime with CUDA
+FROM nvidia/cuda:12.9.0-runtime-ubuntu22.04
+
+# Install Python and runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Add venv to PATH
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create langchain compatibility shim for PaddleX
+# PaddleX imports from old langchain paths which have been moved to separate packages
+RUN mkdir -p /opt/venv/lib/python3.11/site-packages/langchain/docstore && \
+    echo "# Compatibility shim for PaddleX" > /opt/venv/lib/python3.11/site-packages/langchain/__init__.py && \
+    echo "from langchain_core.documents import Document" > /opt/venv/lib/python3.11/site-packages/langchain/docstore/__init__.py && \
+    echo "from langchain_core.documents import Document" > /opt/venv/lib/python3.11/site-packages/langchain/docstore/document.py && \
+    echo "from langchain_text_splitters import RecursiveCharacterTextSplitter" > /opt/venv/lib/python3.11/site-packages/langchain/text_splitter.py
+
+# Set working directory
+WORKDIR /app
+
+# Copy application code
+COPY . .
+
+# Create non-root user with home directory
+RUN groupadd -g 1001 ocruser && \
+    useradd -u 1001 -g ocruser -s /bin/bash -m ocruser
+
+# Set HOME environment variable for PaddleOCR cache
+ENV HOME=/home/ocruser
+
+# Disable PaddleOCR model source connectivity check (speeds up initialization)
+ENV DISABLE_MODEL_SOURCE_CHECK=True
+
+# CUDA environment variables
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/uploads && \
+    mkdir -p /home/ocruser/.paddlex/temp && \
+    mkdir -p /home/ocruser/.paddleocr && \
+    chown -R ocruser:ocruser /app /home/ocruser
+
+USER ocruser
+
+# Expose port
+EXPOSE 7000
+
+# Start FastAPI application
+CMD ["python3", "main.py"]
