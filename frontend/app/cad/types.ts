@@ -32,6 +32,8 @@ export interface MetricsData {
   totalFloorArea: number;
   bcr: number;
   far: number;
+  numFloors?: number | null;
+  buildingHeight?: number | null;
 }
 
 export interface AutoAnalysis {
@@ -42,6 +44,8 @@ export interface AutoAnalysis {
   btl: number;
   far: number;
   materials_count?: number;
+  num_floors?: number;
+  building_height_m?: number;
 }
 
 export type AppStep = 'upload' | 'layers' | 'analyze';

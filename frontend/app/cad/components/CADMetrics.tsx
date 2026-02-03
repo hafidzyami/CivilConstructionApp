@@ -28,35 +28,51 @@ export default function CADMetrics({ metrics, parserMode }: CADMetricsProps) {
         </div>
       )}
       
-      <div className="grid grid-cols-5 gap-4 w-full relative z-10 items-center text-center">
+      <div className="grid grid-cols-7 gap-3 w-full relative z-10 items-center text-center">
         {/* Site Area */}
         <div className="border-r border-slate-700/50">
           <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">{t.demo.cad.metrics.siteArea}</div>
-          <div className="text-2xl xl:text-3xl font-mono text-cyan-400 truncate">
-            {metrics.siteArea.toFixed(0)}<span className="text-sm opacity-50 ml-1">m²</span>
+          <div className="text-xl xl:text-2xl font-mono text-cyan-400 truncate">
+            {metrics.siteArea.toFixed(0)}<span className="text-xs opacity-50 ml-1">m²</span>
           </div>
         </div>
         
         {/* Building Area */}
         <div className="border-r border-slate-700/50">
           <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">{t.demo.cad.metrics.building}</div>
-          <div className="text-2xl xl:text-3xl font-mono text-orange-400 truncate">
-            {metrics.footprintArea.toFixed(0)}<span className="text-sm opacity-50 ml-1">m²</span>
+          <div className="text-xl xl:text-2xl font-mono text-orange-400 truncate">
+            {metrics.footprintArea.toFixed(0)}<span className="text-xs opacity-50 ml-1">m²</span>
           </div>
         </div>
 
         {/* Total Floor */}
         <div className="border-r border-slate-700/50">
           <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">{t.demo.cad.metrics.totalFloor}</div>
-          <div className="text-2xl xl:text-3xl font-mono text-white truncate">
-            {metrics.totalFloorArea.toFixed(0)}<span className="text-sm opacity-50 ml-1">m²</span>
+          <div className="text-xl xl:text-2xl font-mono text-white truncate">
+            {metrics.totalFloorArea.toFixed(0)}<span className="text-xs opacity-50 ml-1">m²</span>
+          </div>
+        </div>
+
+        {/* Number of Floors */}
+        <div className="border-r border-slate-700/50">
+          <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">{t.admin?.dashboard?.numFloors || 'Floors'}</div>
+          <div className="text-xl xl:text-2xl font-mono text-purple-400 truncate">
+            {metrics.numFloors ?? '-'}<span className="text-xs opacity-50 ml-1">{t.admin?.dashboard?.floors || 'F'}</span>
+          </div>
+        </div>
+
+        {/* Building Height */}
+        <div className="border-r border-slate-700/50">
+          <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">{t.admin?.dashboard?.buildingHeight || 'Height'}</div>
+          <div className="text-xl xl:text-2xl font-mono text-blue-400 truncate">
+            {metrics.buildingHeight ? metrics.buildingHeight.toFixed(1) : '-'}<span className="text-xs opacity-50 ml-1">m</span>
           </div>
         </div>
 
         {/* BCR */}
         <div>
           <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">{t.demo.cad.metrics.bcr}</div>
-          <div className="text-3xl xl:text-4xl font-bold text-white tracking-tight">
+          <div className="text-2xl xl:text-3xl font-bold text-white tracking-tight">
             {metrics.bcr.toFixed(0)}<span className="text-lg text-orange-500 ml-0.5">%</span>
           </div>
         </div>
@@ -64,7 +80,7 @@ export default function CADMetrics({ metrics, parserMode }: CADMetricsProps) {
         {/* FAR */}
         <div>
           <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">{t.demo.cad.metrics.far}</div>
-          <div className="text-3xl xl:text-4xl font-bold text-white tracking-tight">
+          <div className="text-2xl xl:text-3xl font-bold text-white tracking-tight">
             {metrics.far.toFixed(0)}<span className="text-lg text-orange-500 ml-0.5">%</span>
           </div>
         </div>

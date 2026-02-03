@@ -56,6 +56,8 @@ model DemoCadData {
   bcr            Float?
   far            Float?
   buildingHeight Float?      // Building height in meters (from EL values)
+
+  numFloors      Int?        // Number of floors/stories in the building
   rawData        Json?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt

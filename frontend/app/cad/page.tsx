@@ -216,12 +216,18 @@ export default function CADPage() {
   const metrics: MetricsData = useMemo(() => {
     // If we have auto analysis results (from Python or LLM parser), use those
     if (autoAnalysis && (parserMode === 'python' || parserMode === 'llm')) {
+      // Calculate num_floors from floors object if not provided directly
+      const numFloors = autoAnalysis.num_floors || 
+        (autoAnalysis.floors ? Object.keys(autoAnalysis.floors).length : null);
+      
       return {
         siteArea: autoAnalysis.site_area || 0,
         footprintArea: autoAnalysis.footprint_area || 0,
         totalFloorArea: autoAnalysis.total_floor_area || 0,
         bcr: autoAnalysis.btl || 0,
         far: autoAnalysis.far || 0,
+        numFloors: numFloors,
+        buildingHeight: autoAnalysis.building_height_m || null,
       };
     }
     
@@ -229,6 +235,7 @@ export default function CADPage() {
     let siteArea = 0;
     let footprintArea = 0;
     let totalFloorArea = 0;
+    let maxFloors = 0;
     Object.entries(selections).forEach(([idStr, sel]) => {
       const poly = polygons.find((p) => p.id === parseInt(idStr));
       if (!poly) return;
@@ -236,11 +243,20 @@ export default function CADPage() {
       if (sel.isBuilding) {
         if (sel.isFootprint) footprintArea += poly.area_m2;
         totalFloorArea += poly.area_m2 * sel.floors;
+        maxFloors = Math.max(maxFloors, sel.floors);
       }
     });
     const bcr = siteArea > 0 ? (footprintArea / siteArea) * 100 : 0;
     const far = siteArea > 0 ? (totalFloorArea / siteArea) * 100 : 0;
-    return { siteArea, footprintArea, totalFloorArea, bcr, far };
+    return { 
+      siteArea, 
+      footprintArea, 
+      totalFloorArea, 
+      bcr, 
+      far,
+      numFloors: maxFloors > 0 ? maxFloors : null,
+      buildingHeight: null, // Manual mode doesn't calculate height
+    };
   }, [selections, polygons, autoAnalysis, parserMode]);
 
   return (

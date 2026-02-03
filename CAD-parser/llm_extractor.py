@@ -256,6 +256,141 @@ def image_to_base64(image_path: str) -> str:
     with open(image_path, 'rb') as f:
         return base64.b64encode(f.read()).decode('utf-8')
 
+def extract_elevation_data(dxf_path: str) -> Dict[str, Any]:
+    """
+    Extract elevation/height data from DXF file by analyzing text entities.
+    
+    Looks for patterns like:
+    - EL+12500, EL +12500, EL=12500
+    - GL+2000, GL +2000
+    - +12.5m, +12500mm
+    - Level 1 +0.000, Level 2 +3.200
+    - 1F, 2F, B1F floor indicators
+    - 층고 (floor height), 높이 (height) annotations
+    
+    Returns:
+        Dictionary with elevation data including max_height_m, floor_heights, etc.
+    """
+    import re
+    
+    try:
+        doc = ezdxf.readfile(dxf_path)
+        msp = doc.modelspace()
+        
+        elevation_values = []  # Store (value_in_mm, source_text)
+        floor_levels = {}  # floor_name -> elevation_mm
+        height_annotations = []  # Direct height annotations
+        
+        # Patterns to match elevation values
+        patterns = [
+            # EL+12500, EL +12500, EL=12500, E.L.+12500
+            (r'E\.?L\.?\s*[+=]?\s*([+-]?\d+(?:\.\d+)?)', 'EL'),
+            # GL+2000, GL +2000
+            (r'GL\s*[+=]?\s*([+-]?\d+(?:\.\d+)?)', 'GL'),
+            # Level 1 +3.200, Level 2 +6.400
+            (r'Level\s*(\d+)\s*[+=]?\s*([+-]?\d+(?:\.\d+)?)', 'LEVEL'),
+            # +12500, +12.5 (standalone elevation markers)
+            (r'^\s*([+-]\d+(?:\.\d+)?)\s*$', 'STANDALONE'),
+            # 1FL +3200, 2F +6400, B1F -3000
+            (r'(B?\d+)\s*F(?:L|층)?\s*[+=]?\s*([+-]?\d+(?:\.\d+)?)', 'FLOOR'),
+            # Height annotations in Korean: 층고 3000, 높이 9000
+            (r'(?:층고|높이|H|height)\s*[=:]?\s*(\d+(?:\.\d+)?)', 'HEIGHT'),
+            # Roof level, TOP level
+            (r'(?:ROOF|TOP|지붕|옥상)\s*[+=]?\s*([+-]?\d+(?:\.\d+)?)', 'ROOF'),
+        ]
+        
+        for entity in msp:
+            if entity.dxftype() in ['TEXT', 'MTEXT']:
+                try:
+                    txt = entity.plain_text().strip()
+                    if not txt:
+                        continue
+                    
+                    # Try each pattern
+                    for pattern, ptype in patterns:
+                        matches = re.finditer(pattern, txt, re.IGNORECASE)
+                        for match in matches:
+                            if ptype == 'LEVEL':
+                                level_num = match.group(1)
+                                value = float(match.group(2))
+                                floor_levels[f"Level {level_num}"] = value
+                                elevation_values.append((value, txt))
+                            elif ptype == 'FLOOR':
+                                floor_name = match.group(1) + 'F'
+                                value = float(match.group(2))
+                                floor_levels[floor_name] = value
+                                elevation_values.append((value, txt))
+                            elif ptype == 'HEIGHT':
+                                value = float(match.group(1))
+                                height_annotations.append((value, txt))
+                            elif ptype in ['EL', 'GL', 'STANDALONE', 'ROOF']:
+                                value = float(match.group(1))
+                                elevation_values.append((value, txt))
+                                if ptype == 'ROOF':
+                                    floor_levels['ROOF'] = value
+                                    
+                except Exception:
+                    pass
+        
+        # Process the collected data
+        result = {
+            'elevation_values': [],
+            'floor_levels': floor_levels,
+            'height_annotations': height_annotations,
+            'max_elevation_raw': None,
+            'min_elevation_raw': None,
+            'building_height_m': None,
+            'num_floors_detected': 0,
+        }
+        
+        if elevation_values:
+            # Get unique values sorted
+            unique_elevations = sorted(set(v[0] for v in elevation_values))
+            result['elevation_values'] = unique_elevations
+            result['max_elevation_raw'] = max(unique_elevations)
+            result['min_elevation_raw'] = min(unique_elevations)
+            
+            # Calculate building height
+            # If max value > 100, assume mm, otherwise assume meters
+            max_val = result['max_elevation_raw']
+            min_val = result['min_elevation_raw']
+            
+            # Height is difference between max and min (or max if min is 0/ground level)
+            if min_val < 0:
+                # Has basement, height from min to max
+                height_raw = max_val - min_val
+            else:
+                # No basement or min is ground level
+                height_raw = max_val
+            
+            # Convert to meters if needed
+            if abs(height_raw) > 100:
+                result['building_height_m'] = height_raw / 1000.0
+            else:
+                result['building_height_m'] = height_raw
+        
+        # Count floors from floor_levels
+        if floor_levels:
+            result['num_floors_detected'] = len(floor_levels)
+        
+        # If we have height annotations but no elevation values, use those
+        if not result['building_height_m'] and height_annotations:
+            max_height = max(h[0] for h in height_annotations)
+            if max_height > 100:
+                result['building_height_m'] = max_height / 1000.0
+            else:
+                result['building_height_m'] = max_height
+        
+        return result
+        
+    except Exception as e:
+        return {
+            'error': str(e),
+            'building_height_m': None,
+            'num_floors_detected': 0,
+        }
+
+
 def extract_dxf_text_content(dxf_path: str, max_lines: int = 500) -> str:
     """
     Extract text representation of DXF content for LLM context.
@@ -270,6 +405,22 @@ def extract_dxf_text_content(dxf_path: str, max_lines: int = 500) -> str:
         lines = []
         lines.append(f"=== DXF FILE ANALYSIS: {Path(dxf_path).name} ===")
         lines.append(f"Units: {doc.header.get('$INSUNITS', 'Unknown')}")
+        lines.append("")
+        
+        # Extract elevation data first
+        elevation_data = extract_elevation_data(dxf_path)
+        lines.append("=== ELEVATION/HEIGHT DATA ===")
+        if elevation_data.get('building_height_m'):
+            lines.append(f"Calculated Building Height: {elevation_data['building_height_m']:.2f} m")
+        if elevation_data.get('floor_levels'):
+            lines.append(f"Floor Levels Found: {elevation_data['floor_levels']}")
+        if elevation_data.get('elevation_values'):
+            lines.append(f"Elevation Values (raw): {elevation_data['elevation_values'][:10]}")
+        if elevation_data.get('height_annotations'):
+            lines.append(f"Height Annotations: {elevation_data['height_annotations'][:5]}")
+        if elevation_data.get('max_elevation_raw'):
+            lines.append(f"Max Elevation (raw): {elevation_data['max_elevation_raw']}")
+            lines.append(f"Min Elevation (raw): {elevation_data['min_elevation_raw']}")
         lines.append("")
         
         # Collect layers and their entity counts
@@ -334,7 +485,21 @@ I need you to extract the following information from this architectural drawing:
 4. **Number of Floors (층수)**: How many floors/stories the building has
 5. **Building Coverage Ratio (건폐율, BCR)**: (Building Footprint / Site Area) × 100%
 6. **Floor Area Ratio (용적률, FAR)**: (Total Floor Area / Site Area) × 100%
-7. **Building Height (건물높이)**: The total building height in meters. Look for EL (elevation) values like "EL+12500", "EL 12.5m", "EL=8500" in text entities. The building height is typically the maximum EL value. If values are >100, they're likely in mm (divide by 1000 for meters).
+7. **Building Height (건물높이)**: The total building height in meters.
+
+**How to find Building Height:**
+Look for these patterns in the text entities:
+- EL values: "EL+12500", "EL +12500", "EL=12500", "E.L.+8500"
+- GL values: "GL+2000", "GL +2000" (ground level references)
+- Level markers: "Level 1 +0.000", "Level 2 +3.200", "Level 5 +9.900"
+- Floor markers: "1F +0", "2F +3200", "RF +9000", "ROOF +12000"
+- Height annotations: "층고 3000", "높이 9000", "H=3000"
+- The pre-calculated elevation data in the DXF content section shows extracted values
+
+**Unit conversion for heights:**
+- Values > 100 are typically in millimeters (mm) → divide by 1000 for meters
+- Values < 100 are typically in meters
+- Building height = max_elevation - min_elevation (or just max if ground is 0)
 
 **DXF Text Content:**
 ```
@@ -347,7 +512,8 @@ I need you to extract the following information from this architectural drawing:
 - Look for layers named like: SITE, 대지, HH, FOOTPRINT, 1F, 2F, etc.
 - The largest polygon is often the site boundary
 - HH or FOOTPRINT layers typically contain building footprint
-- For building height, search for EL values in text entities - these indicate elevation levels
+- For building height, USE THE PRE-CALCULATED VALUE from "ELEVATION/HEIGHT DATA" section if available
+- If no elevation data found, estimate from number of floors (typical floor height: 2.8-3.2m)
 
 **IMPORTANT:** Return your answer ONLY as valid JSON in this exact format:
 ```json
@@ -387,9 +553,13 @@ I need you to extract the following information from this architectural drawing:
         print("  Converting DXF to image...")
         image_path = dxf_to_image(dxf_path)
         
-        # Extract text content from DXF
+        # Extract text content from DXF (includes elevation data)
         print("  Extracting DXF text content...")
         dxf_content = extract_dxf_text_content(dxf_path)
+        
+        # Also get elevation data directly for fallback
+        print("  Extracting elevation data...")
+        elevation_data = extract_elevation_data(dxf_path)
         
         # Prepare prompt
         prompt = self.EXTRACTION_PROMPT.format(dxf_content=dxf_content)
@@ -398,7 +568,7 @@ I need you to extract the following information from this architectural drawing:
         response = self._call_gemini(prompt, image_path)
         
         # Parse response
-        result = self._parse_response(response)
+        result = self._parse_response(response, elevation_data)
         
         # Cleanup temp image
         try:
@@ -431,8 +601,8 @@ I need you to extract the following information from this architectural drawing:
         
         return response.text
     
-    def _parse_response(self, response: str) -> ExtractionResult:
-        """Parse LLM response JSON"""
+    def _parse_response(self, response: str, elevation_data: Dict[str, Any] = None) -> ExtractionResult:
+        """Parse LLM response JSON with fallback to extracted elevation data"""
         import re
         
         # Extract JSON from response
@@ -450,15 +620,44 @@ I need you to extract the following information from this architectural drawing:
             print(f"Warning: Could not parse LLM response as JSON")
             data = {}
         
+        # Get building height from LLM response
+        building_height = data.get('building_height_m')
+        num_floors = data.get('num_floors', 0)
+        
+        # Fallback 1: Use pre-extracted elevation data if LLM returned null
+        if (building_height is None or building_height == 0) and elevation_data:
+            if elevation_data.get('building_height_m'):
+                building_height = elevation_data['building_height_m']
+                print(f"  Using pre-extracted building height: {building_height:.2f} m")
+            # Also update num_floors if we found floor levels
+            if num_floors == 0 and elevation_data.get('num_floors_detected', 0) > 0:
+                num_floors = elevation_data['num_floors_detected']
+        
+        # Fallback 2: Validate building height against number of floors
+        # Typical floor height is 2.8-3.2m, so minimum should be ~2.5m per floor
+        if building_height and num_floors > 0:
+            min_expected_height = num_floors * 2.5
+            if building_height < min_expected_height:
+                # Height seems too low for the number of floors, likely incomplete elevation data
+                estimated_height = num_floors * 3.0  # Assume 3m per floor
+                print(f"  Building height {building_height:.2f}m seems too low for {num_floors} floors.")
+                print(f"  Adjusting to estimated height: {estimated_height:.2f} m ({num_floors} floors × 3.0m)")
+                building_height = estimated_height
+        
+        # Fallback 3: Estimate from number of floors if still no height (typical floor height: 3.0m)
+        if (building_height is None or building_height == 0) and num_floors > 0:
+            building_height = num_floors * 3.0  # Assume 3m per floor
+            print(f"  Estimated building height from floors: {building_height:.2f} m ({num_floors} floors × 3.0m)")
+        
         return ExtractionResult(
             site_area=data.get('site_area_m2', 0),
             building_area=data.get('building_area_m2', 0),
             footprint_area=data.get('footprint_area_m2', 0),
             total_floor_area=data.get('total_floor_area_m2', 0),
-            num_floors=data.get('num_floors', 0),
+            num_floors=num_floors,
             bcr=data.get('bcr_percent', 0),
             far=data.get('far_percent', 0),
-            building_height=data.get('building_height_m', 0) or 0,
+            building_height=building_height or 0,
             layers=data.get('detected_layers', []),
             raw_response=response,
             method="llm"
@@ -485,6 +684,8 @@ def print_comparison(manual: ExtractionResult, llm: ExtractionResult):
          f"{abs(manual.total_floor_area - llm.total_floor_area):.2f}"),
         ("Number of Floors", str(manual.num_floors), str(llm.num_floors),
          str(abs(manual.num_floors - llm.num_floors))),
+        ("Building Height (m)", f"{manual.building_height:.2f}", f"{llm.building_height:.2f}",
+         f"{abs(manual.building_height - llm.building_height):.2f}"),
         ("BCR (%)", f"{manual.bcr:.2f}", f"{llm.bcr:.2f}",
          f"{abs(manual.bcr - llm.bcr):.2f}"),
         ("FAR (%)", f"{manual.far:.2f}", f"{llm.far:.2f}",
@@ -512,16 +713,23 @@ def print_comparison(manual: ExtractionResult, llm: ExtractionResult):
 def print_single_result(result: ExtractionResult, title: str):
     """Print single extraction result"""
     
+    def fmt(val, suffix=""):
+        """Format value handling None"""
+        if val is None:
+            return "N/A"
+        return f"{val:.2f}{suffix}"
+    
     print("\n" + "="*50)
     print(f"{title}")
     print("="*50)
-    print(f"Site Area:        {result.site_area:.2f} m²")
-    print(f"Building Area:    {result.building_area:.2f} m²")
-    print(f"Footprint Area:   {result.footprint_area:.2f} m²")
-    print(f"Total Floor Area: {result.total_floor_area:.2f} m²")
-    print(f"Number of Floors: {result.num_floors}")
-    print(f"BCR:              {result.bcr:.2f}%")
-    print(f"FAR:              {result.far:.2f}%")
+    print(f"Site Area:        {fmt(result.site_area, ' m²')}")
+    print(f"Building Area:    {fmt(result.building_area, ' m²')}")
+    print(f"Footprint Area:   {fmt(result.footprint_area, ' m²')}")
+    print(f"Total Floor Area: {fmt(result.total_floor_area, ' m²')}")
+    print(f"Number of Floors: {result.num_floors if result.num_floors else 'N/A'}")
+    print(f"Building Height:  {fmt(result.building_height, ' m')}")
+    print(f"BCR:              {fmt(result.bcr, '%')}")
+    print(f"FAR:              {fmt(result.far, '%')}")
     print(f"Layers Found:     {len(result.layers) if result.layers else 0}")
     if result.materials:
         print(f"Materials Found:  {len(result.materials)}")

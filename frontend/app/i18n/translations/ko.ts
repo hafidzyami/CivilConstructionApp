@@ -150,6 +150,9 @@ export const ko: TranslationKeys = {
       chatHistory: '채팅 기록',
       messages: '메시지',
       otherDocuments: '기타 문서',
+      numFloors: '층수',
+      floors: '층',
+      buildingHeight: '건물 높이',
     },
   },
 
@@ -504,6 +507,8 @@ export const ko: TranslationKeys = {
         far: '용적률',
         autoCalculated: '자동 계산됨',
         aiCalculated: 'AI 계산됨',
+        floors: '층수',
+        height: '높이',
       },
       
       standardization: {

@@ -127,7 +127,7 @@ export const uploadDocuments = async (req: Request, res: Response) => {
 // Save CAD data
 export const saveCadData = async (req: Request, res: Response) => {
   try {
-    const { sessionId, siteArea, buildingArea, floorArea, bcr, far, buildingHeight, rawData, dxfFileUrl } = req.body;
+    const { sessionId, siteArea, buildingArea, floorArea, bcr, far, buildingHeight, numFloors, rawData, dxfFileUrl } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({
@@ -146,6 +146,7 @@ export const saveCadData = async (req: Request, res: Response) => {
         bcr: bcr ? parseFloat(bcr) : null,
         far: far ? parseFloat(far) : null,
         buildingHeight: buildingHeight ? parseFloat(buildingHeight) : null,
+        numFloors: numFloors ? parseInt(numFloors) : null,
         rawData: rawData || null,
       },
       create: {
@@ -157,6 +158,7 @@ export const saveCadData = async (req: Request, res: Response) => {
         bcr: bcr ? parseFloat(bcr) : null,
         far: far ? parseFloat(far) : null,
         buildingHeight: buildingHeight ? parseFloat(buildingHeight) : null,
+        numFloors: numFloors ? parseInt(numFloors) : null,
         rawData: rawData || null,
       },
     });

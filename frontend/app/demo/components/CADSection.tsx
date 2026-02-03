@@ -53,6 +53,7 @@ interface AutoAnalysis {
   far: number;
   materials_count?: number;
   building_height?: number; // Building height in meters (extracted from EL values)
+  num_floors?: number;      // Number of floors/stories in the building
 }
 
 export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
@@ -78,6 +79,9 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
   
   // Building height state (manual input or auto-extracted)
   const [buildingHeight, setBuildingHeight] = useState<number | null>(null);
+  
+  // Number of floors state (manual input or auto-extracted)
+  const [numFloors, setNumFloors] = useState<number | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -224,6 +228,14 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
             if (analysis.building_height && analysis.building_height > 0) {
               setBuildingHeight(analysis.building_height);
             }
+            
+            // Set number of floors if extracted automatically
+            if (analysis.num_floors && analysis.num_floors > 0) {
+              setNumFloors(analysis.num_floors);
+            } else if (analysis.floors && Object.keys(analysis.floors).length > 0) {
+              // Fallback: count floor entries from the floors object
+              setNumFloors(Object.keys(analysis.floors).length);
+            }
           } catch (e) {
             console.error('Failed to parse auto analysis:', e, data.auto_analysis);
           }
@@ -238,6 +250,9 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
             (finalPolys[0]?.area_raw || 0);
           const floorArea = autoAnalysis?.total_floor_area || data.auto_analysis?.total_floor_area || 
             siteArea;
+          const extractedNumFloors = data.auto_analysis?.num_floors || 
+            (data.auto_analysis?.floors ? Object.keys(data.auto_analysis.floors).length : null);
+          const extractedBuildingHeight = data.auto_analysis?.building_height || null;
 
           const cadSaveRes = await fetch(`${API_URL}/demo/cad-data`, {
             method: 'POST',
@@ -247,6 +262,8 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
               siteArea,
               buildingArea,
               floorArea,
+              numFloors: extractedNumFloors,
+              buildingHeight: extractedBuildingHeight,
               rawData: data,
             }),
           });
@@ -313,6 +330,8 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
         totalFloorArea: autoAnalysis.total_floor_area || 0,
         bcr: autoAnalysis.btl || 0,
         far: autoAnalysis.far || 0,
+        numFloors: numFloors,
+        buildingHeight: buildingHeight,
       };
     }
     
@@ -331,8 +350,8 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
     });
     const bcr = siteArea > 0 ? (footprintArea / siteArea) * 100 : 0;
     const far = siteArea > 0 ? (totalFloorArea / siteArea) : 0;
-    return { siteArea, footprintArea, totalFloorArea, bcr, far };
-  }, [selections, polygons, autoAnalysis, parserMode]);
+    return { siteArea, footprintArea, totalFloorArea, bcr, far, numFloors, buildingHeight };
+  }, [selections, polygons, autoAnalysis, parserMode, numFloors, buildingHeight]);
 
   return (
     <div className="space-y-6">
@@ -448,6 +467,7 @@ export default function CADSection({ sessionId, onComplete }: CADSectionProps) {
                       bcr: metrics.bcr,
                       far: metrics.far,
                       buildingHeight: buildingHeight,
+                      numFloors: numFloors,
                     }),
                   });
                 } catch (err) {
