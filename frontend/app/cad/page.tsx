@@ -220,6 +220,9 @@ export default function CADPage() {
       const numFloors = autoAnalysis.num_floors || 
         (autoAnalysis.floors ? Object.keys(autoAnalysis.floors).length : null);
       
+      // Get building height from either property (LLM uses building_height_m, Python uses building_height)
+      const buildingHeight = autoAnalysis.building_height_m || autoAnalysis.building_height || null;
+      
       return {
         siteArea: autoAnalysis.site_area || 0,
         footprintArea: autoAnalysis.footprint_area || 0,
@@ -227,7 +230,7 @@ export default function CADPage() {
         bcr: autoAnalysis.btl || 0,
         far: autoAnalysis.far || 0,
         numFloors: numFloors,
-        buildingHeight: autoAnalysis.building_height_m || null,
+        buildingHeight: buildingHeight,
       };
     }
     

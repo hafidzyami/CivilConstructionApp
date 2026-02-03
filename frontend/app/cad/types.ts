@@ -45,7 +45,8 @@ export interface AutoAnalysis {
   far: number;
   materials_count?: number;
   num_floors?: number;
-  building_height_m?: number;
+  building_height_m?: number;  // From LLM extractor
+  building_height?: number;    // From Python fullaudit parser
 }
 
 export type AppStep = 'upload' | 'layers' | 'analyze';
