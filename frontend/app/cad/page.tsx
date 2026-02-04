@@ -30,6 +30,12 @@ export default function CADPage() {
   
   // Auto analysis results from Python parser or LLM
   const [autoAnalysis, setAutoAnalysis] = useState<AutoAnalysis | null>(null);
+  
+  // Building height state (manual input or auto-extracted)
+  const [buildingHeight, setBuildingHeight] = useState<number | null>(null);
+  
+  // Number of floors state (manual input or auto-extracted)
+  const [numFloors, setNumFloors] = useState<number | null>(null);
 
   const getApiUrl = () => {
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
@@ -159,6 +165,21 @@ export default function CADPage() {
               : data.auto_analysis;
             setAutoAnalysis(analysis);
             console.log('Auto analysis results:', analysis);
+            
+            // Set building height if extracted automatically
+            if (analysis.building_height && analysis.building_height > 0) {
+              setBuildingHeight(analysis.building_height);
+            } else if (analysis.building_height_m && analysis.building_height_m > 0) {
+              setBuildingHeight(analysis.building_height_m);
+            }
+            
+            // Set number of floors if extracted automatically
+            if (analysis.num_floors && analysis.num_floors > 0) {
+              setNumFloors(analysis.num_floors);
+            } else if (analysis.floors && Object.keys(analysis.floors).length > 0) {
+              // Fallback: count floor entries from the floors object
+              setNumFloors(Object.keys(analysis.floors).length);
+            }
           } catch (e) {
             console.error('Failed to parse auto analysis:', e, data.auto_analysis);
           }
@@ -217,11 +238,11 @@ export default function CADPage() {
     // If we have auto analysis results (from Python or LLM parser), use those
     if (autoAnalysis && (parserMode === 'python' || parserMode === 'llm')) {
       // Calculate num_floors from floors object if not provided directly
-      const numFloors = autoAnalysis.num_floors || 
+      const extractedNumFloors = autoAnalysis.num_floors || 
         (autoAnalysis.floors ? Object.keys(autoAnalysis.floors).length : null);
       
       // Get building height from either property (LLM uses building_height_m, Python uses building_height)
-      const buildingHeight = autoAnalysis.building_height_m || autoAnalysis.building_height || null;
+      const extractedBuildingHeight = autoAnalysis.building_height_m || autoAnalysis.building_height || null;
       
       return {
         siteArea: autoAnalysis.site_area || 0,
@@ -229,8 +250,8 @@ export default function CADPage() {
         totalFloorArea: autoAnalysis.total_floor_area || 0,
         bcr: autoAnalysis.btl || 0,
         far: autoAnalysis.far || 0,
-        numFloors: numFloors,
-        buildingHeight: buildingHeight,
+        numFloors: numFloors ?? extractedNumFloors,
+        buildingHeight: buildingHeight ?? extractedBuildingHeight,
       };
     }
     
@@ -257,10 +278,10 @@ export default function CADPage() {
       totalFloorArea, 
       bcr, 
       far,
-      numFloors: maxFloors > 0 ? maxFloors : null,
-      buildingHeight: null, // Manual mode doesn't calculate height
+      numFloors: numFloors ?? (maxFloors > 0 ? maxFloors : null),
+      buildingHeight: buildingHeight, // Use manual input if provided
     };
-  }, [selections, polygons, autoAnalysis, parserMode]);
+  }, [selections, polygons, autoAnalysis, parserMode, numFloors, buildingHeight]);
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-orange-50 to-slate-100 flex flex-col">
@@ -332,6 +353,7 @@ export default function CADPage() {
                     onLayerChange={setSelectedLayers}
                     onUpdateGeometry={processFile}
                     loading={loading}
+                    readOnly={parserMode === 'python' || parserMode === 'llm'}
                   />
                   <CADMetrics metrics={metrics} parserMode={parserMode} />
                 </div>
@@ -341,6 +363,7 @@ export default function CADPage() {
                   selections={selections}
                   onTogglePoly={togglePoly}
                   onBoxSelect={handleBoxSelect}
+                  readOnly={parserMode === 'python' || parserMode === 'llm'}
                 />
               </div>
             )}

@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { PolygonData, Bounds, Selection } from '../types';
+import { useLanguage } from '../../i18n';
 
 interface CADViewerProps {
   polygons: PolygonData[];
@@ -7,6 +8,7 @@ interface CADViewerProps {
   selections: Record<number, Selection>;
   onTogglePoly: (id: number) => void;
   onBoxSelect: (box: Bounds) => void;
+  readOnly?: boolean; // When true, disable selection but allow zoom/pan
 }
 
 export default function CADViewer({ 
@@ -14,8 +16,10 @@ export default function CADViewer({
   bounds, 
   selections, 
   onTogglePoly, 
-  onBoxSelect 
+  onBoxSelect,
+  readOnly = false
 }: CADViewerProps) {
+  const { t } = useLanguage();
   const svgRef = useRef<SVGSVGElement>(null);
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -63,7 +67,8 @@ export default function CADViewer({
   };
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
+    // Disable selection in readOnly mode, but allow panning
+    if (e.button === 0 && (e.ctrlKey || e.metaKey) && !readOnly) {
       setIsSelecting(true);
       const pt = getSvgPoint(e.clientX, e.clientY);
       setSelectStart(pt);
@@ -131,7 +136,12 @@ export default function CADViewer({
           <div className="text-[10px] text-slate-500 font-medium space-y-1">
             <div className="flex items-center gap-2"><span className="w-4 text-center">🖱️</span> Scroll to Zoom</div>
             <div className="flex items-center gap-2"><span className="w-4 text-center">✋</span> Shift+Drag to Pan</div>
-            <div className="flex items-center gap-2 text-purple-700 font-bold"><span className="w-4 text-center">✨</span> Ctrl+Drag to Select</div>
+            {!readOnly && (
+              <div className="flex items-center gap-2 text-purple-700 font-bold"><span className="w-4 text-center">✨</span> Ctrl+Drag to Select</div>
+            )}
+            {readOnly && (
+              <div className="flex items-center gap-2 text-blue-600 font-bold"><span className="w-4 text-center">👁️</span> View Only Mode</div>
+            )}
           </div>
         </div>
         <button
@@ -194,8 +204,9 @@ export default function CADViewer({
                   strokeWidth="1"
                   vectorEffect="non-scaling-stroke"
                   opacity={opacity}
-                  className="hover:opacity-100 transition-colors duration-200"
-                  onClick={() => !isSelecting && onTogglePoly(poly.id)}
+                  className={`transition-colors duration-200 ${!readOnly ? 'hover:opacity-100 cursor-pointer' : ''}`}
+                  onClick={() => !isSelecting && !readOnly && onTogglePoly(poly.id)}
+                  style={{ pointerEvents: readOnly ? 'none' : 'auto' }}
                 />
               );
             })}
