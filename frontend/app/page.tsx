@@ -279,6 +279,53 @@ export default function Home() {
               </div>
             </Link>
 
+            <Link
+              href="/room-segmentation"
+              className="group relative overflow-hidden bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-10 hover:shadow-2xl hover:shadow-teal-500/10 transition-all duration-500 hover:-translate-y-2"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/0 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              <div className="relative">
+                <div className="w-14 h-14 bg-gradient-to-br from-teal-500 to-teal-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-teal-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <svg
+                    className="w-7 h-7 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+                    />
+                  </svg>
+                </div>
+
+                <h2 className="text-3xl font-bold text-slate-900 mb-4">Room Segmentation</h2>
+                <p className="text-slate-600 text-lg leading-relaxed mb-6">
+                  Extract room layouts and icon segments using ML models.
+                </p>
+
+                <div className="flex items-center text-teal-600 font-semibold group-hover:gap-3 gap-2 transition-all duration-300">
+                  <span>Start Segmentation</span>
+                  <svg
+                    className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 8l4 4m0 0l-4 4m4-4H3"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </Link>
+
             <a
               href="https://api-civil.ganeshait.com/api-docs"
               target="_blank"

@@ -79,3 +79,6 @@ visdom
 wcwidth
 webencodings
 websocket-client
+fastapi
+uvicorn
+python-multipart

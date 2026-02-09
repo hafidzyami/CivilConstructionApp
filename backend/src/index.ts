@@ -10,6 +10,7 @@ import osmRoutes from './routes/osm.routes';
 import chatbotRoutes from './routes/chatbot.routes';
 import cadRoutes from './routes/cad.routes';
 import demoRoutes from './routes/demo.routes';
+import segmentationRoutes from './routes/segmentation.routes';
 import initService from './services/init.service';
 import { initializeBucket } from './lib/minio';
 
@@ -39,6 +40,7 @@ app.use('/api/osm', osmRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/cad', cadRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/segmentation', segmentationRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
