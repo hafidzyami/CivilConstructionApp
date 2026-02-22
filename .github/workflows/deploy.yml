@@ -243,22 +243,35 @@ jobs:
 
             cd $APP_DIR
 
-            # Build only changed services
+            # Ensure Neo4j is running (never recreate to avoid 5min restart)
+            echo "🔒 Ensuring Neo4j is running (no recreate)..."
+            docker compose up -d --no-recreate neo4j
+
+            # Build and deploy only changed services
+            SERVICES_TO_RESTART=""
             if [ "$CAD_CHANGED" = "true" ]; then
               echo "🔨 Building CAD service..."
               docker compose build cad-service
+              SERVICES_TO_RESTART="$SERVICES_TO_RESTART cad-service"
             fi
-            if [ "$BACKEND_CHANGED" = "true" ]; then 
+            if [ "$BACKEND_CHANGED" = "true" ]; then
               echo "🔨 Building Backend..."
               docker compose build backend
+              SERVICES_TO_RESTART="$SERVICES_TO_RESTART backend"
             fi
-            if [ "$FRONTEND_CHANGED" = "true" ]; then 
+            if [ "$FRONTEND_CHANGED" = "true" ]; then
               echo "🔨 Building Frontend..."
               docker compose build frontend
+              SERVICES_TO_RESTART="$SERVICES_TO_RESTART frontend"
             fi
 
             echo "🚀 Starting containers..."
-            docker compose up -d --remove-orphans
+            if [ -n "$SERVICES_TO_RESTART" ]; then
+              echo "🔄 Recreating changed services:$SERVICES_TO_RESTART"
+              docker compose up -d --no-deps --force-recreate $SERVICES_TO_RESTART
+            fi
+            # Ensure all services are up (without recreating existing ones)
+            docker compose up -d --no-recreate --remove-orphans
 
             # --- Connect standalone MinIO to network ---
             echo "🔗 Connecting MinIO to civilconstruction network..."
