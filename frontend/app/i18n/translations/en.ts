@@ -176,6 +176,8 @@ export const en = {
       paddleDesc: 'Text recognition (Korean + Latin only)',
       hybrid: 'Hybrid Mode',
       hybridDesc: 'Surya layout + PaddleOCR text',
+      vlm: 'VLM (Vision Language Model)',
+      vlmDesc: 'AI-powered document understanding using Qwen2.5-VL-7B',
       recommended: 'RECOMMENDED',
     },
     
@@ -408,6 +410,8 @@ export const en = {
       paddleDesc: 'Text recognition (Korean + Latin only)',
       hybrid: 'Hybrid Mode',
       hybridDesc: 'Surya layout + PaddleOCR text',
+      vlm: 'VLM (Vision Language Model)',
+      vlmDesc: 'AI-powered document understanding using Qwen2.5-VL-7B',
       recommended: 'RECOMMENDED',
       processDocuments: 'Process OCR',
       processingDocuments: 'Processing {count} document(s)...',

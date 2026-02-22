@@ -178,9 +178,11 @@ export const ko: TranslationKeys = {
       paddleDesc: '텍스트 인식 (한국어 + 라틴어만)',
       hybrid: '하이브리드 모드',
       hybridDesc: 'Surya 레이아웃 + PaddleOCR 텍스트',
+      vlm: 'VLM (비전 언어 모델)',
+      vlmDesc: 'Qwen2.5-VL-7B 기반 AI 문서 이해',
       recommended: '권장',
     },
-    
+
     process: '이미지 처리',
     
     results: {
@@ -410,6 +412,8 @@ export const ko: TranslationKeys = {
       paddleDesc: '텍스트 인식 (한국어 + 라틴어만)',
       hybrid: '하이브리드 모드',
       hybridDesc: 'Surya 레이아웃 + PaddleOCR 텍스트',
+      vlm: 'VLM (비전 언어 모델)',
+      vlmDesc: 'Qwen2.5-VL-7B 기반 AI 문서 이해',
       recommended: '권장',
       processDocuments: 'OCR 처리',
       processingDocuments: '{count}개 문서 처리 중...',

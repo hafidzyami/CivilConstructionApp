@@ -87,7 +87,7 @@ export default function DemoPage() {
   });
   const [expandedDocTypes, setExpandedDocTypes] = useState<Set<DocumentTypeId>>(new Set());
   const [dragActive, setDragActive] = useState(false);
-  const [ocrEngine, setOcrEngine] = useState<'surya' | 'paddle' | 'hybrid'>('hybrid');
+  const [ocrEngine, setOcrEngine] = useState<'surya' | 'paddle' | 'hybrid' | 'vlm'>('hybrid');
   const [usePreprocessing, setUsePreprocessing] = useState(true);
 
 
@@ -412,6 +412,7 @@ export default function DemoPage() {
                     <option value="surya">{t.demo.ocr.surya}</option>
                     <option value="paddle">{t.demo.ocr.paddle}</option>
                     <option value="hybrid">{t.demo.ocr.hybrid} ({t.demo.ocr.recommended})</option>
+                    <option value="vlm">{t.demo.ocr.vlm}</option>
                   </select>
                 </div>
               </div>

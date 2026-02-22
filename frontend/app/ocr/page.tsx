@@ -41,7 +41,7 @@ export default function OCRPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [usePreprocessing, setUsePreprocessing] = useState(true);
-  const [ocrEngine, setOcrEngine] = useState<'surya' | 'paddle' | 'hybrid'>('hybrid');
+  const [ocrEngine, setOcrEngine] = useState<'surya' | 'paddle' | 'hybrid' | 'vlm'>('hybrid');
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<OCRResult | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -360,6 +360,23 @@ export default function OCRPage() {
                         </span>
                         <p className="text-sm text-slate-500">
                           {t.ocr.options.hybridDesc}
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-purple-50 has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50">
+                      <input
+                        type="radio"
+                        name="engine"
+                        value="vlm"
+                        checked={ocrEngine === 'vlm'}
+                        onChange={(e) => setOcrEngine(e.target.value as 'vlm')}
+                        className="mt-1 text-purple-600 focus:ring-purple-500"
+                      />
+                      <div className="ml-3">
+                        <span className="font-medium text-slate-900">{t.ocr.options.vlm}</span>
+                        <p className="text-sm text-slate-500">
+                          {t.ocr.options.vlmDesc}
                         </p>
                       </div>
                     </label>
