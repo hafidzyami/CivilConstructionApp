@@ -1,11 +1,21 @@
 import { Request, Response } from 'express';
 import fs from 'fs/promises';
-import FormData from 'form-data';
 import fetch from 'node-fetch';
+
+const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || '';
+const RUNPOD_OCR_ENDPOINT_ID = process.env.RUNPOD_OCR_ENDPOINT_ID || '';
+const RUNPOD_VLM_ENDPOINT_ID = process.env.RUNPOD_VLM_ENDPOINT_ID || '';
+const RUNPOD_TIMEOUT_MS = 180_000; // 3 minutes max polling
+const RUNPOD_POLL_INTERVAL_MS = 1500;
+
+function getRunpodBaseUrl(engine: string): string {
+  const endpointId = engine === 'vlm' ? RUNPOD_VLM_ENDPOINT_ID : RUNPOD_OCR_ENDPOINT_ID;
+  return `https://api.runpod.ai/v2/${endpointId}`;
+}
 
 export class OCRController {
   /**
-   * Process OCR on uploaded image via OCR microservice
+   * Process OCR on uploaded file via RunPod serverless GPU
    */
   async processOCR(req: Request, res: Response): Promise<void> {
     const startTime = Date.now();
@@ -13,10 +23,19 @@ export class OCRController {
 
     try {
       if (!req.file) {
-        console.log(`[OCR ${startTime}] ❌ No file uploaded`);
+        console.log(`[OCR ${startTime}] No file uploaded`);
         res.status(400).json({
           success: false,
           error: 'No image file uploaded'
+        });
+        return;
+      }
+
+      if (!RUNPOD_API_KEY || (!RUNPOD_OCR_ENDPOINT_ID && !RUNPOD_VLM_ENDPOINT_ID)) {
+        console.log(`[OCR ${startTime}] RunPod credentials not configured`);
+        res.status(500).json({
+          success: false,
+          error: 'RunPod API credentials not configured'
         });
         return;
       }
@@ -25,73 +44,121 @@ export class OCRController {
       const usePreprocessing = req.body.preprocessing === 'true';
       const engine = req.body.engine || 'hybrid';
 
-      console.log(`[OCR ${startTime}] 📄 File: ${req.file.originalname}`);
-      console.log(`[OCR ${startTime}] 📦 Size: ${(req.file.size / 1024).toFixed(2)} KB`);
-      console.log(`[OCR ${startTime}] 🔧 Engine: ${engine}`);
-      console.log(`[OCR ${startTime}] 🎨 Preprocessing: ${usePreprocessing}`);
+      console.log(`[OCR ${startTime}] File: ${req.file.originalname}`);
+      console.log(`[OCR ${startTime}] Size: ${(req.file.size / 1024).toFixed(2)} KB`);
+      console.log(`[OCR ${startTime}] Engine: ${engine}`);
+      console.log(`[OCR ${startTime}] Preprocessing: ${usePreprocessing}`);
 
       // Validate engine
-      if (!['surya', 'paddle', 'hybrid'].includes(engine)) {
+      if (!['surya', 'paddle', 'hybrid', 'vlm'].includes(engine)) {
         await fs.unlink(imagePath);
-        console.log(`[OCR ${startTime}] ❌ Invalid engine: ${engine}`);
+        console.log(`[OCR ${startTime}] Invalid engine: ${engine}`);
         res.status(400).json({
           success: false,
-          error: 'Invalid OCR engine. Must be: surya, paddle, or hybrid'
+          error: 'Invalid OCR engine. Must be: surya, paddle, hybrid, or vlm'
         });
         return;
       }
 
-      // Get OCR service URL from environment
-      const ocrServiceUrl = process.env.OCR_SERVICE_URL || 'http://localhost:7000';
-      console.log(`[OCR ${startTime}] 🌐 Calling OCR service: ${ocrServiceUrl}`);
-
-      const apiStart = Date.now();
-
-      // Read file and create form data
+      // Read file and convert to base64
       const fileBuffer = await fs.readFile(imagePath);
-      const formData = new FormData();
-      formData.append('file', fileBuffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype
-      });
-      formData.append('preprocessing', usePreprocessing.toString());
-      formData.append('engine', engine);
+      const imageBase64 = fileBuffer.toString('base64');
 
-      // Call OCR microservice
-      const response = await fetch(`${ocrServiceUrl}/ocr/process`, {
-        method: 'POST',
-        body: formData,
-        headers: formData.getHeaders()
-      });
-
-      const apiDuration = Date.now() - apiStart;
-      console.log(`[OCR ${startTime}] ✅ OCR service completed in ${(apiDuration / 1000).toFixed(2)}s`);
-
-      // Clean up uploaded file
+      // Clean up uploaded file immediately
       await fs.unlink(imagePath);
-      console.log(`[OCR ${startTime}] 🗑️  Cleaned up uploaded file`);
+      console.log(`[OCR ${startTime}] Cleaned up uploaded file`);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log(`[OCR ${startTime}] ❌ OCR service error: ${response.status} - ${errorText}`);
-        throw new Error(`OCR service error: ${response.status} - ${errorText}`);
+      // Submit async job to RunPod
+      const runpodBaseUrl = getRunpodBaseUrl(engine);
+      const endpointId = engine === 'vlm' ? RUNPOD_VLM_ENDPOINT_ID : RUNPOD_OCR_ENDPOINT_ID;
+      console.log(`[OCR ${startTime}] Submitting job to RunPod ${engine === 'vlm' ? 'VLM' : 'OCR'} endpoint (${endpointId})...`);
+      const submitStart = Date.now();
+
+      const submitResponse = await fetch(`${runpodBaseUrl}/run`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RUNPOD_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          input: {
+            image: imageBase64,
+            filename: req.file.originalname,
+            engine,
+            preprocessing: usePreprocessing
+          }
+        })
+      });
+
+      if (!submitResponse.ok) {
+        const errorText = await submitResponse.text();
+        console.log(`[OCR ${startTime}] RunPod submit error: ${submitResponse.status} - ${errorText}`);
+        throw new Error(`RunPod submit failed: ${submitResponse.status} - ${errorText}`);
       }
 
-      const result = await response.json();
+      const submitResult = await submitResponse.json() as { id: string; status: string };
+      const jobId = submitResult.id;
+      console.log(`[OCR ${startTime}] Job submitted: ${jobId}`);
 
-      // Log result without base64 image
-      const logResult = { ...result };
-      if (logResult.preprocessedImage) {
-        logResult.preprocessedImage = `[base64 image ${logResult.preprocessedImage.length} chars]`;
+      // Poll for result
+      let result: any = null;
+      const pollStart = Date.now();
+
+      while (Date.now() - pollStart < RUNPOD_TIMEOUT_MS) {
+        await new Promise(resolve => setTimeout(resolve, RUNPOD_POLL_INTERVAL_MS));
+
+        const statusResponse = await fetch(`${runpodBaseUrl}/status/${jobId}`, {
+          headers: {
+            'Authorization': `Bearer ${RUNPOD_API_KEY}`
+          }
+        });
+
+        if (!statusResponse.ok) {
+          console.log(`[OCR ${startTime}] Poll error: ${statusResponse.status}`);
+          continue;
+        }
+
+        const statusResult = await statusResponse.json() as {
+          status: string;
+          output?: any;
+          error?: string;
+        };
+
+        if (statusResult.status === 'COMPLETED') {
+          result = statusResult.output;
+          break;
+        }
+
+        if (statusResult.status === 'FAILED') {
+          throw new Error(`RunPod job failed: ${statusResult.error || 'Unknown error'}`);
+        }
+
+        // IN_QUEUE or IN_PROGRESS - keep polling
+        console.log(`[OCR ${startTime}] Job ${jobId}: ${statusResult.status} (${((Date.now() - pollStart) / 1000).toFixed(1)}s)`);
       }
-      console.log(`[OCR ${startTime}] 📊 Result summary:`, {
+
+      if (!result) {
+        throw new Error(`RunPod job timed out after ${RUNPOD_TIMEOUT_MS / 1000}s`);
+      }
+
+      const apiDuration = Date.now() - submitStart;
+      console.log(`[OCR ${startTime}] RunPod completed in ${(apiDuration / 1000).toFixed(2)}s`);
+
+      // Check for error in result
+      if (result.error) {
+        throw new Error(`OCR processing error: ${result.error}`);
+      }
+
+      // Log result summary
+      console.log(`[OCR ${startTime}] Result summary:`, {
         textLength: result.text?.length || 0,
         hasPreprocessedImage: !!result.preprocessedImage,
-        textLinesCount: result.results?.text_lines?.length || 0
+        textLinesCount: result.results?.text_lines?.length || 0,
+        timingMs: result._timing_ms
       });
 
       const totalDuration = Date.now() - startTime;
-      console.log(`[OCR ${startTime}] ⏱️  Total time: ${(totalDuration / 1000).toFixed(2)}s`);
+      console.log(`[OCR ${startTime}] Total time: ${(totalDuration / 1000).toFixed(2)}s`);
       console.log(`[OCR ${startTime}] ========== REQUEST END ==========\n`);
 
       res.status(200).json({
@@ -103,7 +170,7 @@ export class OCRController {
       });
     } catch (error) {
       const totalDuration = Date.now() - startTime;
-      console.log(`[OCR ${startTime}] ❌ Failed after ${(totalDuration / 1000).toFixed(2)}s`);
+      console.log(`[OCR ${startTime}] Failed after ${(totalDuration / 1000).toFixed(2)}s`);
 
       // Clean up uploaded file if it exists
       if (req.file?.path) {

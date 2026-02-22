@@ -1,0 +1,31 @@
+# RunPod OCR Service Dependencies (OCR Only — no VLM)
+# ============================================================
+# NOTE: torch, torchvision, and paddlepaddle-gpu are installed
+# separately in Dockerfile (base image / pip). Do NOT add here.
+# ============================================================
+
+# RunPod SDK
+runpod
+
+# Image Processing
+opencv-python>=4.8.0
+numpy>=1.24.0,<2.0.0
+pillow>=10.0.0
+
+# OCR Engines
+surya-ocr==0.17.0
+transformers==4.57.5
+paddleocr>=3.1.0
+paddlex<3.3
+
+# PDF and Document Support
+pdf2image>=1.16.0
+python-docx>=1.1.0
+pypdf2>=3.0.0
+
+# HTTP requests (for image URL fetching)
+requests>=2.31.0
+
+# HuggingFace (for model downloads)
+huggingface-hub
+safetensors

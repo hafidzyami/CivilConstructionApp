@@ -73,8 +73,8 @@ const upload = multer({
  *                 description: Whether to apply preprocessing
  *               engine:
  *                 type: string
- *                 enum: [surya, paddle, hybrid]
- *                 description: OCR engine to use
+ *                 enum: [surya, paddle, hybrid, vlm]
+ *                 description: OCR engine to use (vlm uses Qwen2.5-VL-7B vision model)
  *     responses:
  *       200:
  *         description: OCR processing successful

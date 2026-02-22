@@ -28,6 +28,7 @@ def perform_paddle_ocr(image, use_cuda=True):
         # GPU is auto-detected if paddlepaddle-gpu is installed
         print("  > Initializing PaddleOCR (Korean + Latin)...")
         ocr = PaddleOCR(
+            ocr_version="PP-OCRv5",     # Use PP-OCRv5 for better accuracy
             use_angle_cls=False,        # Disabled: orientation handled by DocImgOrientationClassification in preprocessing
             lang='korean',
             # Adjust thresholds to detect whole lines, not individual characters
@@ -140,14 +141,13 @@ def perform_hybrid_ocr(image, use_cuda=True):
         # Step 2: PaddleOCR for text recognition
         print("  > [PADDLE] Initializing OCR (Korean + Latin)...")
         paddle_ocr = PaddleOCR(
+            ocr_version="PP-OCRv5",     # Use PP-OCRv5 for better accuracy
             use_angle_cls=False,
             lang='korean',
-            # show_log=False,       <--- REMOVED THIS LINE (It causes the error)
             det_db_thresh=0.3,
             det_db_box_thresh=0.6,
             det_db_unclip_ratio=1.8,
             rec_batch_num=1,        # Keep this at 1 for memory safety
-            #use_mp=True
         )
 
         # Convert grayscale to BGR if needed

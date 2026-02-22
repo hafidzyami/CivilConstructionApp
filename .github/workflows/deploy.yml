@@ -49,6 +49,9 @@ jobs:
           MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
           MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
           MINIO_PUBLIC_URL: ${{ secrets.MINIO_PUBLIC_URL }}
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          RUNPOD_OCR_ENDPOINT_ID: ${{ secrets.RUNPOD_OCR_ENDPOINT_ID }}
+          RUNPOD_VLM_ENDPOINT_ID: ${{ secrets.RUNPOD_VLM_ENDPOINT_ID }}
           BACKEND_CHANGED: ${{ steps.changes.outputs.backend }}
           FRONTEND_CHANGED: ${{ steps.changes.outputs.frontend }}
           OCR_CHANGED: ${{ steps.changes.outputs.ocr }}
@@ -60,7 +63,7 @@ jobs:
           port: ${{ secrets.VM_PORT || 22 }}
           timeout: 24h
           command_timeout: 24h
-          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,NEO4J_USER,NEO4J_PASSWORD,GEMINI_API_KEY,MINIO_ROOT_USER,MINIO_ROOT_PASSWORD,MINIO_ACCESS_KEY,MINIO_SECRET_KEY,MINIO_PUBLIC_URL,BACKEND_CHANGED,FRONTEND_CHANGED,OCR_CHANGED,CAD_CHANGED
+          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_PORT,NEO4J_USER,NEO4J_PASSWORD,GEMINI_API_KEY,MINIO_ROOT_USER,MINIO_ROOT_PASSWORD,MINIO_ACCESS_KEY,MINIO_SECRET_KEY,MINIO_PUBLIC_URL,RUNPOD_API_KEY,RUNPOD_OCR_ENDPOINT_ID,RUNPOD_VLM_ENDPOINT_ID,BACKEND_CHANGED,FRONTEND_CHANGED,OCR_CHANGED,CAD_CHANGED
           script: |
             set -e
 
@@ -101,14 +104,15 @@ jobs:
             MINIO_USE_SSL=false
             BACKEND_PORT=6969
             FRONTEND_PORT=6968
-            OCR_PORT=7000
             CAD_PORT=7001
             NODE_ENV=production
             NEXT_PUBLIC_API_URL=/api
             DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@host.docker.internal:${POSTGRES_PORT:-5432}/$POSTGRES_DB?schema=public
-            OCR_SERVICE_URL=http://ocr-service:7000
             CAD_SERVICE_URL=http://cad-service:7001
             NEO4J_URI=bolt://neo4j:7687
+            RUNPOD_API_KEY=$RUNPOD_API_KEY
+            RUNPOD_OCR_ENDPOINT_ID=$RUNPOD_OCR_ENDPOINT_ID
+            RUNPOD_VLM_ENDPOINT_ID=$RUNPOD_VLM_ENDPOINT_ID
 
             EOF
             chmod 600 $APP_DIR/.env
@@ -145,28 +149,6 @@ jobs:
                   timeout: 10s
                   retries: 5
                   start_period: 30s
-
-              ocr-service:
-                build:
-                  context: ./repo/ocr-service
-                  dockerfile: Dockerfile
-                image: civilconstruction-ocr:latest
-                container_name: civilconstruction-ocr
-                restart: unless-stopped
-                env_file: .env
-                ports:
-                  - "${OCR_PORT:-7000}:7000"
-                networks:
-                  - civilconstruction-network
-                healthcheck:
-                  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7000/health')"]
-                  interval: 30s
-                  timeout: 10s
-                  retries: 3
-                deploy:
-                  resources:
-                    limits:
-                      memory: 8G
 
               cad-service:
                 build:
@@ -214,6 +196,9 @@ jobs:
                   - MINIO_USE_SSL=false
                   - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
                   - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+                  - RUNPOD_API_KEY=${RUNPOD_API_KEY}
+                  - RUNPOD_OCR_ENDPOINT_ID=${RUNPOD_OCR_ENDPOINT_ID}
+                  - RUNPOD_VLM_ENDPOINT_ID=${RUNPOD_VLM_ENDPOINT_ID}
                 ports:
                   - "${BACKEND_PORT:-6969}:6969"
                 extra_hosts:
@@ -221,8 +206,6 @@ jobs:
                 networks:
                   - civilconstruction-network
                 depends_on:
-                  ocr-service:
-                    condition: service_healthy
                   cad-service:
                     condition: service_healthy
                   neo4j:
@@ -261,11 +244,7 @@ jobs:
             cd $APP_DIR
 
             # Build only changed services
-            if [ "$OCR_CHANGED" = "true" ]; then 
-              echo "🔨 Building OCR service..."
-              docker compose build ocr-service
-            fi
-            if [ "$CAD_CHANGED" = "true" ]; then 
+            if [ "$CAD_CHANGED" = "true" ]; then
               echo "🔨 Building CAD service..."
               docker compose build cad-service
             fi
