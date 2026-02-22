@@ -144,9 +144,9 @@ jobs:
                 networks:
                   - civilconstruction-network
                 healthcheck:
-                  test: ["CMD", "cypher-shell", "-u", "${NEO4J_USER}", "-p", "${NEO4J_PASSWORD}", "RETURN 1"]
+                  test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
                   interval: 15s
-                  timeout: 10s
+                  timeout: 5s
                   retries: 10
                   start_period: 300s
 
@@ -247,6 +247,25 @@ jobs:
             echo "🔒 Ensuring Neo4j is running (no recreate)..."
             docker compose up -d --no-recreate neo4j
 
+            # Wait for Neo4j to be healthy before starting dependent services
+            echo "🔍 Waiting for Neo4j to be healthy..."
+            NEO4J_HEALTHY=false
+            for i in $(seq 1 60); do
+              if docker exec civilconstruction-neo4j cypher-shell -u $NEO4J_USER -p $NEO4J_PASSWORD "RETURN 1" > /dev/null 2>&1; then
+                echo "✅ Neo4j is healthy"
+                NEO4J_HEALTHY=true
+                break
+              fi
+              echo "⏳ Waiting for Neo4j ($i/60)..."
+              sleep 10
+            done
+
+            if [ "$NEO4J_HEALTHY" = "false" ]; then
+              echo "❌ Neo4j failed to become healthy after 10 minutes"
+              docker logs civilconstruction-neo4j --tail 20
+              exit 1
+            fi
+
             # Build and deploy only changed services
             SERVICES_TO_RESTART=""
             if [ "$CAD_CHANGED" = "true" ]; then
@@ -287,17 +306,6 @@ jobs:
             else
               echo "⚠️  Network $NETWORK_NAME not found"
             fi
-
-            # --- Health Check Neo4j ---
-            echo "🔍 Checking Neo4j health..."
-            for i in {1..60}; do
-              if docker exec civilconstruction-neo4j cypher-shell -u $NEO4J_USER -p $NEO4J_PASSWORD "RETURN 1" > /dev/null 2>&1; then
-                echo "✅ Neo4j OK"
-                break
-              fi
-              echo "⏳ Waiting for Neo4j ($i/60)..."
-              sleep 10
-            done
 
             echo "🎉 Deployment Success!"
             docker compose ps
