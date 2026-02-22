@@ -145,10 +145,10 @@ jobs:
                   - civilconstruction-network
                 healthcheck:
                   test: ["CMD", "cypher-shell", "-u", "${NEO4J_USER}", "-p", "${NEO4J_PASSWORD}", "RETURN 1"]
-                  interval: 10s
+                  interval: 15s
                   timeout: 10s
-                  retries: 5
-                  start_period: 30s
+                  retries: 10
+                  start_period: 300s
 
               cad-service:
                 build:
@@ -277,13 +277,13 @@ jobs:
 
             # --- Health Check Neo4j ---
             echo "🔍 Checking Neo4j health..."
-            for i in {1..20}; do
+            for i in {1..60}; do
               if docker exec civilconstruction-neo4j cypher-shell -u $NEO4J_USER -p $NEO4J_PASSWORD "RETURN 1" > /dev/null 2>&1; then
                 echo "✅ Neo4j OK"
                 break
               fi
-              echo "⏳ Waiting for Neo4j ($i/20)..."
-              sleep 5
+              echo "⏳ Waiting for Neo4j ($i/60)..."
+              sleep 10
             done
 
             echo "🎉 Deployment Success!"
