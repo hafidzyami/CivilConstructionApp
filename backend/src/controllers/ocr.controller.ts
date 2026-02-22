@@ -5,7 +5,7 @@ import fetch from 'node-fetch';
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || '';
 const RUNPOD_OCR_ENDPOINT_ID = process.env.RUNPOD_OCR_ENDPOINT_ID || '';
 const RUNPOD_VLM_ENDPOINT_ID = process.env.RUNPOD_VLM_ENDPOINT_ID || '';
-const RUNPOD_TIMEOUT_MS = 180_000; // 3 minutes max polling
+const RUNPOD_TIMEOUT_MS = 300_000; // 5 minutes max polling (cold starts can take ~2-3 min)
 const RUNPOD_POLL_INTERVAL_MS = 1500;
 
 function getRunpodBaseUrl(engine: string): string {

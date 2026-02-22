@@ -232,27 +232,35 @@ export default function DemoPage() {
       }
 
       // Upload all files to MinIO
-      const uploadFormData = new FormData();
-      uploadFormData.append('sessionId', sessionId!.toString());
-      uploadFormData.append('documentType', docTypeId);
-      state.files.forEach(file => {
-        uploadFormData.append('documents', file);
-      });
+      let uploadedDocs: any[] = [];
+      try {
+        const uploadFormData = new FormData();
+        uploadFormData.append('sessionId', sessionId!.toString());
+        uploadFormData.append('documentType', docTypeId);
+        state.files.forEach(file => {
+          uploadFormData.append('documents', file);
+        });
 
-      const uploadRes = await fetch(`${API_URL}/demo/upload-documents`, {
-        method: 'POST',
-        body: uploadFormData,
-      });
+        const uploadRes = await fetch(`${API_URL}/demo/upload-documents`, {
+          method: 'POST',
+          body: uploadFormData,
+        });
 
-      const uploadData = await uploadRes.json();
-      
-      if (uploadData.success) {
-        const uploadedDocs = uploadData.data;
-        
-        // Save OCR results to database for each document (only successful ones)
-        for (let i = 0; i < results.length; i++) {
-          const result = results[i];
-          if (result.success) {
+        const uploadData = await uploadRes.json();
+        if (uploadData.success) {
+          uploadedDocs = uploadData.data;
+        } else {
+          console.warn('File upload failed, continuing with OCR results only:', uploadData.error);
+        }
+      } catch (uploadErr) {
+        console.warn('File upload failed, continuing with OCR results only:', uploadErr);
+      }
+
+      // Save OCR results to database for each document (only successful ones)
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        if (result.success) {
+          try {
             const ocrFormData = new FormData();
             ocrFormData.append('sessionId', sessionId!.toString());
             ocrFormData.append('extractedText', result.textContent || '');
@@ -265,27 +273,28 @@ export default function DemoPage() {
               method: 'POST',
               body: ocrFormData,
             });
+          } catch (saveErr) {
+            console.warn('Failed to save OCR result to database:', saveErr);
           }
         }
+      }
 
-        // Check if all results are successful
-        const allSuccessful = results.every(r => r.success);
-        const hasAnySuccess = results.some(r => r.success);
+      // Check if all results are successful
+      const allSuccessful = results.every(r => r.success);
 
-        setDocumentStates(prev => ({
-          ...prev,
-          [docTypeId]: {
-            ...prev[docTypeId],
-            results,
-            processing: false,
-            processed: allSuccessful, // Only mark as processed if ALL succeeded
-          }
-        }));
-
-        if (!allSuccessful) {
-          const failedCount = results.filter(r => !r.success).length;
-          setError(`${failedCount} file(s) failed OCR processing. You can retry or upload different files.`);
+      setDocumentStates(prev => ({
+        ...prev,
+        [docTypeId]: {
+          ...prev[docTypeId],
+          results,
+          processing: false,
+          processed: allSuccessful,
         }
+      }));
+
+      if (!allSuccessful) {
+        const failedCount = results.filter(r => !r.success).length;
+        setError(`${failedCount} file(s) failed OCR processing. You can retry or upload different files.`);
       }
     } catch (err: any) {
       setError('Failed to process OCR: ' + err.message);
