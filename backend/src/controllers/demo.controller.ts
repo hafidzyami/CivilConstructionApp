@@ -33,6 +33,7 @@ export const getOrCreateSession = async (req: Request, res: Response) => {
       include: {
         documents: true,
         cadData: true,
+        floorplanData: true,
         infrastructureData: true,
         ocrData: true,
       },
@@ -45,6 +46,7 @@ export const getOrCreateSession = async (req: Request, res: Response) => {
         include: {
           documents: true,
           cadData: true,
+          floorplanData: true,
           infrastructureData: true,
           ocrData: true,
         },
@@ -296,6 +298,7 @@ export const getAllSessions = async (req: Request, res: Response) => {
       include: {
         documents: true,
         cadData: true,
+        floorplanData: true,
         infrastructureData: true,
         ocrData: true,
         complianceResult: true,
@@ -330,6 +333,7 @@ export const getSessionById = async (req: Request, res: Response) => {
       include: {
         documents: true,
         cadData: true,
+        floorplanData: true,
         infrastructureData: true,
         ocrData: true,
       },
@@ -462,6 +466,57 @@ export const uploadDxf = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error uploading DXF file:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Save floor plan analysis data (CubiCasa5k)
+export const saveFloorplanData = async (req: Request, res: Response) => {
+  try {
+    const { sessionId, imageUrl, roomStats, iconStats, roomSummary, iconSummary, imageWidth, imageHeight, rawData } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID is required',
+      });
+    }
+
+    const floorplanData = await prisma.demoFloorplanData.upsert({
+      where: { sessionId: parseInt(sessionId) },
+      update: {
+        imageUrl: imageUrl || undefined,
+        roomStats: roomStats || null,
+        iconStats: iconStats || null,
+        roomSummary: roomSummary || null,
+        iconSummary: iconSummary || null,
+        imageWidth: imageWidth ? parseInt(imageWidth) : null,
+        imageHeight: imageHeight ? parseInt(imageHeight) : null,
+        rawData: rawData || null,
+      },
+      create: {
+        sessionId: parseInt(sessionId),
+        imageUrl: imageUrl || null,
+        roomStats: roomStats || null,
+        iconStats: iconStats || null,
+        roomSummary: roomSummary || null,
+        iconSummary: iconSummary || null,
+        imageWidth: imageWidth ? parseInt(imageWidth) : null,
+        imageHeight: imageHeight ? parseInt(imageHeight) : null,
+        rawData: rawData || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: floorplanData,
+      message: 'Floor plan data saved successfully',
+    });
+  } catch (error: any) {
+    console.error('Error saving floor plan data:', error);
     res.status(500).json({
       success: false,
       message: error.message,

@@ -1,0 +1,18 @@
+# Minimal requirements for the CubiCasa5k API service (inference only).
+# This excludes training/notebook/visualization-server deps like visdom, jupyter, tensorboard, etc.
+
+numpy<2
+opencv-python
+Pillow
+matplotlib
+scipy
+scikit-image
+Shapely
+svgpathtools
+svgwrite
+lmdb
+
+# API server
+fastapi
+uvicorn[standard]
+python-multipart

@@ -377,11 +377,12 @@ export const ko: TranslationKeys = {
   // Demo Page
   demo: {
     title: '완전한 데모 워크플로우',
-    subtitle: '전체 시스템 체험: 문서 OCR → CAD 분석 → 인프라 매핑',
+    subtitle: '전체 시스템 체험: 문서 OCR → CAD 분석 → 평면도 AI → 인프라 매핑',
     
     steps: {
       ocr: 'OCR',
       cad: 'CAD',
+      floorplan: '평면도',
       infrastructure: '인프라',
       result: '결과',
       complete: '완료',
@@ -555,6 +556,35 @@ export const ko: TranslationKeys = {
         understand: '이해했습니다 & 계속',
       },
     },
+
+    floorplan: {
+      title: '평면도 분석',
+      subtitle: 'AI를 사용하여 평면도 이미지에서 방, 문, 창문 및 기타 요소를 감지합니다',
+      uploadTitle: '평면도 이미지',
+      dragDrop: '평면도 이미지를 여기에 드래그 앤 드롭하세요',
+      supportedFormats: '지원: PNG, JPG, BMP',
+      selectFile: '이미지 선택',
+      clearFile: '지우기',
+      invalidFormat: '유효한 이미지 파일을 선택하세요 (PNG, JPG, BMP)',
+      analyze: '평면도 분석',
+      analyzing: '평면도 분석 중...',
+      analyzingDesc: '방, 문, 창문 및 기타 요소를 감지하는 중',
+      analysisComplete: '분석 완료',
+      detectedSummary: '{rooms}개의 방 유형, {icons}개의 아이콘 유형 감지됨',
+      imageSize: '이미지',
+      uploadToSee: '평면도 이미지를 업로드하고 분석을 클릭하여 결과를 확인하세요',
+      noRooms: '방이 감지되지 않았습니다',
+      noIcons: '아이콘이 감지되지 않았습니다',
+      roomSegmentation: '방 세분화',
+      iconSegmentation: '아이콘 세분화',
+      vectorizedRooms: '벡터화된 방',
+      vectorizedIcons: '벡터화된 아이콘',
+      tabs: {
+        rooms: '방',
+        icons: '아이콘',
+        visualization: '시각화',
+      },
+    },
     
     infrastructure: {
       title: '인프라 매핑',
@@ -620,6 +650,8 @@ export const ko: TranslationKeys = {
       ocrResult: '{total}개 문서 중 {success}개가 성공적으로 처리되었습니다',
       cadAnalysis: 'CAD 분석',
       cadResult: 'CAD 기하학이 성공적으로 처리 및 분석되었습니다',
+      floorplanAnalysis: '평면도 분석',
+      floorplanResult: 'AI 기반 방 및 아이콘 감지 완료',
       infraMapping: '인프라 매핑',
       infraResult: '인프라 기능이 라벨링되고 분석되었습니다',
       startNew: '새 데모 시작',
@@ -628,6 +660,7 @@ export const ko: TranslationKeys = {
     navigation: {
       skipStep: '이 단계 건너뛰기',
       continueToCAD: 'CAD 분석으로 계속 →',
+      continueToFloorplan: '평면도 분석으로 계속 →',
       continueToInfra: '인프라로 계속 →',
       backToHome: '홈으로 돌아가기',
     },

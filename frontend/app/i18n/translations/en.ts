@@ -375,11 +375,12 @@ export const en = {
   // Demo Page
   demo: {
     title: 'Complete Demo Workflow',
-    subtitle: 'Experience the full system: Document OCR → CAD Analysis → Infrastructure Mapping',
+    subtitle: 'Experience the full system: Document OCR → CAD Analysis → Floor Plan AI → Infrastructure Mapping',
     
     steps: {
       ocr: 'OCR',
       cad: 'CAD',
+      floorplan: 'Floor Plan',
       infrastructure: 'Infrastructure',
       result: 'Result',
       complete: 'Complete',
@@ -553,6 +554,35 @@ export const en = {
         understand: 'I Understand & Continue',
       },
     },
+
+    floorplan: {
+      title: 'Floor Plan Analysis',
+      subtitle: 'Upload a floor plan image to detect rooms, doors, windows, and other elements using AI',
+      uploadTitle: 'Floor Plan Image',
+      dragDrop: 'Drag and drop a floor plan image here',
+      supportedFormats: 'Supported: PNG, JPG, BMP',
+      selectFile: 'Select Image',
+      clearFile: 'Clear',
+      invalidFormat: 'Please select a valid image file (PNG, JPG, BMP)',
+      analyze: 'Analyze Floor Plan',
+      analyzing: 'Analyzing floor plan...',
+      analyzingDesc: 'Detecting rooms, doors, windows and other elements',
+      analysisComplete: 'Analysis Complete',
+      detectedSummary: '{rooms} room types, {icons} icon types detected',
+      imageSize: 'Image',
+      uploadToSee: 'Upload a floor plan image and click Analyze to see results',
+      noRooms: 'No rooms detected',
+      noIcons: 'No icons detected',
+      roomSegmentation: 'Room Segmentation',
+      iconSegmentation: 'Icon Segmentation',
+      vectorizedRooms: 'Vectorized Rooms',
+      vectorizedIcons: 'Vectorized Icons',
+      tabs: {
+        rooms: 'Rooms',
+        icons: 'Icons',
+        visualization: 'Visualization',
+      },
+    },
     
     infrastructure: {
       title: 'Infrastructure Mapping',
@@ -618,6 +648,8 @@ export const en = {
       ocrResult: '{success} of {total} document(s) processed successfully',
       cadAnalysis: 'CAD Analysis',
       cadResult: 'CAD geometry processed and analyzed successfully',
+      floorplanAnalysis: 'Floor Plan Analysis',
+      floorplanResult: 'AI-powered room and icon detection completed',
       infraMapping: 'Infrastructure Mapping',
       infraResult: 'Infrastructure features labeled and analyzed',
       startNew: 'Start New Demo',
@@ -626,6 +658,7 @@ export const en = {
     navigation: {
       skipStep: 'Skip this step',
       continueToCAD: 'Continue to CAD Analysis →',
+      continueToFloorplan: 'Continue to Floor Plan Analysis →',
       continueToInfra: 'Continue to Infrastructure →',
       backToHome: 'Back to Home',
     },

@@ -1,3 +1,11 @@
 data/*
 runs_cubi/*
 floortran/*
+__pycache__/
+*.ipynb
+draft/
+samples.ipynb
+venv/
+
+# Ensure model weights are NOT excluded
+!model_best_val_loss_var.pkl

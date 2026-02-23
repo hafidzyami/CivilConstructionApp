@@ -12,6 +12,9 @@ export interface ComplianceCheckInput {
   bcr?: number;
   far?: number;
   buildingHeight?: number;  // Building height in meters
+  // Floor Plan Data (CubiCasa5k)
+  floorplanRooms?: Record<string, { pixels: number; percentage: number }>;
+  floorplanIcons?: Record<string, { pixels: number; percentage: number }>;
   // Infrastructure Data
   latitude?: number;
   longitude?: number;
@@ -144,6 +147,7 @@ class ComplianceService {
       where: { id: sessionId },
       include: {
         cadData: true,
+        floorplanData: true,
         infrastructureData: true,
         ocrData: true,
       },
@@ -165,6 +169,12 @@ class ComplianceService {
       input.bcr = sessionData.cadData.bcr || undefined;
       input.far = sessionData.cadData.far || undefined;
       input.buildingHeight = sessionData.cadData.buildingHeight || undefined;
+    }
+
+    // Extract floor plan data (CubiCasa5k)
+    if (sessionData.floorplanData) {
+      input.floorplanRooms = (sessionData.floorplanData.roomSummary as any) || undefined;
+      input.floorplanIcons = (sessionData.floorplanData.iconSummary as any) || undefined;
     }
 
     // Extract infrastructure data
@@ -385,6 +395,88 @@ class ComplianceService {
       });
     }
 
+    // --------------------------------------------------
+    // Floor Plan Analysis checks (CubiCasa5k)
+    // --------------------------------------------------
+    if (input.floorplanRooms && Object.keys(input.floorplanRooms).length > 0) {
+      // Check if bathroom exists (required for residential)
+      const hasBathroom = input.floorplanRooms['Bath'] !== undefined;
+      checks.push({
+        name: 'Bathroom Facility',
+        status: hasBathroom ? 'pass' : 'warning',
+        actualValue: hasBathroom ? 'Detected' : 'Not detected',
+        requiredValue: 'Required for residential building',
+        regulation: 'Building Act / Sanitation Requirements',
+        message: hasBathroom
+          ? 'Bathroom facility detected in the floor plan'
+          : 'No bathroom detected in the floor plan - residential buildings require at least one bathroom',
+      });
+
+      // Check if kitchen exists (required for residential)
+      const hasKitchen = input.floorplanRooms['Kitchen'] !== undefined;
+      checks.push({
+        name: 'Kitchen Facility',
+        status: hasKitchen ? 'pass' : 'warning',
+        actualValue: hasKitchen ? 'Detected' : 'Not detected',
+        requiredValue: 'Required for residential building',
+        regulation: 'Building Act / Living Standards',
+        message: hasKitchen
+          ? 'Kitchen facility detected in the floor plan'
+          : 'No kitchen detected in the floor plan - residential buildings typically require a kitchen',
+      });
+
+      // Check if bedroom exists (required for residential)
+      const hasBedroom = input.floorplanRooms['Bed Room'] !== undefined;
+      checks.push({
+        name: 'Bedroom',
+        status: hasBedroom ? 'pass' : 'warning',
+        actualValue: hasBedroom ? 'Detected' : 'Not detected',
+        requiredValue: 'Required for residential building',
+        regulation: 'Building Act / Living Standards',
+        message: hasBedroom
+          ? 'Bedroom detected in the floor plan'
+          : 'No bedroom detected in the floor plan',
+      });
+
+      // Check room layout summary
+      const detectedRooms = Object.keys(input.floorplanRooms).join(', ');
+      checks.push({
+        name: 'Floor Plan Room Layout',
+        status: 'pass',
+        actualValue: detectedRooms,
+        regulation: 'Floor Plan AI Analysis (CubiCasa5k)',
+        message: `Floor plan analysis detected: ${detectedRooms}`,
+      });
+    }
+
+    if (input.floorplanIcons && Object.keys(input.floorplanIcons).length > 0) {
+      // Check for windows (ventilation / fire safety)
+      const hasWindows = input.floorplanIcons['Window'] !== undefined;
+      checks.push({
+        name: 'Window / Ventilation',
+        status: hasWindows ? 'pass' : 'warning',
+        actualValue: hasWindows ? 'Detected' : 'Not detected',
+        requiredValue: 'Windows required for ventilation',
+        regulation: 'Building Act Article 49 (Ventilation)',
+        message: hasWindows
+          ? 'Windows detected in the floor plan - ventilation requirements can be verified'
+          : 'No windows detected - verify that the building meets ventilation requirements',
+      });
+
+      // Check for doors (egress / fire safety)
+      const hasDoors = input.floorplanIcons['Door'] !== undefined;
+      checks.push({
+        name: 'Door / Egress',
+        status: hasDoors ? 'pass' : 'warning',
+        actualValue: hasDoors ? 'Detected' : 'Not detected',
+        requiredValue: 'Doors required for egress',
+        regulation: 'Building Act Article 49 (Egress)',
+        message: hasDoors
+          ? 'Doors detected in the floor plan - egress requirements can be assessed'
+          : 'No doors detected - verify egress requirements comply with fire safety regulations',
+      });
+    }
+
     return checks;
   }
 
@@ -418,6 +510,14 @@ class ComplianceService {
       .join('\n\n');
 
     // Prepare building data context
+    const floorplanContext = input.floorplanRooms
+      ? `\nFloor Plan AI Analysis (CubiCasa5k):
+- Detected Rooms: ${Object.keys(input.floorplanRooms).join(', ') || 'None'}
+- Detected Icons/Features: ${input.floorplanIcons ? Object.keys(input.floorplanIcons).join(', ') : 'None'}
+${Object.entries(input.floorplanRooms).map(([name, info]) => `  - ${name}: ${info.percentage}% of floor area`).join('\n')}
+${input.floorplanIcons ? Object.entries(input.floorplanIcons).map(([name, info]) => `  - ${name}: ${info.percentage}% of floor area`).join('\n') : ''}`
+      : '';
+
     const buildingContext = `
 Building Data:
 - Site Area: ${input.siteArea ? `${input.siteArea.toFixed(2)} m²` : 'Not provided'}
@@ -430,6 +530,7 @@ Building Data:
 - Building Type: ${input.buildingType || 'Not specified'}
 - Zone Type: ${input.zoneType || 'Not specified'}
 - Location: ${input.latitude && input.longitude ? `${input.latitude}, ${input.longitude}` : 'Not provided'}
+${floorplanContext}
 `;
 
     const basicChecksContext = basicChecks

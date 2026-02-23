@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import CADSection from './components/CADSection';
+import FloorPlanSection from './components/FloorPlanSection';
 import ResultSection from './components/ResultSection';
 import ResultChatbot from './components/ResultChatbot';
 import { useLanguage } from '../i18n';
@@ -16,7 +17,7 @@ const InfrastructureSection = dynamic(
   { ssr: false }
 );
 
-type Step = 'ocr' | 'cad' | 'infrastructure' | 'result' | 'chatbot' | 'complete';
+type Step = 'ocr' | 'cad' | 'floorplan' | 'infrastructure' | 'result' | 'chatbot' | 'complete';
 
 type DocumentTypeId = 'landScope' | 'saleTransfer' | 'ownershipRights' | 'coOwnerConsent' | 'preDecision' | 'otherPermit' | 'combinedAgreement';
 
@@ -741,7 +742,10 @@ export default function DemoPage() {
         );
 
       case 'cad':
-        return <CADSection sessionId={sessionId} onComplete={() => setCurrentStep('infrastructure')} />;
+        return <CADSection sessionId={sessionId} onComplete={() => setCurrentStep('floorplan')} />;
+
+      case 'floorplan':
+        return <FloorPlanSection sessionId={sessionId} onComplete={() => setCurrentStep('infrastructure')} />;
 
       case 'infrastructure':
         return <InfrastructureSection sessionId={sessionId} onComplete={() => setCurrentStep('result')} />;
@@ -808,6 +812,16 @@ export default function DemoPage() {
                     </p>
                   </div>
                 </div>
+
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🏠</span>
+                  <div>
+                    <p className="font-semibold text-slate-900">{t.demo?.complete?.floorplanAnalysis || 'Floor Plan Analysis'}</p>
+                    <p className="text-sm text-slate-600">
+                      {t.demo?.complete?.floorplanResult || 'AI-powered room and icon detection completed'}
+                    </p>
+                  </div>
+                </div>
                 
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🗺️</span>
@@ -845,6 +859,7 @@ export default function DemoPage() {
   const steps = [
     { id: 'ocr', label: t.demo.steps.ocr, icon: '🔍' },
     { id: 'cad', label: t.demo.steps.cad, icon: '📐' },
+    { id: 'floorplan', label: t.demo?.steps?.floorplan || 'Floor Plan', icon: '🏠' },
     { id: 'infrastructure', label: t.demo.steps.infrastructure, icon: '🗺️' },
     { id: 'result', label: t.demo?.steps?.result || 'Result', icon: '📋' },
   ];

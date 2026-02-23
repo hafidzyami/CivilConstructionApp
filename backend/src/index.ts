@@ -11,6 +11,7 @@ import chatbotRoutes from './routes/chatbot.routes';
 import cadRoutes from './routes/cad.routes';
 import demoRoutes from './routes/demo.routes';
 import segmentationRoutes from './routes/segmentation.routes';
+import cubicasaRoutes from './routes/cubicasa.routes';
 import initService from './services/init.service';
 import { initializeBucket } from './lib/minio';
 
@@ -41,6 +42,7 @@ app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/cad', cadRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/segmentation', segmentationRoutes);
+app.use('/api/cubicasa', cubicasaRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -170,6 +170,45 @@ router.post('/infrastructure-data', demoController.saveInfrastructureData);
 
 /**
  * @swagger
+ * /api/demo/floorplan-data:
+ *   post:
+ *     summary: Save floor plan analysis data (CubiCasa5k)
+ *     tags: [Demo]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sessionId
+ *             properties:
+ *               sessionId:
+ *                 type: integer
+ *               imageUrl:
+ *                 type: string
+ *               roomStats:
+ *                 type: object
+ *               iconStats:
+ *                 type: object
+ *               roomSummary:
+ *                 type: object
+ *               iconSummary:
+ *                 type: object
+ *               imageWidth:
+ *                 type: integer
+ *               imageHeight:
+ *                 type: integer
+ *               rawData:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Floor plan data saved successfully
+ */
+router.post('/floorplan-data', demoController.saveFloorplanData);
+
+/**
+ * @swagger
  * /api/demo/ocr-data:
  *   post:
  *     summary: Save OCR data

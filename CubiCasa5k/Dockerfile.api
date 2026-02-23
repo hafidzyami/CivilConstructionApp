@@ -1,0 +1,28 @@
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies (minimal, inference-only)
+COPY requirements-api.txt /app/requirements-api.txt
+RUN pip install --upgrade pip setuptools
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+# Copy source code
+COPY . /app/
+
+ENV PATH="/app:${PATH}"
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 7002
+
+CMD ["python", "api_service.py"]

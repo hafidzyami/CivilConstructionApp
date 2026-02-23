@@ -15,6 +15,7 @@ model DemoSession {
   chatHistory        DemoChatHistory[]
   complianceResult   DemoComplianceResult?
   documents          DemoDocument[]
+  floorplanData      DemoFloorplanData?
   infrastructureData DemoInfrastructure?
   ocrData            DemoOcr[]
 }
@@ -109,4 +110,20 @@ model DemoChatHistory {
 
   @@index([sessionId])
   @@index([chatSessionId])
+}
+
+model DemoFloorplanData {
+  id             Int         @id @default(autoincrement())
+  sessionId      Int         @unique
+  imageUrl       String?
+  roomStats      Json?
+  iconStats      Json?
+  roomSummary    Json?
+  iconSummary    Json?
+  imageWidth     Int?
+  imageHeight    Int?
+  rawData        Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  session        DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
