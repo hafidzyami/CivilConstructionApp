@@ -3,11 +3,15 @@ import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
+import logger from '../lib/logger';
+
+const CONTEXT = 'Segmentation';
 
 export const SegmentationController = {
     process: async (req: Request, res: Response) => {
         try {
             if (!req.file) {
+                logger.warn(CONTEXT, 'process: no file uploaded');
                 return res.status(400).json({
                     success: false,
                     message: 'No file uploaded'
@@ -16,6 +20,7 @@ export const SegmentationController = {
 
             const filePath = req.file.path;
             const fileName = req.file.filename;
+            logger.info(CONTEXT, 'process: processing image', { file: fileName });
 
             // Construct form data to send to the ML service
             const formData = new FormData();
@@ -34,6 +39,7 @@ export const SegmentationController = {
                     maxBodyLength: Infinity
                 });
 
+                logger.info(CONTEXT, 'process: segmentation succeeded', { file: fileName });
                 // The ML service returns base64 encoded images
                 // We can pass them directly to the frontend
                 return res.json({
@@ -42,9 +48,9 @@ export const SegmentationController = {
                 });
 
             } catch (error: any) {
-                console.error('ML Service Error:', error.message);
+                logger.error(CONTEXT, 'process: ML service error', { error: error.message });
                 if (error.response) {
-                    console.error('ML Service Response:', error.response.data);
+                    logger.error(CONTEXT, 'process: ML service response', { data: error.response.data });
                     return res.status(error.response.status).json({
                         success: false,
                         message: 'ML Service failed',
@@ -64,7 +70,7 @@ export const SegmentationController = {
             }
 
         } catch (error: any) {
-            console.error('Segmentation Controller Error:', error);
+            logger.error(CONTEXT, 'process: internal error', { error: error.message });
             res.status(500).json({
                 success: false,
                 message: 'Internal server error',

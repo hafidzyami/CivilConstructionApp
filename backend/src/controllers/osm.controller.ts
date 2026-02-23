@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
+import logger from '../lib/logger';
+
+const CONTEXT = 'OSM';
 
 interface OSMRequest {
   lat: number;
@@ -51,11 +54,14 @@ export const getOSMData = async (
 
     // Validate input
     if (!lat || !lon || !radius) {
+      logger.warn(CONTEXT, 'getOSMData: missing required parameters', { lat, lon, radius });
       res.status(400).json({
         error: 'Missing required parameters: lat, lon, radius',
       });
       return;
     }
+
+    logger.info(CONTEXT, 'getOSMData: fetching OSM data', { lat, lon, radius });
 
     // Calculate bounding box
     const latDelta = radius / 111000;
@@ -155,9 +161,10 @@ export const getOSMData = async (
       features,
     };
 
+    logger.info(CONTEXT, 'getOSMData: succeeded', { featureCount: features.length });
     res.json(geojson);
   } catch (error: unknown) {
-    console.error('OSM fetch error:', error);
+    logger.error(CONTEXT, 'getOSMData: failed', { error: error instanceof Error ? error.message : String(error) });
     if (axios.isAxiosError(error)) {
       res.status(error.response?.status || 500).json({
         error: 'Failed to fetch OSM data',

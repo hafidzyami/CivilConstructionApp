@@ -5,6 +5,9 @@ import complianceService from '../services/compliance.service';
 import neo4jConnection from '../lib/neo4j';
 import prisma from '../lib/prisma';
 import { z } from 'zod';
+import logger from '../lib/logger';
+
+const CONTEXT = 'Chatbot';
 
 // Validation schemas
 const chatQuerySchema = z.object({
@@ -32,6 +35,7 @@ export const processChatQuery = async (req: Request, res: Response): Promise<voi
     const validation = chatQuerySchema.safeParse(req.body);
 
     if (!validation.success) {
+      logger.warn(CONTEXT, 'processChatQuery: validation failed', { errors: validation.error.errors });
       res.status(400).json({
         error: 'Invalid request',
         details: validation.error.errors,
@@ -40,15 +44,17 @@ export const processChatQuery = async (req: Request, res: Response): Promise<voi
     }
 
     const { query, sessionId = 'default', searchMode } = validation.data;
+    logger.info(CONTEXT, 'processChatQuery: processing query', { sessionId, searchMode, queryLength: query.length });
 
     const response = await chatbotService.processQuery(query, sessionId, searchMode);
 
+    logger.info(CONTEXT, 'processChatQuery: succeeded', { sessionId });
     res.status(200).json({
       success: true,
       response,
     });
   } catch (error: any) {
-    console.error('Error processing chat query:', error);
+    logger.error(CONTEXT, 'processChatQuery: failed', { error: error.message });
     res.status(500).json({
       error: 'Failed to process query',
       message: error.message,
@@ -63,15 +69,17 @@ export const processChatQuery = async (req: Request, res: Response): Promise<voi
 export const getChatHistory = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId = 'default' } = req.params;
+    logger.info(CONTEXT, 'getChatHistory: fetching history', { sessionId });
 
     const history = chatbotService.getHistory(sessionId);
 
+    logger.info(CONTEXT, 'getChatHistory: succeeded', { sessionId, count: history.length });
     res.status(200).json({
       success: true,
       history,
     });
   } catch (error: any) {
-    console.error('Error getting chat history:', error);
+    logger.error(CONTEXT, 'getChatHistory: failed', { error: error.message });
     res.status(500).json({
       error: 'Failed to get chat history',
       message: error.message,
@@ -86,15 +94,17 @@ export const getChatHistory = async (req: Request, res: Response): Promise<void>
 export const clearChatHistory = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId = 'default' } = req.params;
+    logger.info(CONTEXT, 'clearChatHistory: clearing history', { sessionId });
 
     chatbotService.clearHistory(sessionId);
 
+    logger.info(CONTEXT, 'clearChatHistory: succeeded', { sessionId });
     res.status(200).json({
       success: true,
       message: 'Chat history cleared',
     });
   } catch (error: any) {
-    console.error('Error clearing chat history:', error);
+    logger.error(CONTEXT, 'clearChatHistory: failed', { error: error.message });
     res.status(500).json({
       error: 'Failed to clear chat history',
       message: error.message,
@@ -108,14 +118,16 @@ export const clearChatHistory = async (req: Request, res: Response): Promise<voi
  */
 export const getRegulations = async (req: Request, res: Response): Promise<void> => {
   try {
+    logger.info(CONTEXT, 'getRegulations: fetching stats');
     const stats = await knowledgeBaseService.getStats();
 
+    logger.info(CONTEXT, 'getRegulations: succeeded');
     res.status(200).json({
       success: true,
       stats,
     });
   } catch (error: any) {
-    console.error('Error getting regulations:', error);
+    logger.error(CONTEXT, 'getRegulations: failed', { error: error.message });
     res.status(500).json({
       error: 'Failed to get regulations',
       message: error.message,
@@ -132,6 +144,7 @@ export const searchArticles = async (req: Request, res: Response): Promise<void>
     const validation = chatQuerySchema.safeParse(req.body);
 
     if (!validation.success) {
+      logger.warn(CONTEXT, 'searchArticles: validation failed', { errors: validation.error.errors });
       res.status(400).json({
         error: 'Invalid request',
         details: validation.error.errors,
@@ -141,16 +154,18 @@ export const searchArticles = async (req: Request, res: Response): Promise<void>
 
     const { query } = validation.data;
     const limit = parseInt(req.query.limit as string) || 10;
+    logger.info(CONTEXT, 'searchArticles: searching', { query, limit });
 
     const results = await knowledgeBaseService.searchArticles(query, limit);
 
+    logger.info(CONTEXT, 'searchArticles: succeeded', { count: results.length });
     res.status(200).json({
       success: true,
       results,
       count: results.length,
     });
   } catch (error: any) {
-    console.error('Error searching articles:', error);
+    logger.error(CONTEXT, 'searchArticles: failed', { error: error.message });
     res.status(500).json({
       error: 'Failed to search articles',
       message: error.message,
@@ -167,27 +182,31 @@ export const getArticleDetails = async (req: Request, res: Response): Promise<vo
     const { articleId } = req.params;
 
     if (!articleId) {
+      logger.warn(CONTEXT, 'getArticleDetails: missing articleId');
       res.status(400).json({
         error: 'Article ID is required',
       });
       return;
     }
 
+    logger.info(CONTEXT, 'getArticleDetails: fetching article', { articleId });
     const article = await knowledgeBaseService.getArticleDetails(articleId);
 
     if (!article) {
+      logger.warn(CONTEXT, 'getArticleDetails: article not found', { articleId });
       res.status(404).json({
         error: 'Article not found',
       });
       return;
     }
 
+    logger.info(CONTEXT, 'getArticleDetails: succeeded', { articleId });
     res.status(200).json({
       success: true,
       article,
     });
   } catch (error: any) {
-    console.error('Error getting article details:', error);
+    logger.error(CONTEXT, 'getArticleDetails: failed', { error: error.message });
     res.status(500).json({
       error: 'Failed to get article details',
       message: error.message,
@@ -202,7 +221,7 @@ export const getArticleDetails = async (req: Request, res: Response): Promise<vo
  */
 export const reingestKnowledgeBase = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log('🔄 Starting knowledge base re-ingestion...');
+    logger.info(CONTEXT, 'reingestKnowledgeBase: starting re-ingestion...');
 
     // Re-ingest using the v2 service (clears and reloads from JSON)
     const result = await knowledgeBaseService.reingest();
@@ -211,21 +230,14 @@ export const reingestKnowledgeBase = async (req: Request, res: Response): Promis
       throw new Error('Re-ingestion failed');
     }
 
-    console.log('✅ Knowledge base re-ingestion completed successfully!');
-    console.log(`   📊 Statistics:
-       - Regulations: ${result.summary.regulations}
-       - Articles: ${result.summary.articles}
-       - SubArticles: ${result.summary.subArticles}
-       - MENTIONS relationships: ${result.summary.mentions}
-       - RELATED_TO relationships: ${result.summary.relatedTo}`);
-
+    logger.info(CONTEXT, 'reingestKnowledgeBase: succeeded', { summary: result.summary });
     res.status(200).json({
       success: true,
       message: 'Knowledge base re-ingested successfully',
       summary: result.summary,
     });
   } catch (error: any) {
-    console.error('❌ Error re-ingesting knowledge base:', error);
+    logger.error(CONTEXT, 'reingestKnowledgeBase: failed', { error: error.message });
     res.status(500).json({
       success: false,
       error: 'Failed to re-ingest knowledge base',
@@ -240,6 +252,7 @@ export const reingestKnowledgeBase = async (req: Request, res: Response): Promis
  */
 export const getKnowledgeBaseStats = async (req: Request, res: Response): Promise<void> => {
   try {
+    logger.info(CONTEXT, 'getKnowledgeBaseStats: fetching stats');
     const session = neo4jConnection.getSession();
 
     const stats = await session.run(`
@@ -274,12 +287,13 @@ export const getKnowledgeBaseStats = async (req: Request, res: Response): Promis
 
     await session.close();
 
+    logger.info(CONTEXT, 'getKnowledgeBaseStats: succeeded', { summary });
     res.status(200).json({
       success: true,
       stats: summary,
     });
   } catch (error: any) {
-    console.error('Error getting knowledge base stats:', error);
+    logger.error(CONTEXT, 'getKnowledgeBaseStats: failed', { error: error.message });
     res.status(500).json({
       success: false,
       error: 'Failed to get knowledge base stats',
@@ -298,6 +312,7 @@ export const processResultChatQuery = async (req: Request, res: Response): Promi
     const validation = resultChatQuerySchema.safeParse(req.body);
 
     if (!validation.success) {
+      logger.warn(CONTEXT, 'processResultChatQuery: validation failed', { errors: validation.error.errors });
       res.status(400).json({
         error: 'Invalid request',
         details: validation.error.errors,
@@ -306,11 +321,13 @@ export const processResultChatQuery = async (req: Request, res: Response): Promi
     }
 
     const { query, sessionId, demoSessionId } = validation.data;
+    logger.info(CONTEXT, 'processResultChatQuery: processing', { sessionId, demoSessionId, queryLength: query.length });
 
     // Get compliance result for context
     const complianceResult = await complianceService.getComplianceResult(demoSessionId);
 
     if (!complianceResult) {
+      logger.warn(CONTEXT, 'processResultChatQuery: compliance result not found', { demoSessionId });
       res.status(404).json({
         error: 'Compliance result not found',
         message: 'Please complete the compliance check first before asking questions about the result.',
@@ -349,13 +366,14 @@ export const processResultChatQuery = async (req: Request, res: Response): Promi
       },
     });
 
+    logger.info(CONTEXT, 'processResultChatQuery: succeeded', { sessionId, demoSessionId });
     res.status(200).json({
       success: true,
       response,
       complianceStatus: complianceResult.status,
     });
   } catch (error: any) {
-    console.error('Error processing result chat query:', error);
+    logger.error(CONTEXT, 'processResultChatQuery: failed', { error: error.message });
     res.status(500).json({
       error: 'Failed to process query',
       message: error.message,

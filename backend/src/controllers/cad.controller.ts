@@ -2,7 +2,9 @@ import { Request, Response } from 'express';
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
+import logger from '../lib/logger';
 
+const CONTEXT = 'CAD';
 // CAD service is at port 7001
 const CAD_SERVICE_URL = process.env.CAD_SERVICE_URL || 'http://cad-service:7001';
 
@@ -10,12 +12,11 @@ const CAD_SERVICE_URL = process.env.CAD_SERVICE_URL || 'http://cad-service:7001'
 export const processFromUrl = async (req: Request, res: Response) => {
   try {
     const { fileUrl } = req.body;
-    
+
     if (!fileUrl) {
+      logger.warn(CONTEXT, 'processFromUrl: missing fileUrl');
       return res.status(400).json({ success: false, message: 'No fileUrl provided' });
     }
-
-    console.log('Fetching DXF from URL:', fileUrl);
 
     // Download the file from MinIO/URL
     const fileResponse = await axios.get(fileUrl, {
@@ -42,7 +43,7 @@ export const processFromUrl = async (req: Request, res: Response) => {
 
     res.json(response.data);
   } catch (error: any) {
-    console.error('CAD Process from URL Error:', error.message);
+    logger.error(CONTEXT, 'processFromUrl: failed', { error: error.message });
     res.status(500).json({ 
       success: false, 
       message: 'Failed to process CAD file from URL', 
@@ -72,7 +73,7 @@ export const getLayers = async (req: Request, res: Response) => {
     res.json(response.data);
   } catch (error: any) {
     if (req.file) fs.unlinkSync(req.file.path);
-    console.error('CAD Layer Error:', error.message);
+    logger.error(CONTEXT, 'getLayers: failed', { error: error.message });
     res.status(500).json({ message: 'Failed to extract layers', error: error.message });
   }
 };
@@ -97,7 +98,7 @@ export const processCad = async (req: Request, res: Response) => {
     res.json(response.data);
   } catch (error: any) {
     if (req.file) fs.unlinkSync(req.file.path);
-    console.error('CAD Process Error:', error.message);
+    logger.error(CONTEXT, 'processCad: failed', { error: error.message });
     res.status(500).json({ message: 'Failed to process CAD file', error: error.message });
   }
 };
@@ -121,7 +122,7 @@ export const processCadAuto = async (req: Request, res: Response) => {
     res.json(response.data);
   } catch (error: any) {
     if (req.file) fs.unlinkSync(req.file.path);
-    console.error('CAD Auto Process Error:', error.message);
+    logger.error(CONTEXT, 'processCadAuto: failed', { error: error.message });
     res.status(500).json({ message: 'Failed to auto-process CAD file', error: error.message });
   }
 };
@@ -146,7 +147,7 @@ export const processCadLLM = async (req: Request, res: Response) => {
     res.json(response.data);
   } catch (error: any) {
     if (req.file) fs.unlinkSync(req.file.path);
-    console.error('CAD LLM Process Error:', error.message);
+    logger.error(CONTEXT, 'processCadLLM: failed', { error: error.message });
     res.status(500).json({ message: 'Failed to process CAD file with LLM', error: error.message });
   }
 };

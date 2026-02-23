@@ -3,6 +3,9 @@ import { uploadFile } from '../lib/minio';
 import multer from 'multer';
 import prisma from '../lib/prisma';
 import complianceService from '../services/compliance.service';
+import logger from '../lib/logger';
+
+const CONTEXT = 'Demo';
 
 // Configure multer for memory storage
 const upload = multer({
@@ -21,11 +24,14 @@ export const getOrCreateSession = async (req: Request, res: Response) => {
     const { userId } = req.body;
 
     if (!userId) {
+      logger.warn(CONTEXT, 'getOrCreateSession: missing userId');
       return res.status(400).json({
         success: false,
         message: 'User ID is required',
       });
     }
+
+    logger.info(CONTEXT, 'getOrCreateSession: start', { userId });
 
     // Find existing session or create new one
     let session = await prisma.demoSession.findFirst({
@@ -58,7 +64,7 @@ export const getOrCreateSession = async (req: Request, res: Response) => {
       data: session,
     });
   } catch (error: any) {
-    console.error('Error getting/creating session:', error);
+    logger.error(CONTEXT, 'getOrCreateSession: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -80,11 +86,14 @@ export const uploadDocuments = async (req: Request, res: Response) => {
     }
 
     if (!files || files.length === 0) {
+      logger.warn(CONTEXT, 'uploadDocuments: no files uploaded', { sessionId });
       return res.status(400).json({
         success: false,
         message: 'No files uploaded',
       });
     }
+
+    logger.info(CONTEXT, 'uploadDocuments: uploading files', { sessionId, count: files.length });
 
     // Upload files to MinIO and save to database
     const uploadedDocs = [];
@@ -118,7 +127,7 @@ export const uploadDocuments = async (req: Request, res: Response) => {
       message: `${uploadedDocs.length} document(s) uploaded successfully`,
     });
   } catch (error: any) {
-    console.error('Error uploading documents:', error);
+    logger.error(CONTEXT, 'uploadDocuments: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -132,11 +141,14 @@ export const saveCadData = async (req: Request, res: Response) => {
     const { sessionId, siteArea, buildingArea, floorArea, bcr, far, buildingHeight, numFloors, rawData, dxfFileUrl } = req.body;
 
     if (!sessionId) {
+      logger.warn(CONTEXT, 'saveCadData: missing sessionId');
       return res.status(400).json({
         success: false,
         message: 'Session ID is required',
       });
     }
+
+    logger.info(CONTEXT, 'saveCadData: saving CAD data', { sessionId });
 
     const cadData = await prisma.demoCadData.upsert({
       where: { sessionId: parseInt(sessionId) },
@@ -171,7 +183,7 @@ export const saveCadData = async (req: Request, res: Response) => {
       message: 'CAD data saved successfully',
     });
   } catch (error: any) {
-    console.error('Error saving CAD data:', error);
+    logger.error(CONTEXT, 'saveCadData: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -185,11 +197,14 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
     const { sessionId, latitude, longitude, radius, buildings, roads, railways, waterways, results, rawData } = req.body;
 
     if (!sessionId) {
+      logger.warn(CONTEXT, 'saveInfrastructureData: missing sessionId');
       return res.status(400).json({
         success: false,
         message: 'Session ID is required',
       });
     }
+
+    logger.info(CONTEXT, 'saveInfrastructureData: saving infrastructure', { sessionId });
 
     // Extract labeled features from results
     let labeledFeatures = null;
@@ -230,7 +245,7 @@ export const saveInfrastructureData = async (req: Request, res: Response) => {
       message: 'Infrastructure data saved successfully',
     });
   } catch (error: any) {
-    console.error('Error saving infrastructure data:', error);
+    logger.error(CONTEXT, 'saveInfrastructureData: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -245,11 +260,14 @@ export const saveOcrData = async (req: Request, res: Response) => {
     const file = req.file as Express.Multer.File;
 
     if (!sessionId) {
+      logger.warn(CONTEXT, 'saveOcrData: missing sessionId');
       return res.status(400).json({
         success: false,
         message: 'Session ID is required',
       });
     }
+
+    logger.info(CONTEXT, 'saveOcrData: saving OCR data', { sessionId, engine });
 
     let finalFileUrl = fileUrl || ''; // Use provided fileUrl first
     if (file && !finalFileUrl) {
@@ -283,7 +301,7 @@ export const saveOcrData = async (req: Request, res: Response) => {
       message: 'OCR data saved successfully',
     });
   } catch (error: any) {
-    console.error('Error saving OCR data:', error);
+    logger.error(CONTEXT, 'saveOcrData: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -294,6 +312,7 @@ export const saveOcrData = async (req: Request, res: Response) => {
 // Get all sessions (for admin)
 export const getAllSessions = async (req: Request, res: Response) => {
   try {
+    logger.info(CONTEXT, 'getAllSessions: fetching all sessions');
     const sessions = await prisma.demoSession.findMany({
       include: {
         documents: true,
@@ -315,7 +334,7 @@ export const getAllSessions = async (req: Request, res: Response) => {
       count: sessions.length,
     });
   } catch (error: any) {
-    console.error('Error getting all sessions:', error);
+    logger.error(CONTEXT, 'getAllSessions: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -327,6 +346,7 @@ export const getAllSessions = async (req: Request, res: Response) => {
 export const getSessionById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    logger.info(CONTEXT, 'getSessionById: fetching session', { id });
 
     const session = await prisma.demoSession.findUnique({
       where: { id: parseInt(id) },
@@ -340,18 +360,20 @@ export const getSessionById = async (req: Request, res: Response) => {
     });
 
     if (!session) {
+      logger.warn(CONTEXT, 'getSessionById: session not found', { id });
       return res.status(404).json({
         success: false,
         message: 'Session not found',
       });
     }
 
+    logger.info(CONTEXT, 'getSessionById: succeeded', { id });
     res.json({
       success: true,
       data: session,
     });
   } catch (error: any) {
-    console.error('Error getting session:', error);
+    logger.error(CONTEXT, 'getSessionById: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -363,6 +385,7 @@ export const getSessionById = async (req: Request, res: Response) => {
 export const deleteSession = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    logger.info(CONTEXT, 'deleteSession: deleting session', { id });
 
     // Check if session exists
     const session = await prisma.demoSession.findUnique({
@@ -386,7 +409,7 @@ export const deleteSession = async (req: Request, res: Response) => {
       message: 'Session deleted successfully',
     });
   } catch (error: any) {
-    console.error('Error deleting session:', error);
+    logger.error(CONTEXT, 'deleteSession: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -397,6 +420,7 @@ export const deleteSession = async (req: Request, res: Response) => {
 // Get next user ID
 export const getNextUserId = async (req: Request, res: Response) => {
   try {
+    logger.info(CONTEXT, 'getNextUserId: fetching next user ID');
     const lastSession = await prisma.demoSession.findFirst({
       orderBy: { userId: 'desc' },
     });
@@ -408,7 +432,7 @@ export const getNextUserId = async (req: Request, res: Response) => {
       data: { userId: nextUserId },
     });
   } catch (error: any) {
-    console.error('Error getting next user ID:', error);
+    logger.error(CONTEXT, 'getNextUserId: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -423,6 +447,7 @@ export const uploadDxf = async (req: Request, res: Response) => {
     const file = req.file as Express.Multer.File;
 
     if (!sessionId) {
+      logger.warn(CONTEXT, 'uploadDxf: missing sessionId');
       return res.status(400).json({
         success: false,
         message: 'Session ID is required',
@@ -430,11 +455,14 @@ export const uploadDxf = async (req: Request, res: Response) => {
     }
 
     if (!file) {
+      logger.warn(CONTEXT, 'uploadDxf: no DXF file uploaded', { sessionId });
       return res.status(400).json({
         success: false,
         message: 'No DXF file uploaded',
       });
     }
+
+    logger.info(CONTEXT, 'uploadDxf: uploading DXF', { sessionId, file: file.originalname });
 
     // Upload DXF file to MinIO
     const fileUrl = await uploadFile(
@@ -465,7 +493,7 @@ export const uploadDxf = async (req: Request, res: Response) => {
       message: 'DXF file uploaded successfully',
     });
   } catch (error: any) {
-    console.error('Error uploading DXF file:', error);
+    logger.error(CONTEXT, 'uploadDxf: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -479,11 +507,14 @@ export const saveFloorplanData = async (req: Request, res: Response) => {
     const { sessionId, imageUrl, roomStats, iconStats, roomSummary, iconSummary, imageWidth, imageHeight, rawData } = req.body;
 
     if (!sessionId) {
+      logger.warn(CONTEXT, 'saveFloorplanData: missing sessionId');
       return res.status(400).json({
         success: false,
         message: 'Session ID is required',
       });
     }
+
+    logger.info(CONTEXT, 'saveFloorplanData: saving floor plan data', { sessionId });
 
     const floorplanData = await prisma.demoFloorplanData.upsert({
       where: { sessionId: parseInt(sessionId) },
@@ -516,7 +547,7 @@ export const saveFloorplanData = async (req: Request, res: Response) => {
       message: 'Floor plan data saved successfully',
     });
   } catch (error: any) {
-    console.error('Error saving floor plan data:', error);
+    logger.error(CONTEXT, 'saveFloorplanData: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -530,11 +561,14 @@ export const checkCompliance = async (req: Request, res: Response) => {
     const { sessionId } = req.body;
 
     if (!sessionId) {
+      logger.warn(CONTEXT, 'checkCompliance: missing sessionId');
       return res.status(400).json({
         success: false,
         message: 'Session ID is required',
       });
     }
+
+    logger.info(CONTEXT, 'checkCompliance: running compliance check', { sessionId });
 
     // Perform compliance check
     const result = await complianceService.checkCompliance(parseInt(sessionId));
@@ -548,7 +582,7 @@ export const checkCompliance = async (req: Request, res: Response) => {
       message: 'Compliance check completed successfully',
     });
   } catch (error: any) {
-    console.error('Error checking compliance:', error);
+    logger.error(CONTEXT, 'checkCompliance: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,
@@ -562,27 +596,31 @@ export const getComplianceResult = async (req: Request, res: Response) => {
     const { sessionId } = req.params;
 
     if (!sessionId) {
+      logger.warn(CONTEXT, 'getComplianceResult: missing sessionId');
       return res.status(400).json({
         success: false,
         message: 'Session ID is required',
       });
     }
 
+    logger.info(CONTEXT, 'getComplianceResult: fetching result', { sessionId });
     const result = await complianceService.getComplianceResult(parseInt(sessionId));
 
     if (!result) {
+      logger.warn(CONTEXT, 'getComplianceResult: result not found', { sessionId });
       return res.status(404).json({
         success: false,
         message: 'Compliance result not found. Please run compliance check first.',
       });
     }
 
+    logger.info(CONTEXT, 'getComplianceResult: succeeded', { sessionId, status: result.status });
     res.json({
       success: true,
       data: result,
     });
   } catch (error: any) {
-    console.error('Error getting compliance result:', error);
+    logger.error(CONTEXT, 'getComplianceResult: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: error.message,

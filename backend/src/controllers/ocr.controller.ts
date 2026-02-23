@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import fetch from 'node-fetch';
+import logger from '../lib/logger';
+
+const CONTEXT = 'OCR';
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || '';
 const RUNPOD_OCR_ENDPOINT_ID = process.env.RUNPOD_OCR_ENDPOINT_ID || '';
@@ -19,11 +22,11 @@ export class OCRController {
    */
   async processOCR(req: Request, res: Response): Promise<void> {
     const startTime = Date.now();
-    console.log(`\n[OCR ${startTime}] ========== REQUEST START ==========`);
+    logger.info(CONTEXT, '========== REQUEST START ==========', { ts: startTime });
 
     try {
       if (!req.file) {
-        console.log(`[OCR ${startTime}] No file uploaded`);
+        logger.warn(CONTEXT, 'processOCR: no file uploaded');
         res.status(400).json({
           success: false,
           error: 'No image file uploaded'
@@ -32,7 +35,7 @@ export class OCRController {
       }
 
       if (!RUNPOD_API_KEY || (!RUNPOD_OCR_ENDPOINT_ID && !RUNPOD_VLM_ENDPOINT_ID)) {
-        console.log(`[OCR ${startTime}] RunPod credentials not configured`);
+        logger.warn(CONTEXT, 'processOCR: RunPod credentials not configured');
         res.status(500).json({
           success: false,
           error: 'RunPod API credentials not configured'
@@ -44,15 +47,17 @@ export class OCRController {
       const usePreprocessing = req.body.preprocessing === 'true';
       const engine = req.body.engine || 'hybrid';
 
-      console.log(`[OCR ${startTime}] File: ${req.file.originalname}`);
-      console.log(`[OCR ${startTime}] Size: ${(req.file.size / 1024).toFixed(2)} KB`);
-      console.log(`[OCR ${startTime}] Engine: ${engine}`);
-      console.log(`[OCR ${startTime}] Preprocessing: ${usePreprocessing}`);
+      logger.info(CONTEXT, 'processOCR: request details', {
+        file: req.file.originalname,
+        sizeKB: (req.file.size / 1024).toFixed(2),
+        engine,
+        preprocessing: usePreprocessing,
+      });
 
       // Validate engine
       if (!['surya', 'paddle', 'hybrid', 'vlm'].includes(engine)) {
         await fs.unlink(imagePath);
-        console.log(`[OCR ${startTime}] Invalid engine: ${engine}`);
+        logger.warn(CONTEXT, 'processOCR: invalid engine', { engine });
         res.status(400).json({
           success: false,
           error: 'Invalid OCR engine. Must be: surya, paddle, hybrid, or vlm'
@@ -66,12 +71,12 @@ export class OCRController {
 
       // Clean up uploaded file immediately
       await fs.unlink(imagePath);
-      console.log(`[OCR ${startTime}] Cleaned up uploaded file`);
+      logger.debug(CONTEXT, 'processOCR: cleaned up uploaded file');
 
       // Submit async job to RunPod
       const runpodBaseUrl = getRunpodBaseUrl(engine);
       const endpointId = engine === 'vlm' ? RUNPOD_VLM_ENDPOINT_ID : RUNPOD_OCR_ENDPOINT_ID;
-      console.log(`[OCR ${startTime}] Submitting job to RunPod ${engine === 'vlm' ? 'VLM' : 'OCR'} endpoint (${endpointId})...`);
+      logger.info(CONTEXT, `processOCR: submitting job to RunPod ${engine === 'vlm' ? 'VLM' : 'OCR'} endpoint`, { endpointId });
       const submitStart = Date.now();
 
       const submitResponse = await fetch(`${runpodBaseUrl}/run`, {
@@ -92,13 +97,13 @@ export class OCRController {
 
       if (!submitResponse.ok) {
         const errorText = await submitResponse.text();
-        console.log(`[OCR ${startTime}] RunPod submit error: ${submitResponse.status} - ${errorText}`);
+        logger.error(CONTEXT, 'processOCR: RunPod submit error', { status: submitResponse.status, error: errorText });
         throw new Error(`RunPod submit failed: ${submitResponse.status} - ${errorText}`);
       }
 
       const submitResult = await submitResponse.json() as { id: string; status: string };
       const jobId = submitResult.id;
-      console.log(`[OCR ${startTime}] Job submitted: ${jobId}`);
+      logger.info(CONTEXT, 'processOCR: job submitted', { jobId });
 
       // Poll for result
       let result: any = null;
@@ -114,7 +119,7 @@ export class OCRController {
         });
 
         if (!statusResponse.ok) {
-          console.log(`[OCR ${startTime}] Poll error: ${statusResponse.status}`);
+          logger.warn(CONTEXT, 'processOCR: poll error', { status: statusResponse.status });
           continue;
         }
 
@@ -134,7 +139,7 @@ export class OCRController {
         }
 
         // IN_QUEUE or IN_PROGRESS - keep polling
-        console.log(`[OCR ${startTime}] Job ${jobId}: ${statusResult.status} (${((Date.now() - pollStart) / 1000).toFixed(1)}s)`);
+        logger.debug(CONTEXT, `processOCR: job ${jobId} status`, { status: statusResult.status, elapsed: `${((Date.now() - pollStart) / 1000).toFixed(1)}s` });
       }
 
       if (!result) {
@@ -142,7 +147,7 @@ export class OCRController {
       }
 
       const apiDuration = Date.now() - submitStart;
-      console.log(`[OCR ${startTime}] RunPod completed in ${(apiDuration / 1000).toFixed(2)}s`);
+      logger.info(CONTEXT, 'processOCR: RunPod completed', { duration: `${(apiDuration / 1000).toFixed(2)}s` });
 
       // Check for error in result
       if (result.error) {
@@ -150,16 +155,16 @@ export class OCRController {
       }
 
       // Log result summary
-      console.log(`[OCR ${startTime}] Result summary:`, {
+      logger.info(CONTEXT, 'processOCR: result summary', {
         textLength: result.text?.length || 0,
         hasPreprocessedImage: !!result.preprocessedImage,
         textLinesCount: result.results?.text_lines?.length || 0,
-        timingMs: result._timing_ms
+        timingMs: result._timing_ms,
       });
 
       const totalDuration = Date.now() - startTime;
-      console.log(`[OCR ${startTime}] Total time: ${(totalDuration / 1000).toFixed(2)}s`);
-      console.log(`[OCR ${startTime}] ========== REQUEST END ==========\n`);
+      logger.info(CONTEXT, `processOCR: total time ${(totalDuration / 1000).toFixed(2)}s`);
+      logger.info(CONTEXT, '========== REQUEST END ==========');
 
       res.status(200).json({
         success: true,
@@ -170,7 +175,9 @@ export class OCRController {
       });
     } catch (error) {
       const totalDuration = Date.now() - startTime;
-      console.log(`[OCR ${startTime}] Failed after ${(totalDuration / 1000).toFixed(2)}s`);
+      logger.error(CONTEXT, `processOCR: failed after ${(totalDuration / 1000).toFixed(2)}s`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Clean up uploaded file if it exists
       if (req.file?.path) {
@@ -181,8 +188,7 @@ export class OCRController {
         }
       }
 
-      console.error(`[OCR ${startTime}] Error:`, error);
-      console.log(`[OCR ${startTime}] ========== REQUEST END (ERROR) ==========\n`);
+      logger.error(CONTEXT, '========== REQUEST END (ERROR) ==========');
 
       res.status(500).json({
         success: false,

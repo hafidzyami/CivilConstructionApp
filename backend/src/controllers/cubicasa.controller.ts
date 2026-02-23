@@ -3,6 +3,9 @@ import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
 import fetch from 'node-fetch';
+import logger from '../lib/logger';
+
+const CONTEXT = 'CubiCasa';
 
 const CUBICASA_SERVICE_URL = process.env.CUBICASA_SERVICE_URL || 'http://cubicasa-service:7002';
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || '';
@@ -34,7 +37,7 @@ async function analyzeViaRunpod(imageBuffer: Buffer, filename: string): Promise<
   }
 
   const { id: jobId } = (await submitRes.json()) as { id: string };
-  console.log(`[CubiCasa RunPod] Job submitted: ${jobId}`);
+  logger.info(CONTEXT, 'analyzeViaRunpod: job submitted', { jobId });
 
   // Poll until done
   const deadline = Date.now() + RUNPOD_TIMEOUT_MS;
@@ -56,7 +59,7 @@ async function analyzeViaRunpod(imageBuffer: Buffer, filename: string): Promise<
       throw new Error(`RunPod job failed: ${status.error || 'unknown error'}`);
     }
 
-    console.log(`[CubiCasa RunPod] Job ${jobId}: ${status.status} (${((Date.now() - (deadline - RUNPOD_TIMEOUT_MS)) / 1000).toFixed(1)}s)`);
+    logger.debug(CONTEXT, `analyzeViaRunpod: job ${jobId} status`, { status: status.status, elapsed: `${((Date.now() - (deadline - RUNPOD_TIMEOUT_MS)) / 1000).toFixed(1)}s` });
   }
 
   throw new Error(`RunPod job timed out after ${RUNPOD_TIMEOUT_MS / 1000}s`);
@@ -96,24 +99,27 @@ export const analyzeFloorplan = async (req: Request, res: Response) => {
   const filename = req.file.originalname;
   const useRunpod = !!(RUNPOD_API_KEY && RUNPOD_CUBICASA_ENDPOINT_ID);
 
+  logger.info(CONTEXT, 'analyzeFloorplan: request received', { filename, mode: useRunpod ? 'runpod' : 'local' });
+
   try {
     let data: any;
 
     if (useRunpod) {
-      console.log(`[CubiCasa] Using RunPod endpoint: ${RUNPOD_CUBICASA_ENDPOINT_ID}`);
+      logger.info(CONTEXT, 'analyzeFloorplan: using RunPod endpoint', { endpoint: RUNPOD_CUBICASA_ENDPOINT_ID })
       const imageBuffer = fs.readFileSync(filePath);
       fs.unlinkSync(filePath);
       data = await analyzeViaRunpod(imageBuffer, filename);
     } else {
-      console.log(`[CubiCasa] Using local service: ${CUBICASA_SERVICE_URL}`);
+      logger.info(CONTEXT, 'analyzeFloorplan: using local service', { url: CUBICASA_SERVICE_URL });
       data = await analyzeViaLocalService(filePath, filename);
       fs.unlinkSync(filePath);
     }
 
+    logger.info(CONTEXT, 'analyzeFloorplan: succeeded', { filename });
     res.json(data);
   } catch (error: any) {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    console.error('[CubiCasa] Analyze Error:', error.message);
+    logger.error(CONTEXT, 'analyzeFloorplan: failed', { error: error.message });
     res.status(500).json({
       success: false,
       message: 'Failed to analyze floor plan',
@@ -127,6 +133,7 @@ export const analyzeFloorplan = async (req: Request, res: Response) => {
  */
 export const health = async (_req: Request, res: Response) => {
   if (RUNPOD_API_KEY && RUNPOD_CUBICASA_ENDPOINT_ID) {
+    logger.info(CONTEXT, 'health: mode=runpod', { endpoint: RUNPOD_CUBICASA_ENDPOINT_ID });
     return res.json({
       status: 'ok',
       mode: 'runpod',
@@ -134,9 +141,11 @@ export const health = async (_req: Request, res: Response) => {
     });
   }
   try {
+    logger.info(CONTEXT, 'health: checking local service', { url: CUBICASA_SERVICE_URL });
     const response = await axios.get(`${CUBICASA_SERVICE_URL}/health`, { timeout: 5000 });
     res.json(response.data);
   } catch (error: any) {
+    logger.error(CONTEXT, 'health: local service unavailable', { error: error.message });
     res.status(503).json({ status: 'unavailable', error: error.message });
   }
 };
