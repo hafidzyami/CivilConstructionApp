@@ -1,0 +1,19 @@
+# RunPod handler dependencies for CubiCasa5k (CPU inference)
+
+# RunPod serverless SDK
+runpod
+
+# PyTorch CPU – installed via Dockerfile with the official CPU index URL
+# torch torchvision  ← pinned in Dockerfile
+
+# Image / numerical
+numpy<2
+opencv-python-headless
+Pillow
+matplotlib
+scipy
+scikit-image
+Shapely
+svgpathtools
+svgwrite
+lmdb
