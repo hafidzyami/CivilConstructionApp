@@ -214,6 +214,7 @@ def process_ocr(input_data):
         all_text_lines = []
         all_text_content = []
         preprocessed_image_b64 = None
+        all_preprocessed_images = []
         preprocessing_metadata = None
 
         for page_idx, image in enumerate(images_to_process):
@@ -227,8 +228,10 @@ def process_ocr(input_data):
                 image_for_ocr = preprocessed
                 logger.info(f"Preprocessing took {time.time() - preprocess_start:.2f}s")
 
+                page_preprocessed_b64 = image_to_base64(preprocessed)
+                all_preprocessed_images.append(page_preprocessed_b64)
                 if page_idx == 0:
-                    preprocessed_image_b64 = image_to_base64(preprocessed)
+                    preprocessed_image_b64 = page_preprocessed_b64
                     preprocessing_metadata = metadata
 
             # OCR
@@ -266,6 +269,7 @@ def process_ocr(input_data):
 
         result['text'] = '\n\n'.join(all_text_content)
         result['preprocessedImage'] = preprocessed_image_b64
+        result['preprocessedImages'] = all_preprocessed_images if len(all_preprocessed_images) > 1 else None
         result['preprocessingMetadata'] = preprocessing_metadata
         result['results'] = {
             'layout': {'regions': []},

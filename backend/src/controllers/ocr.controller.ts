@@ -170,6 +170,7 @@ export class OCRController {
         success: true,
         textContent: result.text,
         preprocessedImage: result.preprocessedImage,
+        preprocessedImages: result.preprocessedImages || null,
         preprocessingMetadata: result.preprocessingMetadata,
         results: result.results
       });
