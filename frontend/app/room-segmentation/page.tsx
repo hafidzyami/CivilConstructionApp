@@ -11,8 +11,8 @@ export default function RoomSegmentationPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<{
-    room_segmentation: string;
-    icon_segmentation: string;
+    roomSegmentation: string;
+    iconSegmentation: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export default function RoomSegmentationPage() {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_URL}/segmentation/process`, {
+      const response = await fetch(`${API_URL}/cubicasa/analyze`, {
         method: 'POST',
         body: formData,
       });
@@ -47,11 +47,14 @@ export default function RoomSegmentationPage() {
       }
 
       const data = await response.json();
-      
-      if (data.success) {
-        setResults(data.data);
+
+      if (data.success && data.visualizations) {
+        setResults({
+          roomSegmentation: data.visualizations.roomSegmentation,
+          iconSegmentation: data.visualizations.iconSegmentation,
+        });
       } else {
-        throw new Error(data.message || 'Processing failed');
+        throw new Error(data.message || data.error || 'Processing failed');
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
@@ -165,10 +168,10 @@ export default function RoomSegmentationPage() {
                     <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-6 shadow-xl">
                         <h3 className="text-xl font-bold text-slate-900 mb-4">Room Segmentation</h3>
                         <div className="relative h-64 w-full bg-slate-100 rounded-xl overflow-hidden">
-                            <Image 
-                                src={`data:image/png;base64,${results.room_segmentation}`} 
-                                alt="Room Segmentation" 
-                                fill 
+                            <Image
+                                src={results.roomSegmentation}
+                                alt="Room Segmentation"
+                                fill
                                 className="object-contain"
                             />
                         </div>
@@ -177,10 +180,10 @@ export default function RoomSegmentationPage() {
                     <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-6 shadow-xl">
                         <h3 className="text-xl font-bold text-slate-900 mb-4">Icon Segmentation</h3>
                         <div className="relative h-64 w-full bg-slate-100 rounded-xl overflow-hidden">
-                            <Image 
-                                src={`data:image/png;base64,${results.icon_segmentation}`} 
-                                alt="Icon Segmentation" 
-                                fill 
+                            <Image
+                                src={results.iconSegmentation}
+                                alt="Icon Segmentation"
+                                fill
                                 className="object-contain"
                             />
                         </div>

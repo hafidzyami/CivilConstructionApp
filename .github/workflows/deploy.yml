@@ -227,10 +227,13 @@ jobs:
                   dockerfile: Dockerfile
                   args:
                     NEXT_PUBLIC_API_URL: /api
+                    BACKEND_URL: http://civilconstruction-backend:6969
                 image: civilconstruction-frontend:latest
                 container_name: civilconstruction-frontend
                 restart: unless-stopped
                 env_file: .env
+                environment:
+                  - BACKEND_URL=http://civilconstruction-backend:6969
                 ports:
                   - "${FRONTEND_PORT:-6968}:3000"
                 depends_on:

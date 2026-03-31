@@ -166,7 +166,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+        BACKEND_URL: http://civilconstruction-backend:6969
     restart: unless-stopped
     depends_on:
       backend:
@@ -175,6 +176,7 @@ services:
       - ${FRONTEND_PORT:-6968}:3000
     environment:
       NODE_ENV: ${NODE_ENV:-production}
+      BACKEND_URL: http://civilconstruction-backend:6969
     networks:
       - civilconstruction-network
     healthcheck:
